@@ -130,6 +130,8 @@ static inline const void put_uint16_t(uint16_t n, uint8_t *b) {
     *b = n & 0xff;
 }
 
+extern const uint8_t *ccid_atr;
+
 
 #ifdef DEBUG
 void stdout_init (void);

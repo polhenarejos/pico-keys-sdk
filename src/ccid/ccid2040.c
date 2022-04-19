@@ -39,6 +39,8 @@ extern void low_flash_init();
 
 static uint8_t itf_num;
 
+const uint8_t *ccid_atr = NULL;
+
 #if MAX_RES_APDU_DATA_SIZE > MAX_CMD_APDU_DATA_SIZE
 #define USB_BUF_SIZE (MAX_RES_APDU_DATA_SIZE+20+9)
 #else
@@ -425,19 +427,7 @@ static const uint8_t ATR_head[] = {
 static enum ccid_state ccid_power_on(struct ccid *c) {
     TU_LOG1("!!! CCID POWER ON %d\r\n",c->application);
     uint8_t p[CCID_MSG_HEADER_SIZE+1]; /* >= size of historical_bytes -1 */
-    int hist_len = historical_bytes[0];
-    
-    //char atr_sc_hsm[] = { 0x3B,0x8E,0x80,0x01,0x80,0x31,0x81,0x54,0x48,0x53,0x4D,0x31,0x73,0x80,0x21,0x40,0x81,0x07,0x18 };
-    //char atr_sc_hsm[] = { 0x3B, 0xDE, 0x18, 0xFF, 0x81, 0x91, 0xFE, 0x1F, 0xC3, 0x80, 0x31, 0x81, 0x54, 0x48, 0x53, 0x4D, 0x31, 0x73, 0x80, 0x21, 0x40, 0x81, 0x07, 0x1C };
-    char atr_sc_hsm[] = { 0x3B,0xFE,0x18,0x00,0x00,0x81,0x31,0xFE,0x45,0x80,0x31,0x81,0x54,0x48,0x53,0x4D,0x31,0x73,0x80,0x21,0x40,0x81,0x07,0xFA };
-    uint8_t mode = 1; //1 sc-hsm, 0 openpgp
-    size_t size_atr;
-    if (mode == 1)
-        size_atr = sizeof(atr_sc_hsm);
-    else
-        size_atr = sizeof (ATR_head) + hist_len + 1;
-    uint8_t xor_check = 0;
-    int i;
+    size_t size_atr = (ccid_atr ? ccid_atr[0] : 0);
     if (c->application == 0) {
         multicore_reset_core1();
         multicore_launch_core1(card_thread);
@@ -457,24 +447,8 @@ static enum ccid_state ccid_power_on(struct ccid *c) {
     p[CCID_MSG_CHAIN_OFFSET] = 0x00;
 
     memcpy(endp1_tx_buf, p, CCID_MSG_HEADER_SIZE);
-    if (mode == 1) {
-        memcpy(endp1_tx_buf+CCID_MSG_HEADER_SIZE, atr_sc_hsm, sizeof(atr_sc_hsm));
-    }
-    else {
-        memcpy(endp1_tx_buf+CCID_MSG_HEADER_SIZE, ATR_head, sizeof (ATR_head));
-
-        for (i = 1; i < (int)sizeof (ATR_head); i++)
-            xor_check ^= ATR_head[i];
-        memcpy (p, historical_bytes + 1, hist_len);
-#ifdef LIFE_CYCLE_MANAGEMENT_SUPPORT
-        if (file_selection == 255)
-            p[7] = 0x03;
-#endif
-        for (i = 0; i < hist_len; i++)
-            xor_check ^= p[i];
-        p[i] = xor_check;
-        memcpy(endp1_tx_buf+CCID_MSG_HEADER_SIZE+sizeof (ATR_head), p, hist_len+1);
-    }
+    if (ccid_atr)
+        memcpy(endp1_tx_buf+CCID_MSG_HEADER_SIZE, ccid_atr+1, size_atr);
 
   /* This is a single packet Bulk-IN transaction */
     c->epi->buf = NULL;

@@ -19,7 +19,7 @@
 #include "usb_descriptors.h"
 #include "ccid.h"
 #include "pico/unique_id.h"
-#include "version.h"
+#include "ccid_version.h"
 
 
 #ifndef USB_VID

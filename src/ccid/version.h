@@ -18,10 +18,10 @@
 #ifndef __VERSION_H_
 #define __VERSION_H_
 
-#define HSM_VERSION 0x010C
+#define CCID_VERSION 0x0100
 
-#define HSM_VERSION_MAJOR ((HSM_VERSION >> 8) & 0xff)
-#define HSM_VERSION_MINOR (HSM_VERSION & 0xff)
+#define CCID_VERSION_MAJOR ((CCID_VERSION >> 8) & 0xff)
+#define CCID_VERSION_MINOR (CCID_VERSION & 0xff)
 
 #endif
 

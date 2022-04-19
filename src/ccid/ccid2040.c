@@ -1266,11 +1266,11 @@ void prepare_ccid() {
     struct ccid *c = &ccid;
     struct apdu *a = &apdu;
 
-    epi_init (epi, 1, c);
-    epo_init (epo, 2, c);
+    epi_init(epi, 1, c);
+    epo_init(epo, 2, c);
 
     apdu_init(a);
-    ccid_init (c, epi, epo, a);
+    ccid_init(c, epi, epo, a);
 }
 
 int process_apdu() {
@@ -1478,6 +1478,53 @@ void led_off_all() {
     gpio_put(PICO_DEFAULT_LED_PIN, 0);
 #endif
 #endif
+}
+
+int format_tlv_len(size_t len, uint8_t *out) {
+    if (len < 128) {
+        *out = len;
+        return 1;
+    }
+    else if (len < 256) {
+        *out++ = 0x81;
+        *out++ = len;
+        return 2;
+    }
+    else {
+        *out++ = 0x82;
+        *out++ = (len >> 8) & 0xff;
+        *out++ = len & 0xff;
+        return 3;
+    }
+    return 0;
+}
+
+int walk_tlv(const uint8_t *cdata, size_t cdata_len, uint8_t **p, uint8_t *tag, size_t *tag_len, uint8_t **data) {
+    if (!p)
+        return 0;
+    if (!*p)
+        *p = (uint8_t *)cdata;
+    if (*p-cdata >= cdata_len)
+        return 0;
+    uint8_t tg = 0x0;
+    size_t tgl = 0;
+    tg = *(*p)++;
+    tgl = *(*p)++;
+    if (tgl == 0x82) {
+        tgl = *(*p)++ << 8;
+        tgl |= *(*p)++;
+    }
+    else if (tgl == 0x81) {
+        tgl = *(*p)++;
+    }
+    if (tag)
+        *tag = tg;
+    if (tag_len)
+        *tag_len = tgl;
+    if (data)
+        *data = *p;
+    *p = *p+tgl;
+    return 1;
 }
 
 void init_rtc() {

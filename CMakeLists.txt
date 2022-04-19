@@ -50,6 +50,8 @@ target_sources(pico_ccid PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/low_flash.c
         ${CMAKE_CURRENT_LIST_DIR}/src/rng/random.c
         ${CMAKE_CURRENT_LIST_DIR}/src/rng/neug.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/ccid/eac.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/ccid/crypto_utils.c
         )
 
 target_include_directories(pico_ccid PUBLIC
@@ -57,6 +59,8 @@ target_include_directories(pico_ccid PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/src/ccid
         ${CMAKE_CURRENT_LIST_DIR}/src/rng
         ${CMAKE_CURRENT_LIST_DIR}/src/usb
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library
         )
         
 pico_add_extra_outputs(pico_ccid)

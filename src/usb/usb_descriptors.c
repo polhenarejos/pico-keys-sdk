@@ -52,7 +52,7 @@ tusb_desc_device_t const desc_device =
 
     .idVendor           = (USB_VID),
     .idProduct          = (USB_PID),
-    .bcdDevice          = HSM_VERSION,
+    .bcdDevice          = CCID_VERSION,
 
     .iManufacturer      = 1,
     .iProduct           = 2,

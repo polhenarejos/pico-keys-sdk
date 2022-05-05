@@ -379,17 +379,31 @@ void led_set_blink(uint32_t mode) {
 
 void execute_tasks();
 
-static void wait_button() {
+static bool wait_button() {
+    uint32_t start_button = board_millis();
+    bool timeout = false;
     led_set_blink((1000 << 16) | 100);
+    
     while (board_button_read() == false) {
         execute_tasks();
         //sleep_ms(10);
+        if (start_button + 15000 < board_millis()) { /* timeout */
+            timeout = true;
+            break;
+        }
     }
-    while (board_button_read() == true) {
-        execute_tasks();
-        //sleep_ms(10);
+    if (!timeout) {
+        while (board_button_read() == true) {
+            execute_tasks();
+            //sleep_ms(10);
+            if (start_button + 15000 < board_millis()) { /* timeout */
+                timeout = true;
+                break;
+            }
+        }
     }
     led_set_blink(BLINK_PROCESSING);
+    return timeout;
 }
 
 void usb_tx_enable(const uint8_t *buf, uint32_t len)  {
@@ -1419,8 +1433,7 @@ void ccid_task(void) {
         	        ccid_prepare_receive(c);
         	}
         	else if (m == EV_PRESS_BUTTON) {
-        	    wait_button();
-        	    uint32_t flag = EV_BUTTON_PRESSED;
+        	    uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
         	    queue_try_add(&c->card_comm, &flag);
         	}
         }

@@ -87,8 +87,8 @@ struct apdu {
 #define EV_VERIFY_CMD_AVAILABLE   2
 #define EV_CMD_AVAILABLE          4
 #define EV_EXIT                   8
-#define EV_BUTTON_PRESSED        16
-#define EV_BUTTON_TIMEOUT        32
+#define EV_BUTTON_TIMEOUT        16
+#define EV_BUTTON_PRESSED        32
 
 //Variables set by core1
 extern queue_t *ccid_comm;

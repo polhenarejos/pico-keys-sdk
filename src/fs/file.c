@@ -75,8 +75,8 @@ void process_fci(const file_t *pe) {
     res_APDU_size += 2;
     if (pe->name) {
         res_APDU[res_APDU_size++] = 0x84;
-        res_APDU[res_APDU_size++] = pe->name[0];
-        memcpy(res_APDU+res_APDU_size, pe->name+2, pe->name[0]);
+        res_APDU[res_APDU_size++] = MIN(pe->name[0],16);
+        memcpy(res_APDU+res_APDU_size, pe->name+2, MIN(pe->name[0],16));
         res_APDU_size += pe->name[0];
     }
     res_APDU[1] = res_APDU_size-2;

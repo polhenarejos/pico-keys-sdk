@@ -80,8 +80,10 @@ void process_fci(const file_t *pe) {
         res_APDU[res_APDU_size++] = 0x84;
         res_APDU[res_APDU_size++] = MIN(pe->name[0],16);
         memcpy(res_APDU+res_APDU_size, pe->name+2, MIN(pe->name[0],16));
-        res_APDU_size += pe->name[0];
+        res_APDU_size += MIN(pe->name[0],16);
     }
+    memcpy(res_APDU+res_APDU_size, "\x8A\x01\x05", 3); //life-cycle (5 -> activated)
+    res_APDU_size += 3;
     res_APDU[1] = res_APDU_size-2;
     res_APDU[3] = res_APDU_size-4;
 }

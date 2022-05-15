@@ -41,6 +41,9 @@ void process_fci(const file_t *pe) {
     res_APDU[res_APDU_size++] = 0x6f;
     res_APDU[res_APDU_size++] = 0x00; //computed later
     
+    res_APDU[res_APDU_size++] = 0x62;
+    res_APDU[res_APDU_size++] = 0x00; //computed later
+    
     res_APDU[res_APDU_size++] = 0x81;
     res_APDU[res_APDU_size++] = 2;
     if (pe->data) {
@@ -80,6 +83,7 @@ void process_fci(const file_t *pe) {
         res_APDU_size += pe->name[0];
     }
     res_APDU[1] = res_APDU_size-2;
+    res_APDU[3] = res_APDU_size-4;
 }
 
 #define MAX_DYNAMIC_FILES 64

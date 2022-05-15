@@ -74,7 +74,7 @@ void process_fci(const file_t *pe) {
     put_uint16_t(pe->fid, res_APDU+res_APDU_size);
     res_APDU_size += 2;
     if (pe->name) {
-        res_APDU[res_APDU_size++] = 0x83;
+        res_APDU[res_APDU_size++] = 0x84;
         res_APDU[res_APDU_size++] = pe->name[0];
         memcpy(res_APDU+res_APDU_size, pe->name+2, pe->name[0]);
         res_APDU_size += pe->name[0];
@@ -168,7 +168,7 @@ bool authenticate_action(const file_t *ef, uint8_t op) {
         return false;
     else if (acl == 0x90 || acl & 0x9F == 0x10) {
             // PIN required.
-        if(isUserAuthenticated) {
+        if (isUserAuthenticated) {
             return true;
         } 
         else {

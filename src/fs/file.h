@@ -106,6 +106,8 @@ extern file_t file_entries[];
 extern uint8_t *file_read(const uint8_t *addr);
 extern uint16_t file_read_uint16(const uint8_t *addr);
 extern uint8_t file_read_uint8(const uint8_t *addr);
+extern uint8_t *file_get_data(const file_t *tf);
+extern uint16_t file_get_size(const file_t *tf);
 extern file_t *file_new(uint16_t);
 file_t *get_parent(file_t *f);
 

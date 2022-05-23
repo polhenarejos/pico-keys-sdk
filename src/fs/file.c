@@ -247,6 +247,18 @@ uint8_t file_read_uint8(const uint8_t *addr) {
     return flash_read_uint8((uintptr_t)addr);
 }
 
+uint8_t *file_get_data(const file_t *tf) {
+    if (!tf || !tf->data)
+        return NULL;
+    return file_read(tf->data+sizeof(uint16_t));
+}
+
+uint16_t file_get_size(const file_t *tf) {
+    if (!tf || !tf->data)
+        return 0;
+    return file_read_uint16(tf->data);
+}
+
 file_t *search_dynamic_file(uint16_t fid) {
     for (int i = 0; i < dynamic_files; i++) {
         if (dynamic_file[i].fid == fid)

@@ -53,14 +53,12 @@
 #define SPECIFY_DF 0x2
 #define SPECIFY_ANY 0x3
 
-#define EF_DKEK     0x108F
 #define EF_PRKDFS   0x6040
 #define EF_PUKDFS   0x6041
 #define EF_CDFS     0x6042
 #define EF_AODFS    0x6043
 #define EF_DODFS    0x6044
 #define EF_SKDFS    0x6045
-#define EF_DEVOPS   0x100E
 
 #define MAX_DEPTH 4
 

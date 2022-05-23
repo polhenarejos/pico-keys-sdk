@@ -88,7 +88,7 @@ void process_fci(const file_t *pe) {
     res_APDU[3] = res_APDU_size-4;
 }
 
-#define MAX_DYNAMIC_FILES 64
+#define MAX_DYNAMIC_FILES 128
 uint16_t dynamic_files = 0;
 file_t dynamic_file[MAX_DYNAMIC_FILES];
 
@@ -226,6 +226,9 @@ void scan_flash() {
         uint16_t fid = flash_read_uint16(base+sizeof(uintptr_t)+sizeof(uintptr_t));
         printf("[%x] scan fid %x, len %d\r\n",base,fid,flash_read_uint16(base+sizeof(uintptr_t)+sizeof(uintptr_t)+sizeof(uint16_t)));
         file_t *file = (file_t *)search_by_fid(fid, NULL, SPECIFY_EF);
+        if (!file) {
+            file = file_new(fid);
+        }
         if (file) 
             file->data = (uint8_t *)(base+sizeof(uintptr_t)+sizeof(uintptr_t)+sizeof(uint16_t));
         if (flash_read_uintptr(base) == 0x0) {
@@ -284,23 +287,4 @@ file_t *file_new(uint16_t fid) {
     memcpy(f, &file, sizeof(file_t));
     //memset((uint8_t *)f->acl, 0x90, sizeof(f->acl));
     return f;
-}
-
-file_chain_t *add_file_to_chain(file_t *file, file_chain_t **chain) {
-    if (search_file_chain(file->fid, *chain))
-        return NULL;
-    file_chain_t *fc = (file_chain_t *)malloc(sizeof(file_chain_t));
-    fc->file = file;
-    fc->next = *chain;
-    *chain = fc;
-    return fc;
-}
-
-file_t *search_file_chain(uint16_t fid, file_chain_t *chain) {
-    for (file_chain_t *fc = chain; fc; fc = fc->next) {
-        if (fid == fc->file->fid) {
-            return fc->file;
-        }
-    }
-    return NULL;
 }

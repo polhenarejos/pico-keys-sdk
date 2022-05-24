@@ -103,14 +103,15 @@ int flash_clear_file(file_t *file) {
     return CCID_OK;
 }
 
-int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len) {
+int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t len, uint16_t offset) {
     if (!file)
         return CCID_ERR_NULL_PARAM;
-    if (len > FLASH_SECTOR_SIZE)
+    uint16_t size_file_flash = file->data ? flash_read_uint16((uintptr_t)file->data) : 0;
+    uint8_t *old_data = NULL;
+    if (offset+len > FLASH_SECTOR_SIZE || offset > size_file_flash)
         return CCID_ERR_NO_MEMORY;
     if (file->data) { //already in flash
-        uint16_t size_file_flash = flash_read_uint16((uintptr_t)file->data);
-        if (len <= size_file_flash) { //it fits, no need to move it
+        if (offset+len <= size_file_flash) { //it fits, no need to move it
             flash_program_halfword((uintptr_t)file->data, len);
             if (data)
                 flash_program_block((uintptr_t)file->data+sizeof(uint16_t), data, len);
@@ -118,8 +119,16 @@ int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len) {
         }
         else { //we clear the old file
             flash_clear_file(file);
+            if (offset > 0) {
+                old_data = (uint8_t *)calloc(1, offset+len);
+                memcpy(old_data, file->data+sizeof(uint16_t), offset);
+                memcpy(old_data+offset, data, len);
+                len = offset+len;
+                data = old_data;
+            }
         }
     }
+    
     uintptr_t new_addr = allocate_free_addr(len);
     //printf("na %x\r\n",new_addr);
     if (new_addr == 0x0) 
@@ -129,5 +138,10 @@ int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len) {
     flash_program_halfword((uintptr_t)file->data, len);
     if (data)
         flash_program_block((uintptr_t)file->data+sizeof(uint16_t), data, len);
+    if (old_data)
+        free(old_data);
     return CCID_OK;
+}
+int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len) {
+    return flash_write_data_to_file_offset(file, data, len, 0);
 }

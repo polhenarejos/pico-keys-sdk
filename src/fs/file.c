@@ -355,20 +355,49 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     file_t *ef = search_by_fid(EF_META, NULL, SPECIFY_EF);
     if (!ef)
         return CCID_ERR_FILE_NOT_FOUND;
-    if ((r = meta_delete(fid)) != CCID_OK)
-        return r;
-    size_t fdata_len = 1+format_tlv_len(len+2, NULL)+len+2;
-    uint8_t *fdata = (uint8_t *)calloc(1, fdata_len), *f = fdata;
-    *f++ = fid & 0xff;
-    f += format_tlv_len(len, f);
-    *f++ = fid >> 8;
-    *f++ = fid & 0xff;
-    memcpy(f, data, len);
-    r = flash_write_data_to_file(ef, fdata, fdata_len);
+    uint16_t ef_size = file_get_size(ef);
+    uint8_t *fdata = (uint8_t *)calloc(1, ef_size);
+    memcpy(fdata, file_get_data(ef), ef_size);
+    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL;
+    size_t tag_len = 0;
+    while (walk_tlv(fdata, ef_size, &p, &tag, &tag_len, &tag_data)) {
+        if (tag_len < 2)
+            continue;
+        uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
+        if (cfid == fid) {
+            if (tag_len-2 == len) { //an update
+                memcpy(p-tag_len+2, data, len);
+                r = flash_write_data_to_file(ef, fdata, ef_size);
+                free(fdata);
+                if (r != CCID_OK)
+                    return CCID_EXEC_ERROR;
+                low_flash_available();
+                return CCID_OK;
+            }
+            else { //needs reallocation
+                uint8_t *tpos = p-tag_len-format_tlv_len(tag_len, NULL)-1;
+                memmove(tpos, p, fdata+ef_size-p);
+                tpos += fdata+ef_size-p;
+                uintptr_t meta_offset = tpos-fdata;
+                ef_size += len - (tag_len-2);
+                if (len > tag_len-2)
+                    fdata = (uint8_t *)realloc(fdata, ef_size);
+                uint8_t *f = fdata+meta_offset;
+                *f++ = fid & 0xff;
+                f += format_tlv_len(len+2, f);
+                *f++ = fid >> 8;
+                *f++ = fid & 0xff;
+                memcpy(f, data, len);
+                r = flash_write_data_to_file(ef, fdata, ef_size);
+                free(fdata);
+                if (r != CCID_OK)
+                    return CCID_EXEC_ERROR;
+                low_flash_available();
+                return CCID_OK;
+            }
+        }
+    }
     free(fdata);
-    if (r != CCID_OK)
-        return CCID_EXEC_ERROR;
-    low_flash_available();
-    return CCID_OK;
+    return CCID_WRONG_DATA;
 }
 

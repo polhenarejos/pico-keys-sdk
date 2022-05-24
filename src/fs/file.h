@@ -113,7 +113,7 @@ extern int delete_dynamic_file(file_t *f);
 
 extern bool isUserAuthenticated;
 
-extern int meta_find(uint16_t, uint8_t *out, size_t out_len);
+extern int meta_find(uint16_t, uint8_t **out);
 extern int meta_delete(uint16_t fid);
 extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
 

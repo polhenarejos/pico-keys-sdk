@@ -85,11 +85,13 @@ void process_fci(const file_t *pe) {
     }
     memcpy(res_APDU+res_APDU_size, "\x8A\x01\x05", 3); //life-cycle (5 -> activated)
     res_APDU_size += 3;
-    uint8_t meta_size = meta_find(pe->fid, res_APDU+res_APDU_size+3, 256);
+    uint8_t *meta_data = NULL;
+    uint8_t meta_size = meta_find(pe->fid, &meta_data);
     if (meta_size) {
         res_APDU[res_APDU_size++] = 0xA5;
         res_APDU[res_APDU_size++] = 0x81;
         res_APDU[res_APDU_size++] = meta_size;
+        memcpy(res_APDU+res_APDU_size,meta_data,meta_size);
         res_APDU_size += meta_size;
     }
     res_APDU[1] = res_APDU_size-2;
@@ -299,7 +301,7 @@ file_t *file_new(uint16_t fid) {
     //memset((uint8_t *)f->acl, 0x90, sizeof(f->acl));
     return f;
 }
-int meta_find(uint16_t fid, uint8_t *out, size_t out_len) {
+int meta_find(uint16_t fid, uint8_t **out) {
     file_t *ef = search_by_fid(EF_META, NULL, SPECIFY_EF);
     if (!ef)
         return CCID_ERR_FILE_NOT_FOUND;
@@ -310,11 +312,8 @@ int meta_find(uint16_t fid, uint8_t *out, size_t out_len) {
             continue;
         uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
         if (cfid == fid) {
-            if (out) {
-                if (out_len < tag_len-2)
-                    return CCID_ERR_NO_MEMORY;
-                memcpy(out, tag_data+2, tag_len-2);
-            }
+            if (out)
+                *out = tag_data+2;
             return tag_len-2;
         }
     }

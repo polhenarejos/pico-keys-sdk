@@ -406,6 +406,8 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     memcpy(f, data, len);
     r = flash_write_data_to_file(ef, fdata, ef_size+1+format_tlv_len(len+2,NULL)+2+len);
     free(fdata);
+    if (r != CCID_OK)
+        return CCID_EXEC_ERROR;
     return CCID_OK;
 }
 

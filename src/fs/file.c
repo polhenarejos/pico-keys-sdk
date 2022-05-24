@@ -87,7 +87,7 @@ void process_fci(const file_t *pe) {
     res_APDU_size += 3;
     uint8_t *meta_data = NULL;
     uint8_t meta_size = meta_find(pe->fid, &meta_data);
-    if (meta_size) {
+    if (meta_size > 0 && meta_data != NULL) {
         res_APDU[res_APDU_size++] = 0xA5;
         res_APDU[res_APDU_size++] = 0x81;
         res_APDU[res_APDU_size++] = meta_size;

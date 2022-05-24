@@ -112,9 +112,9 @@ int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t 
         return CCID_ERR_NO_MEMORY;
     if (file->data) { //already in flash
         if (offset+len <= size_file_flash) { //it fits, no need to move it
-            flash_program_halfword((uintptr_t)file->data, len);
+            flash_program_halfword((uintptr_t)file->data, offset+len);
             if (data)
-                flash_program_block((uintptr_t)file->data+sizeof(uint16_t), data, len);
+                flash_program_block((uintptr_t)file->data+sizeof(uint16_t)+offset, data, len);
             return CCID_OK;
         }
         else { //we clear the old file

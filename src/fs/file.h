@@ -59,6 +59,7 @@
 #define EF_AODFS    0x6043
 #define EF_DODFS    0x6044
 #define EF_SKDFS    0x6045
+#define EF_META     0xE010
 
 #define MAX_DEPTH 4
 
@@ -72,12 +73,6 @@ typedef struct file
     uint8_t *data; //should include 2 bytes len at begining
     const uint8_t acl[7];
 } __attribute__((packed)) file_t;
-
-typedef struct file_chain
-{
-    file_t *file;
-    struct file_chain *next;
-} file_chain_t;
 
 extern file_t *currentEF;
 extern file_t *currentDF;
@@ -116,9 +111,11 @@ extern file_t dynamic_file[];
 extern file_t *search_dynamic_file(uint16_t);
 extern int delete_dynamic_file(file_t *f);
 
-extern file_chain_t *add_file_to_chain(file_t *file, file_chain_t **chain);
-extern file_t *search_file_chain(uint16_t fid, file_chain_t *chain);
 extern bool isUserAuthenticated;
+
+extern int meta_find(uint16_t, uint8_t *out, size_t out_len);
+extern int meta_delete(uint16_t fid);
+extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
 
 #endif
 

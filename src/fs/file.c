@@ -23,6 +23,7 @@
 extern const uintptr_t end_data_pool;
 extern const uintptr_t start_data_pool;
 extern int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len);
+extern int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t len, uint16_t offset);
 extern int flash_program_halfword (uintptr_t addr, uint16_t data);
 extern int flash_program_word (uintptr_t addr, uint32_t data);
 extern int flash_program_uintptr (uintptr_t addr, uintptr_t data);
@@ -84,6 +85,13 @@ void process_fci(const file_t *pe) {
     }
     memcpy(res_APDU+res_APDU_size, "\x8A\x01\x05", 3); //life-cycle (5 -> activated)
     res_APDU_size += 3;
+    uint8_t meta_size = meta_find(pe->fid, res_APDU+res_APDU_size+3, 256);
+    if (meta_size) {
+        res_APDU[res_APDU_size++] = 0xA5;
+        res_APDU[res_APDU_size++] = 0x81;
+        res_APDU[res_APDU_size++] = meta_size;
+        res_APDU_size += meta_size;
+    }
     res_APDU[1] = res_APDU_size-2;
     res_APDU[3] = res_APDU_size-4;
 }
@@ -182,15 +190,6 @@ bool authenticate_action(const file_t *ef, uint8_t op) {
         }
     }
     return false;
-}
-
-void initialize_chain(file_chain_t **chain) {
-    file_chain_t *next;
-    for (file_chain_t *f = *chain; f; f = next) {
-        next = f->next;
-        free(f);
-    }
-    *chain = NULL;
 }
 
 void initialize_flash(bool hard) {
@@ -300,3 +299,77 @@ file_t *file_new(uint16_t fid) {
     //memset((uint8_t *)f->acl, 0x90, sizeof(f->acl));
     return f;
 }
+int meta_find(uint16_t fid, uint8_t *out, size_t out_len) {
+    file_t *ef = search_by_fid(EF_META, NULL, SPECIFY_EF);
+    if (!ef)
+        return CCID_ERR_FILE_NOT_FOUND;
+    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL, *data = file_get_data(ef);
+    size_t tag_len = 0, data_len = file_get_size(ef);
+    while (walk_tlv(data, data_len, &p, &tag, &tag_len, &tag_data)) {
+        if (tag_len < 2)
+            continue;
+        uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
+        if (cfid == fid) {
+            if (out) {
+                if (out_len < tag_len-2)
+                    return CCID_ERR_NO_MEMORY;
+                memcpy(out, tag_data+2, tag_len-2);
+            }
+            return tag_len-2;
+        }
+    }
+    return 0;
+}
+int meta_delete(uint16_t fid) {
+    file_t *ef = search_by_fid(EF_META, NULL, SPECIFY_EF);
+    if (!ef)
+        return CCID_ERR_FILE_NOT_FOUND;
+    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL, *data = file_get_data(ef);
+    size_t tag_len = 0, data_len = file_get_size(ef);
+    uint8_t *fdata = NULL;
+    while (walk_tlv(data, data_len, &p, &tag, &tag_len, &tag_data)) {
+        uint8_t *tpos = p-tag_len-format_tlv_len(tag_len, NULL)-1;
+        if (tag_len < 2)
+            continue;
+        uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
+        if (cfid == fid) {
+            size_t new_len = data_len-1-tag_len-format_tlv_len(tag_len, NULL);
+            fdata = (uint8_t *)calloc(1, new_len);
+            if (tpos > data) {
+                memcpy(fdata, data, tpos-data);
+            }
+            if (data+data_len > p) {
+                memcpy(fdata+(tpos-data), p, data+data_len-p);
+            }
+            int r = flash_write_data_to_file(ef, fdata, new_len);
+            free(fdata);
+            if (r != CCID_OK)
+                return CCID_EXEC_ERROR;
+            low_flash_available();
+            break;
+        }
+    }
+    return CCID_OK;
+}
+int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
+    int r;
+    file_t *ef = search_by_fid(EF_META, NULL, SPECIFY_EF);
+    if (!ef)
+        return CCID_ERR_FILE_NOT_FOUND;
+    if ((r = meta_delete(fid)) != CCID_OK)
+        return r;
+    size_t fdata_len = 1+format_tlv_len(len+2, NULL)+len+2;
+    uint8_t *fdata = (uint8_t *)calloc(1, fdata_len), *f = fdata;
+    *f++ = fid & 0xff;
+    f += format_tlv_len(len, f);
+    *f++ = fid >> 8;
+    *f++ = fid & 0xff;
+    memcpy(f, data, len);
+    r = flash_write_data_to_file(ef, fdata, fdata_len);
+    free(fdata);
+    if (r != CCID_OK)
+        return CCID_EXEC_ERROR;
+    low_flash_available();
+    return CCID_OK;
+}
+

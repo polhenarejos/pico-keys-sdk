@@ -35,12 +35,14 @@ extern uint8_t *flash_read(uintptr_t addr);
 extern void low_flash_available();
 
 //puts FCI in the RAPDU
-void process_fci(const file_t *pe) {
+void process_fci(const file_t *pe, int fmd) {
     uint8_t *p = res_APDU;
     uint8_t buf[64];
     res_APDU_size = 0;
-    res_APDU[res_APDU_size++] = 0x6f;
-    res_APDU[res_APDU_size++] = 0x00; //computed later
+    if (fmd) {
+        res_APDU[res_APDU_size++] = 0x6f;
+        res_APDU[res_APDU_size++] = 0x00; //computed later
+    }
     
     res_APDU[res_APDU_size++] = 0x62;
     res_APDU[res_APDU_size++] = 0x00; //computed later
@@ -95,7 +97,8 @@ void process_fci(const file_t *pe) {
         res_APDU_size += meta_size;
     }
     res_APDU[1] = res_APDU_size-2;
-    res_APDU[3] = res_APDU_size-4;
+    if (fmd)
+        res_APDU[3] = res_APDU_size-4;
 }
 
 #define MAX_DYNAMIC_FILES 128

@@ -397,7 +397,15 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
             }
         }
     }
+    fdata = (uint8_t *)realloc(fdata, ef_size+1+format_tlv_len(len+2,NULL)+2+len);
+    uint8_t *f = fdata+ef_size;
+    *f++ = fid & 0xff;
+    f += format_tlv_len(len+2, f);
+    *f++ = fid >> 8;
+    *f++ = fid & 0xff;
+    memcpy(f, data, len);
+    r = flash_write_data_to_file(ef, fdata, ef_size+1+format_tlv_len(len+2,NULL)+2+len);
     free(fdata);
-    return CCID_WRONG_DATA;
+    return CCID_OK;
 }
 

@@ -1495,18 +1495,23 @@ void led_off_all() {
 
 int format_tlv_len(size_t len, uint8_t *out) {
     if (len < 128) {
-        *out = len;
+        if (out)
+            *out = len;
         return 1;
     }
     else if (len < 256) {
-        *out++ = 0x81;
-        *out++ = len;
+        if (out) {
+            *out++ = 0x81;
+            *out++ = len;
+        }
         return 2;
     }
     else {
-        *out++ = 0x82;
-        *out++ = (len >> 8) & 0xff;
-        *out++ = len & 0xff;
+        if (out) {
+            *out++ = 0x82;
+            *out++ = (len >> 8) & 0xff;
+            *out++ = len & 0xff;
+        }
         return 3;
     }
     return 0;

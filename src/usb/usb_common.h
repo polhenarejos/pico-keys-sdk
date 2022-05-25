@@ -1,0 +1,320 @@
+/*
+ * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+#ifndef _USB_COMMON_H
+#define _USB_COMMON_H
+
+#include "pico/types.h"
+#include "hardware/structs/usb.h"
+
+// bmRequestType bit definitions
+#define USB_REQ_TYPE_STANDARD 0x00u
+#define USB_REQ_TYPE_TYPE_MASK 0x60u
+#define USB_REQ_TYPE_TYPE_CLASS 0x20u
+#define USB_REQ_TYPE_TYPE_VENDOR 0x40u
+
+#define USB_REQ_TYPE_RECIPIENT_MASK 0x1fu
+#define USB_REQ_TYPE_RECIPIENT_DEVICE 0x00u
+#define USB_REQ_TYPE_RECIPIENT_INTERFACE 0x01u
+#define USB_REQ_TYPE_RECIPIENT_ENDPOINT 0x02u
+
+#define USB_DIR_OUT 0x00u
+#define USB_DIR_IN 0x80u
+
+#define USB_TRANSFER_TYPE_CONTROL 0x0
+#define USB_TRANSFER_TYPE_ISOCHRONOUS 0x1
+#define USB_TRANSFER_TYPE_BULK 0x2
+#define USB_TRANSFER_TYPE_INTERRUPT 0x3
+#define USB_TRANSFER_TYPE_BITS 0x3
+
+// Descriptor types
+#define USB_DT_DEVICE 0x01
+#define USB_DT_CONFIG 0x02
+#define USB_DT_STRING 0x03
+#define USB_DT_INTERFACE 0x04
+#define USB_DT_ENDPOINT 0x05
+
+#define USB_REQUEST_GET_STATUS 0x0
+#define USB_REQUEST_CLEAR_FEATURE 0x01
+#define USB_REQUEST_SET_FEATURE 0x03
+#define USB_REQUEST_SET_ADDRESS 0x05
+#define USB_REQUEST_GET_DESCRIPTOR 0x06
+#define USB_REQUEST_SET_DESCRIPTOR 0x07
+#define USB_REQUEST_GET_CONFIGURATION 0x08
+#define USB_REQUEST_SET_CONFIGURATION 0x09
+#define USB_REQUEST_GET_INTERFACE 0x0a
+#define USB_REQUEST_SET_INTERFACE 0x0b
+#define USB_REQUEST_SYNC_FRAME 0x0c
+
+#define USB_REQUEST_MSC_GET_MAX_LUN 0xfe
+#define USB_REQUEST_MSC_RESET 0xff
+
+#define USB_FEAT_ENDPOINT_HALT            0x00
+#define USB_FEAT_DEVICE_REMOTE_WAKEUP   0x01
+#define USB_FEAT_TEST_MODE                0x02
+
+#define USB_DESCRIPTOR_TYPE_ENDPOINT 0x05
+
+struct usb_setup_packet {
+    uint8_t bmRequestType;
+    uint8_t bRequest;
+    uint16_t wValue;
+    uint16_t wIndex;
+    uint16_t wLength;
+} __packed;
+
+struct usb_descriptor {
+    uint8_t bLength;
+    uint8_t bDescriptorType;
+};
+
+struct usb_device_descriptor {
+    uint8_t bLength;
+    uint8_t bDescriptorType;
+    uint16_t bcdUSB;
+    uint8_t bDeviceClass;
+    uint8_t bDeviceSubClass;
+    uint8_t bDeviceProtocol;
+    uint8_t bMaxPacketSize0;
+    uint16_t idVendor;
+    uint16_t idProduct;
+    uint16_t bcdDevice;
+    uint8_t iManufacturer;
+    uint8_t iProduct;
+    uint8_t iSerialNumber;
+    uint8_t bNumConfigurations;
+} __packed;
+
+struct usb_configuration_descriptor {
+    uint8_t bLength;
+    uint8_t bDescriptorType;
+    uint16_t wTotalLength;
+    uint8_t bNumInterfaces;
+    uint8_t bConfigurationValue;
+    uint8_t iConfiguration;
+    uint8_t bmAttributes;
+    uint8_t bMaxPower;
+} __packed;
+
+struct usb_interface_descriptor {
+    uint8_t bLength;
+    uint8_t bDescriptorType;
+    uint8_t bInterfaceNumber;
+    uint8_t bAlternateSetting;
+    uint8_t bNumEndpoints;
+    uint8_t bInterfaceClass;
+    uint8_t bInterfaceSubClass;
+    uint8_t bInterfaceProtocol;
+    uint8_t iInterface;
+} __packed;
+
+struct usb_endpoint_descriptor {
+    uint8_t bLength;
+    uint8_t bDescriptorType;
+    uint8_t bEndpointAddress;
+    uint8_t bmAttributes;
+    uint16_t wMaxPacketSize;
+    uint8_t bInterval;
+} __packed;
+
+struct usb_endpoint_descriptor_long {
+    uint8_t bLength;
+    uint8_t bDescriptorType;
+    uint8_t bEndpointAddress;
+    uint8_t bmAttributes;
+    uint16_t wMaxPacketSize;
+    uint8_t bInterval;
+    uint8_t bRefresh;
+    uint8_t bSyncAddr;
+} __attribute__((packed));
+
+
+struct ccid_class_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t bcdCCID;
+	uint8_t  bMaxSlotIndex;
+	uint8_t  bVoltageSupport;
+	uint32_t dwProtocols;
+	uint32_t dwDefaultClock;
+	uint32_t dwMaximumClock;
+	uint8_t  bNumClockSupport;
+	uint32_t dwDataRate;
+	uint32_t dwMaxDataRate;
+	uint8_t  bNumDataRatesSupported;
+	uint32_t dwMaxIFSD;
+	uint32_t dwSynchProtocols;
+	uint32_t dwMechanical;
+	uint32_t dwFeatures;
+	uint32_t dwMaxCCIDMessageLength;
+	uint8_t  bClassGetResponse;
+	uint8_t  bclassEnvelope;
+	uint16_t wLcdLayout;
+	uint8_t  bPINSupport;
+	uint8_t  bMaxCCIDBusySlots;
+} __attribute__ ((__packed__));
+
+static const struct ccid_class_descriptor ccid_desc = {
+    .bLength                = sizeof(struct ccid_class_descriptor),
+    .bDescriptorType        = 0x21,
+    .bcdCCID                = (0x0110),
+    .bMaxSlotIndex          = 0,
+    .bVoltageSupport        = 0x01,  // 5.0V
+    .dwProtocols            = (
+                              0x01|  // T=0
+                              0x02), // T=1
+    .dwDefaultClock         = (0xDFC),
+    .dwMaximumClock         = (0xDFC),
+    .bNumClockSupport       = 0,
+    .dwDataRate             = (0x2580),
+    .dwMaxDataRate          = (0x2580),
+    .bNumDataRatesSupported = 0,
+    .dwMaxIFSD              = (0xFE), // IFSD is handled by the real reader driver
+    .dwSynchProtocols       = (0),
+    .dwMechanical           = (0),
+    .dwFeatures             = 0x40840, //USB-ICC, short & extended APDU
+    .dwMaxCCIDMessageLength = 65544+10,
+    .bClassGetResponse      = 0xFF,
+    .bclassEnvelope         = 0xFF,
+    .wLcdLayout             = 0x0,
+    .bPINSupport            = 0x0,
+    .bMaxCCIDBusySlots      = 0x01,
+};
+
+// Struct in which we keep the endpoint configuration
+typedef void (*usb_ep_handler)(uint8_t *buf, uint16_t len);
+struct usb_endpoint_configuration {
+    const struct usb_endpoint_descriptor *descriptor;
+    usb_ep_handler handler;
+
+    // Pointers to endpoint + buffer control registers
+    // in the USB controller DPSRAM
+    volatile uint32_t *endpoint_control;
+    volatile uint32_t *buffer_control;
+    volatile uint8_t *data_buffer;
+
+    // Toggle after each packet (unless replying to a SETUP)
+    uint8_t next_pid;
+};
+
+// Struct in which we keep the device configuration
+struct usb_device_configuration {
+    const struct usb_device_descriptor *device_descriptor;
+    const struct usb_interface_descriptor *interface_descriptor;
+    const struct usb_configuration_descriptor *config_descriptor;
+    const struct ccid_class_descriptor *ccid_descriptor;
+    const unsigned char *lang_descriptor;
+    const unsigned char **descriptor_strings;
+    // USB num endpoints is 16
+    struct usb_endpoint_configuration endpoints[USB_NUM_ENDPOINTS];
+};
+
+#define EP0_IN_ADDR  (USB_DIR_IN  | 0)
+#define EP0_OUT_ADDR (USB_DIR_OUT | 0)
+#define EP1_OUT_ADDR (USB_DIR_OUT | 1)
+#define EP2_IN_ADDR  (USB_DIR_IN  | 2)
+
+// EP0 IN and OUT
+static const struct usb_endpoint_descriptor ep0_out = {
+        .bLength          = sizeof(struct usb_endpoint_descriptor),
+        .bDescriptorType  = USB_DT_ENDPOINT,
+        .bEndpointAddress = EP0_OUT_ADDR, // EP number 0, OUT from host (rx to device)
+        .bmAttributes     = USB_TRANSFER_TYPE_CONTROL,
+        .wMaxPacketSize   = 64,
+        .bInterval        = 0
+};
+
+static const struct usb_endpoint_descriptor ep0_in = {
+        .bLength          = sizeof(struct usb_endpoint_descriptor),
+        .bDescriptorType  = USB_DT_ENDPOINT,
+        .bEndpointAddress = EP0_IN_ADDR, // EP number 0, OUT from host (rx to device)
+        .bmAttributes     = USB_TRANSFER_TYPE_CONTROL,
+        .wMaxPacketSize   = 64,
+        .bInterval        = 0
+};
+
+// Descriptors
+static const struct usb_device_descriptor device_descriptor = {
+        .bLength         = sizeof(struct usb_device_descriptor),
+        .bDescriptorType = USB_DT_DEVICE,
+        .bcdUSB          = 0x0200, // USB 1.1 device
+        .bDeviceClass    = 0,      // Specified in interface descriptor
+        .bDeviceSubClass = 0,      // No subclass
+        .bDeviceProtocol = 0,      // No protocol
+        .bMaxPacketSize0 = 64,     // Max packet size for ep0
+        .idVendor        = 0x20a0, // Your vendor id
+        .idProduct       = 0x4230, // Your product ID
+        .bcdDevice       = 0x0101,      // No device revision number
+        .iManufacturer   = 1,      // Manufacturer string index
+        .iProduct        = 2,      // Product string index
+        .iSerialNumber   = 3,      // No serial number
+        .bNumConfigurations = 1    // One configuration
+};
+
+static const struct usb_interface_descriptor interface_descriptor = {
+        .bLength            = sizeof(struct usb_interface_descriptor),
+        .bDescriptorType    = USB_DT_INTERFACE,
+        .bInterfaceNumber   = 0,
+        .bAlternateSetting  = 0,
+        .bNumEndpoints      = 2,    // Interface has 2 endpoints
+        .bInterfaceClass    = 0x0b, // Vendor specific endpoint
+        .bInterfaceSubClass = 0,
+        .bInterfaceProtocol = 0,
+        .iInterface         = 5
+};
+
+static const struct usb_endpoint_descriptor ep1_out = {
+        .bLength          = sizeof(struct usb_endpoint_descriptor),
+        .bDescriptorType  = USB_DT_ENDPOINT,
+        .bEndpointAddress = EP1_OUT_ADDR, // EP number 1, OUT from host (rx to device)
+        .bmAttributes     = USB_TRANSFER_TYPE_BULK,
+        .wMaxPacketSize   = 64,
+        .bInterval        = 0
+};
+
+static const struct usb_endpoint_descriptor ep2_in = {
+        .bLength          = sizeof(struct usb_endpoint_descriptor),
+        .bDescriptorType  = USB_DT_ENDPOINT,
+        .bEndpointAddress = EP2_IN_ADDR, // EP number 2, IN from host (tx from device)
+        .bmAttributes     = USB_TRANSFER_TYPE_BULK,
+        .wMaxPacketSize   = 64,
+        .bInterval        = 0
+};
+
+static const struct usb_configuration_descriptor config_descriptor = {
+        .bLength         = sizeof(struct usb_configuration_descriptor),
+        .bDescriptorType = USB_DT_CONFIG,
+        .wTotalLength    = (sizeof(config_descriptor) +
+                            sizeof(interface_descriptor) +
+                            sizeof(ccid_desc) +
+                            sizeof(ep1_out) +
+                            sizeof(ep2_in)),
+        .bNumInterfaces  = 1,
+        .bConfigurationValue = 1, // Configuration 1
+        .iConfiguration = 4,      // No string
+        .bmAttributes = 0xa0,     // attributes: self powered, no remote wakeup
+        .bMaxPower = 0x32         // 100ma
+};
+
+static const unsigned char lang_descriptor[] = {
+        4,         // bLength
+        0x03,      // bDescriptorType == String Descriptor
+        0x09, 0x04 // language id = us english
+};
+
+static const unsigned char *descriptor_strings[] = {
+        (unsigned char *) "Virtual SC",    // Vendor
+        (unsigned char *) "CCID", // Product
+        (unsigned char *) "11223344",
+        (unsigned char *) "Configuration rocks",
+        (unsigned char *) "Interface rocks"
+};
+
+#define USB_REQ_CCID        0xA1
+
+
+#endif
+

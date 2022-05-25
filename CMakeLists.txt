@@ -43,7 +43,7 @@ set_source_files_properties(
         )
         
 target_sources(pico_ccid PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/src/ccid/ccid2040.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/flash.c

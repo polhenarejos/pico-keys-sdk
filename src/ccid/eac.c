@@ -88,13 +88,13 @@ int sm_unwrap() {
         return r;
     int le = sm_get_le();
     if (le >= 0)
-        apdu.expected_res_size = le;
+        apdu.ne = le;
     uint8_t *body = NULL;
     size_t body_size = 0;
     bool is87 = false;
     uint8_t tag = 0x0, *tag_data = NULL, *p = NULL;
     size_t tag_len = 0;    
-    while (walk_tlv(apdu.cmd_apdu_data, apdu.cmd_apdu_data_len, &p, &tag, &tag_len, &tag_data)) {
+    while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x87 || tag == 0x85) {
             body = tag_data;
             body_size = tag_len;
@@ -111,9 +111,9 @@ int sm_unwrap() {
     }
     sm_update_iv();
     aes_decrypt(sm_kenc, sm_iv, 128, HSM_AES_MODE_CBC, body, body_size);
-    memmove(apdu.cmd_apdu_data, body, body_size);
-    apdu.cmd_apdu_data_len = sm_remove_padding(apdu.cmd_apdu_data, body_size);
-    DEBUG_PAYLOAD(apdu.cmd_apdu_data, apdu.cmd_apdu_data_len);
+    memmove(apdu.data, body, body_size);
+    apdu.nc = sm_remove_padding(apdu.data, body_size);
+    DEBUG_PAYLOAD(apdu.data, apdu.nc);
     return CCID_OK;
 }
 
@@ -173,15 +173,15 @@ int sm_wrap() {
     res_APDU[res_APDU_size++] = 0x8E;
     res_APDU[res_APDU_size++] = 8;
     res_APDU_size += 8;
-    if (apdu.expected_res_size > 0)
-        apdu.expected_res_size = res_APDU_size;
+    if (apdu.ne > 0)
+        apdu.ne = res_APDU_size;
     return CCID_OK;
 }
 
 int sm_get_le() {
     uint8_t tag = 0x0, *tag_data = NULL, *p = NULL;
     size_t tag_len = 0;    
-    while (walk_tlv(apdu.cmd_apdu_data, apdu.cmd_apdu_data_len, &p, &tag, &tag_len, &tag_data)) {
+    while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x97) {
             uint32_t le = 0;
             for (int t = 1; t <= tag_len; t++)
@@ -205,7 +205,7 @@ int sm_verify() {
     memset(input, 0, sizeof(input));
     int input_len = 0, r = 0;
     bool add_header = (CLA(apdu) & 0xC) == 0xC;
-    int data_len = (int)(apdu.cmd_apdu_data_len/sm_blocksize)*sm_blocksize;
+    int data_len = (int)(apdu.nc/sm_blocksize)*sm_blocksize;
     if (data_len % sm_blocksize)
         data_len += sm_blocksize;
     if (data_len+(add_header ? sm_blocksize : 0) > 1024)
@@ -232,7 +232,7 @@ int sm_verify() {
     size_t mac_len = 0;
     uint8_t tag = 0x0, *tag_data = NULL, *p = NULL;
     size_t tag_len = 0;    
-    while (walk_tlv(apdu.cmd_apdu_data, apdu.cmd_apdu_data_len, &p, &tag, &tag_len, &tag_data)) {
+    while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag & 0x1) {
             input[input_len++] = tag;
             int tlen = format_tlv_len(tag_len, input+input_len);

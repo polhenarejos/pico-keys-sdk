@@ -317,9 +317,14 @@ static const unsigned char *descriptor_strings[] = {
 
 extern uint16_t usb_read(uint8_t *buffer, size_t buffer_size);
 extern uint16_t usb_read_available();
-extern uint32_t usb_write(uint8_t *buffer, size_t buffer_size);
+extern uint32_t usb_write_offset(uint16_t size, uint16_t offset);
+extern uint32_t usb_write(uint16_t size);
 extern bool usb_is_configured();
 extern void usb_init();
+extern uint8_t *usb_get_rx();
+extern uint32_t usb_send_tx_buffer();
+extern uint8_t *usb_get_tx();
+extern void usb_clear_rx();
 
 #endif
 

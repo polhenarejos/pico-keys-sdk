@@ -121,7 +121,7 @@ file_t *get_parent(file_t *f) {
 
 file_t *search_by_name(uint8_t *name, uint16_t namelen) {
     for (file_t *p = file_entries; p != file_last; p++) {
-        if (p->name && *p->name == apdu.cmd_apdu_data_len && memcmp(p->name+1, name, namelen) == 0) {
+        if (p->name && *p->name == apdu.nc && memcmp(p->name+1, name, namelen) == 0) {
             return p;
         }
     }

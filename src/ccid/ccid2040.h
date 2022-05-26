@@ -59,20 +59,16 @@ extern const uint8_t historical_bytes[];
         } printf("\r\n"); \
     }
     
+
 struct apdu {
-  uint8_t seq;
-
-  /* command APDU */
-  uint8_t *cmd_apdu_head;	/* CLS INS P1 P2 [ internal Lc ] */
-  uint8_t *cmd_apdu_data;
-  size_t cmd_apdu_data_len;	/* Nc, calculated by Lc field */
-  size_t expected_res_size;	/* Ne, calculated by Le field */
-
-  /* response APDU */
-  uint16_t sw;
-  uint16_t res_apdu_data_len;
-  uint8_t *res_apdu_data;
-};
+    uint8_t *header;
+    uint32_t nc;
+    uint32_t ne;
+    uint8_t *data;
+    uint16_t sw;
+    uint8_t *rdata;
+    uint16_t rlen;
+} __packed;
 
 #define MAX_CMD_APDU_DATA_SIZE (24+4+512*4)
 #define MAX_RES_APDU_DATA_SIZE (5+9+512*4)
@@ -95,10 +91,6 @@ struct apdu {
 #define EV_BUTTON_TIMEOUT        16
 #define EV_BUTTON_PRESSED        32
 
-//Variables set by core1
-extern queue_t *ccid_comm;
-extern queue_t *card_comm;
-
 enum ccid_state {
     CCID_STATE_NOCARD,		/* No card available */
     CCID_STATE_START,		/* Initial */
@@ -112,13 +104,13 @@ enum ccid_state {
     CCID_STATE_EXEC_REQUESTED,	/* Exec requested */
 };
 
-#define CLA(a) a.cmd_apdu_head[0]
-#define INS(a) a.cmd_apdu_head[1]
-#define P1(a) a.cmd_apdu_head[2]
-#define P2(a) a.cmd_apdu_head[3]
+#define CLA(a) a.header[0]
+#define INS(a) a.header[1]
+#define P1(a) a.header[2]
+#define P2(a) a.header[3]
 
-#define res_APDU apdu.res_apdu_data
-#define res_APDU_size apdu.res_apdu_data_len
+#define res_APDU apdu.rdata
+#define res_APDU_size apdu.rlen
 
 extern struct apdu apdu;
 
@@ -137,6 +129,9 @@ static inline const void put_uint16_t(uint16_t n, uint8_t *b) {
 }
 
 extern const uint8_t *ccid_atr;
+
+extern queue_t ccid_to_card_q;
+extern queue_t card_to_ccid_q;
 
 
 #ifdef DEBUG

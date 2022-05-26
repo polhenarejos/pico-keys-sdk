@@ -18,11 +18,16 @@
 #ifndef _CCID2040_H_
 #define _CCID2040_H_
 
-#include "ccid.h"
-#include "tusb.h"
 #include "file.h"
 #include "pico/unique_id.h"
 #include "pico/util/queue.h"
+#include <string.h> 
+
+#include "pico/time.h"
+static inline uint32_t board_millis(void)
+{
+    return to_ms_since_boot(get_absolute_time());
+}
 
 #define USB_REQ_CCID        0xA1
 

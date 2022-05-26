@@ -27,8 +27,13 @@
 #include "hardware/structs/rosc.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
-#include "bsp/board.h"
 #include "pico/unique_id.h"
+
+#include "pico/time.h"
+static inline uint32_t board_millis(void)
+{
+    return to_ms_since_boot(get_absolute_time());
+}
 
 void adc_start() {
     adc_init();

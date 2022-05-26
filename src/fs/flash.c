@@ -22,7 +22,6 @@
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 #include "ccid2040.h"
-#include "tusb.h"
 #include "file.h"
 
 /*

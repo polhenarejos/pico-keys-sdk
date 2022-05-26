@@ -15,20 +15,25 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include <stdio.h>
 
 // Pico
 #include "pico/stdlib.h"
-#include <stdlib.h>
 
 // For memcpy
 #include <string.h>
 
-#include "bsp/board.h"
-#include "tusb.h"
-#include "usb_descriptors.h"
-#include "device/usbd_pvt.h"
+// Include descriptor struct definitions
+#include "usb_common.h"
+// USB register definitions from pico-sdk
+#include "hardware/regs/usb.h"
+// USB hardware struct definitions from pico-sdk
+#include "hardware/structs/usb.h"
+// For interrupt enable and numbers
+#include "hardware/irq.h"
+// For resetting the USB controller
+#include "hardware/resets.h"
+
 #include "pico/multicore.h"
 #include "random.h"
 #include "ccid2040.h"
@@ -271,105 +276,8 @@ static void ccid_notify_slot_change(struct ccid *c)
 
 #define USB_CCID_TIMEOUT (50)
 
-#define GPG_THREAD_TERMINATED 0xffff
-#define GPG_ACK_TIMEOUT 0x6600
-
-static void ccid_init_cb(void) {
-    struct ccid *c = &ccid;
-    TU_LOG1("-------- CCID INIT\r\n");
-    vendord_init();
-
-    //ccid_notify_slot_change(c);
-}
-
-static void ccid_reset_cb(uint8_t rhport) {
-    TU_LOG1("-------- CCID RESET\r\n");
-    itf_num = 0;
-    vendord_reset(rhport);
-}
-
-static uint16_t ccid_open(uint8_t rhport, tusb_desc_interface_t const *itf_desc, uint16_t max_len) {
-    uint8_t *itf_vendor = (uint8_t *)malloc(sizeof(uint8_t)*max_len);
-    TU_LOG1("-------- CCID OPEN\r\n");
-    TU_VERIFY(itf_desc->bInterfaceClass == TUSB_CLASS_SMART_CARD && itf_desc->bInterfaceSubClass == 0 && itf_desc->bInterfaceProtocol == 0, 0);
-
-    //vendord_open expects a CLASS_VENDOR interface class
-    memcpy(itf_vendor, itf_desc, sizeof(uint8_t)*max_len);
-    ((tusb_desc_interface_t *)itf_vendor)->bInterfaceClass = TUSB_CLASS_VENDOR_SPECIFIC;
-    vendord_open(rhport, (tusb_desc_interface_t *)itf_vendor, max_len);
-    free(itf_vendor);
-
-    uint16_t const drv_len = sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t);
-    TU_VERIFY(max_len >= drv_len, 0);
-
-    itf_num = itf_desc->bInterfaceNumber;
-    return drv_len;
-}
-
-// Support for parameterized reset via vendor interface control request
-static bool ccid_control_xfer_cb(uint8_t __unused rhport, uint8_t stage, tusb_control_request_t const * request) {
-    // nothing to do with DATA & ACK stage
-    TU_LOG2("-------- CCID CTRL XFER\r\n");
-    if (stage != CONTROL_STAGE_SETUP) return true;
-
-    if (request->wIndex == itf_num)
-    {
-        TU_LOG2("-------- bmRequestType %x, bRequest %x, wValue %x, wLength %x\r\n",request->bmRequestType,request->bRequest, request->wValue, request->wLength);
-/*
-#if PICO_STDIO_USB_RESET_INTERFACE_SUPPORT_RESET_TO_BOOTSEL
-        if (request->bRequest == RESET_REQUEST_BOOTSEL) {
-#ifdef PICO_STDIO_USB_RESET_BOOTSEL_ACTIVITY_LED
-            uint gpio_mask = 1u << PICO_STDIO_USB_RESET_BOOTSEL_ACTIVITY_LED;
-#else
-            uint gpio_mask = 0u;
-#endif
-#if !PICO_STDIO_USB_RESET_BOOTSEL_FIXED_ACTIVITY_LED
-            if (request->wValue & 0x100) {
-                gpio_mask = 1u << (request->wValue >> 9u);
-            }
-#endif
-            reset_usb_boot(gpio_mask, (request->wValue & 0x7f) | PICO_STDIO_USB_RESET_BOOTSEL_INTERFACE_DISABLE_MASK);
-            // does not return, otherwise we'd return true
-        }
-#endif
-
-#if PICO_STDIO_USB_RESET_INTERFACE_SUPPORT_RESET_TO_FLASH_BOOT
-        if (request->bRequest == RESET_REQUEST_FLASH) {
-            watchdog_reboot(0, 0, PICO_STDIO_USB_RESET_RESET_TO_FLASH_DELAY_MS);
-            return true;
-        }
-#endif
-*/
-        return true;
-    }
-    return false;
-}
-
-static bool ccid_xfer_cb(uint8_t rhport, uint8_t ep_addr, xfer_result_t result, uint32_t xferred_bytes) {
-    //TU_LOG2("------ CALLED XFER_CB\r\n");
-    return vendord_xfer_cb(rhport, ep_addr, result, xferred_bytes);
-    //return true;
-}
-
-
-static usbd_class_driver_t const ccid_driver = {
-#if CFG_TUSB_DEBUG >= 2
-    .name = "CCID",
-#endif
-    .init             = ccid_init_cb,
-    .reset            = ccid_reset_cb,
-    .open             = ccid_open,
-    .control_xfer_cb  = ccid_control_xfer_cb,
-    .xfer_cb          = ccid_xfer_cb,
-    .sof              = NULL
-};
-
-// Implement callback to add our custom driver
-usbd_class_driver_t const *usbd_app_driver_get_cb(uint8_t *driver_count) {
-    *driver_count = 1;
-    return &ccid_driver;
-}
-
+#define CCID_THREAD_TERMINATED 0xffff
+#define CCID_ACK_TIMEOUT 0x6600
 
 static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
@@ -378,6 +286,44 @@ void led_set_blink(uint32_t mode) {
 }
 
 void execute_tasks();
+
+#include "hardware/structs/ioqspi.h"
+#define BUTTON_STATE_ACTIVE   0
+
+bool __no_inline_not_in_flash_func(get_bootsel_button)() {
+    const uint CS_PIN_INDEX = 1;
+
+    // Must disable interrupts, as interrupt handlers may be in flash, and we
+    // are about to temporarily disable flash access!
+    uint32_t flags = save_and_disable_interrupts();
+
+    // Set chip select to Hi-Z
+    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
+                    GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    // Note we can't call into any sleep functions in flash right now
+    for (volatile int i = 0; i < 1000; ++i);
+
+    // The HI GPIO registers in SIO can observe and control the 6 QSPI pins.
+    // Note the button pulls the pin *low* when pressed.
+    bool button_state = (sio_hw->gpio_hi_in & (1u << CS_PIN_INDEX));
+
+    // Need to restore the state of chip select, else we are going to have a
+    // bad time when we return to code in flash!
+    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
+                    GPIO_OVERRIDE_NORMAL << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    restore_interrupts(flags);
+
+    return button_state;
+}
+
+static uint32_t board_button_read(void)
+{
+    return BUTTON_STATE_ACTIVE == get_bootsel_button();
+}
 
 static bool wait_button() {
     uint32_t start_button = board_millis();
@@ -406,12 +352,12 @@ static bool wait_button() {
     return timeout;
 }
 
-void usb_tx_enable(const uint8_t *buf, uint32_t len)  {
+void usb_tx_enable(const uint8_t *wbuf, uint32_t len)  {
     if (len > 0) {
-        if (buf[0] != 0x81)
-            DEBUG_PAYLOAD(buf,len);
-        //DEBUG_PAYLOAD(buf,len);
-        tud_vendor_write(buf, len);
+        //if (wbuf[0] != 0x81)
+            DEBUG_PAYLOAD(wbuf,len);
+        //DEBUG_PAYLOAD(wbuf,len);
+        usb_write(wbuf, len);
     }
 }
 
@@ -439,7 +385,7 @@ static const uint8_t ATR_head[] = {
 
 /* Send back ATR (Answer To Reset) */
 static enum ccid_state ccid_power_on(struct ccid *c) {
-    TU_LOG1("!!! CCID POWER ON %d\r\n",c->application);
+    printf("!!! CCID POWER ON %d\r\n",c->application);
     uint8_t p[CCID_MSG_HEADER_SIZE+1]; /* >= size of historical_bytes -1 */
     size_t size_atr = (ccid_atr ? ccid_atr[0] : 0);
     if (c->application == 0) {
@@ -499,8 +445,10 @@ static void ccid_send_status(struct ccid *c) {
     /* This is a single packet Bulk-IN transaction */
     c->epi->buf = NULL;
     c->epi->tx_done = 1;
+    
 
     memcpy(endp1_tx_buf, ccid_reply, CCID_MSG_HEADER_SIZE);
+    
     usb_tx_enable(endp1_tx_buf, CCID_MSG_HEADER_SIZE);
     c->tx_busy = 1;
 }
@@ -786,7 +734,7 @@ static enum ccid_state ccid_handle_data(struct ccid *c)
 {
     enum ccid_state next_state = c->ccid_state;
 
-    TU_LOG3("---- CCID STATE %d,msg_type %x,start %d\r\n",c->ccid_state,c->ccid_header.msg_type,CCID_STATE_START);
+    printf("---- CCID STATE %d,msg_type %x,start %d\r\n",c->ccid_state,c->ccid_header.msg_type,CCID_STATE_START);
     if (c->err != 0) {
         ccid_reset(c);
         ccid_error(c, CCID_OFFSET_DATA_LEN);
@@ -952,7 +900,7 @@ static int end_abdata(struct ep_out *epo, size_t orig_len) {
     if (orig_len == USB_LL_BUF_SIZE && len < c->ccid_header.data_len)
         /* more packet comes */
         return 1;
-
+printf("!!end_abdata len %d %d\r\n",len,c->ccid_header.data_len);
     if (len != c->ccid_header.data_len)
         epo->err = 1;
 
@@ -963,7 +911,7 @@ static int end_cmd_apdu_head(struct ep_out *epo, size_t orig_len) {
     struct ccid *c = (struct ccid *)epo->priv;
 
     (void)orig_len;
-
+printf("!!end_cmd_apdu_head len %d %d %d\r\n",epo->cnt,c->ccid_header.data_len,epo->cnt);
     if (epo->cnt < 4 || epo->cnt != c->ccid_header.data_len) {
         epo->err = 1;
         return 0;
@@ -1173,6 +1121,7 @@ static void ccid_rx_ready(uint16_t len) {
     int offset = 0;
     int cont;
     size_t orig_len = len;
+    printf("epo buf_len %d\r\n",epo->buf_len);
     while (epo->err == 0) {
         if (len == 0)
             break;
@@ -1257,13 +1206,13 @@ static void ccid_tx_done () {
 }
 
 static int usb_event_handle(struct ccid *c) {
-    TU_LOG3("!!! tx %d, vendor %d, cfg %d, rx %d\r\n",c->tx_busy,tud_vendor_n_write_available(0),CFG_TUD_VENDOR_TX_BUFSIZE,tud_vendor_available());
-    if (c->tx_busy == 1 && tud_vendor_n_write_available(0) == CFG_TUD_VENDOR_TX_BUFSIZE) {
+    //printf("!!! tx %d, rx %d\r\n",c->tx_busy,usb_read_available());
+    //if (c->tx_busy == 1 && tud_vendor_n_write_available(0) == CFG_TUD_VENDOR_TX_BUFSIZE) {
+    if (c->tx_busy == 1)
         ccid_tx_done ();
-    }
-    if (tud_vendor_available() && c->epo->ready) {
-        uint32_t count = tud_vendor_read(endp1_rx_buf, sizeof(endp1_rx_buf));
-        if (endp1_rx_buf[0] != 0x65)
+    if (usb_read_available() && c->epo->ready) {
+        uint32_t count = usb_read(endp1_rx_buf, sizeof(endp1_rx_buf));
+        //if (endp1_rx_buf[0] != 0x65)
             DEBUG_PAYLOAD(endp1_rx_buf, count);
         //DEBUG_PAYLOAD(endp1_rx_buf, count);
         ccid_rx_ready(count);
@@ -1349,9 +1298,9 @@ void card_thread() {
 
 void ccid_task(void) {
     struct ccid *c = &ccid;
-    if (tud_vendor_mounted()) {
+    if (usb_is_configured()) {
         // connected and there are data available
-        if ((c->epo->ready && tud_vendor_available()) || (tud_vendor_n_write_available(0) == CFG_TUD_VENDOR_TX_BUFSIZE && c->tx_busy == 1)) {
+        if ((c->epo->ready && usb_read_available()) || (c->tx_busy == 1)) {
             if (usb_event_handle (c) != 0) {
                 if (c->application) {
                     uint32_t flag = EV_EXIT;
@@ -1369,7 +1318,7 @@ void ccid_task(void) {
         uint32_t m = 0x0;
         bool has_m = queue_try_remove(&c->ccid_comm, &m);
         if (m != 0)
-            TU_LOG3("\r\n ------ M = %d\r\n",m);
+            printf("\r\n ------ M = %d\r\n",m);
         if (has_m) {
             if (m == EV_CARD_CHANGE) {
 	            if (c->ccid_state == CCID_STATE_NOCARD)
@@ -1393,7 +1342,7 @@ void ccid_task(void) {
             else if (m == EV_EXEC_FINISHED) {
 	            if (c->ccid_state == CCID_STATE_EXECUTE) {
 	                exec_done:
-            	    if (c->a->sw == GPG_THREAD_TERMINATED) {
+            	    if (c->a->sw == CCID_THREAD_TERMINATED) {
                 		c->sw1sw2[0] = 0x90;
                 		c->sw1sw2[1] = 0x00;
                 		c->state = APDU_STATE_RESULT;
@@ -1441,9 +1390,7 @@ void ccid_task(void) {
             timeout -= MIN(board_millis()-prev_millis,timeout);
             if (timeout == 0) {
                 if (c->timeout_cnt == 7 && c->ccid_state == CCID_STATE_ACK_REQUIRED_1) {
-                    c->a->sw = GPG_ACK_TIMEOUT;
-                    c->a->res_apdu_data_len = 0;
-                    c->a->sw = GPG_ACK_TIMEOUT;
+                    c->a->sw = CCID_ACK_TIMEOUT;
                     c->a->res_apdu_data_len = 0;
     
                     goto exec_done;
@@ -1453,10 +1400,6 @@ void ccid_task(void) {
             }
         }
     }
-}
-
-void tud_mount_cb() {
-    ccid_prepare_receive (&ccid);
 }
 
 void led_blinking_task() {
@@ -1567,7 +1510,7 @@ pico_unique_board_id_t unique_id;
 void execute_tasks() {
     prev_millis = board_millis();
     ccid_task();
-    tud_task(); // tinyusb device task
+    //tud_task(); // tinyusb device task
     led_blinking_task();
 }
 
@@ -1575,7 +1518,8 @@ int main(void) {
     struct apdu *a = &apdu;
     struct ccid *c = &ccid;
 
-    board_init();
+    //board_init();
+    stdio_init_all();
 
 #ifdef PIMORONI_TINY2040
     gpio_init(TINY2040_LED_R_PIN);
@@ -1590,11 +1534,10 @@ int main(void) {
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 #endif
 #endif
-    
 
     led_off_all();
 
-    tusb_init();
+    usb_init();
 
     prepare_ccid();
     
@@ -1603,6 +1546,8 @@ int main(void) {
     low_flash_init();
     
     init_rtc();
+    
+    ccid_prepare_receive(&ccid);
       
     while (1) {
         execute_tasks();

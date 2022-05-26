@@ -23,7 +23,7 @@
 // For resetting the USB controller
 #include "hardware/resets.h"
 
-
+extern void led_blinking_task();
 
 // Device descriptors
 
@@ -327,6 +327,27 @@ void usb_bus_reset(void) {
     configured = false;
 }
 
+bool usb_is_configured(void) {
+    return configured;
+}
+
+uint32_t usb_write(uint8_t *buffer, size_t buffer_size) {
+    struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP2_IN_ADDR);
+    usb_start_transfer(ep, buffer, MIN(buffer_size, 64));
+    return MIN(buffer_size, 64);
+}
+
+void usb_init() {
+    usb_device_init();
+    
+    // Wait until configured
+    while (!usb_is_configured()) {
+        tight_loop_contents();
+        led_blinking_task();
+    }
+    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
+}
+
 /**
  * @brief Send the requested string descriptor to the host.
  *
@@ -564,30 +585,45 @@ void ep0_out_handler(uint8_t *buf, uint16_t len) {
     ;
 }
 
-#define DEBUG_PAYLOAD(p,s) { \
-    printf("Payload %s (%d bytes):\r\n", #p,s);\
-    for (int i = 0; i < s; i += 16) {\
-        printf("%07Xh : ",i+p);\
-        for (int j = 0; j < 16; j++) {\
-            if (j < s-i) printf("%02X ",(p)[i+j]);\
-            else printf("   ");\
-            if (j == 7) printf(" ");\
-            } printf(":  "); \
-        for (int j = 0; j < MIN(16,s-i); j++) {\
-            printf("%c",(p)[i+j] == 0x0a || (p)[i+j] == 0x0d ? '\\' : (p)[i+j]);\
-            if (j == 7) printf(" ");\
-            }\
-            printf("\r\n");\
-        } printf("\r\n"); \
-    }
-    
-
 // Device specific functions
+static uint8_t rx_buffer[4096];
+static uint16_t w_offset = 0, r_offset = 0;
 void ep1_out_handler(uint8_t *buf, uint16_t len) {
     printf("RX %d bytes from host\n", len);
     // Send data back to host
-    struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP2_IN_ADDR);
-    DEBUG_PAYLOAD(buf,len);
+    uint16_t size = MIN(sizeof(rx_buffer)-w_offset,len);
+    if (size > 0) {
+        memcpy(rx_buffer+w_offset, buf, size);
+        w_offset += size;
+    }
+    /*
+    do {
+        uint16_t size = MIN(sizeof(rx_buffer)-w_offset,len);
+        memcpy(rx_buffer+w_offset, buf, size);
+        len -= size;
+        w_offset += size;
+        if (w_offset == sizeof(rx_buffer))
+            w_offset = 0;
+        buf += size;
+    } while (len > 0);
+    */
+}
+
+uint16_t usb_read_available() {
+    return w_offset - r_offset;
+}
+
+uint16_t usb_read(uint8_t *buffer, size_t buffer_size) {
+    if (w_offset-r_offset > 0) {
+        uint16_t size = MIN(buffer_size, w_offset-r_offset);
+        memcpy(buffer, rx_buffer+r_offset, size);
+        r_offset += size;
+        if (r_offset == w_offset) {
+            r_offset = w_offset = 0;
+        }            
+        return size;
+    }
+    return 0;
 }
 
 void ep2_in_handler(uint8_t *buf, uint16_t len) {
@@ -595,7 +631,7 @@ void ep2_in_handler(uint8_t *buf, uint16_t len) {
     // Get ready to rx again from host
     usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
 }
-
+/*
 int main(void) {
     stdio_init_all();
     printf("USB Device Low-Level hardware example\n");
@@ -639,3 +675,4 @@ int main(void) {
 
     return 0;
 }
+*/

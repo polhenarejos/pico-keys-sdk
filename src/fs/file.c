@@ -16,9 +16,9 @@
  */
 
 #include "file.h"
-#include "tusb.h"
 #include "ccid2040.h"
 #include <string.h>
+#include <stdio.h>
 
 extern const uintptr_t end_data_pool;
 extern const uintptr_t start_data_pool;

@@ -315,6 +315,11 @@ static const unsigned char *descriptor_strings[] = {
 
 #define USB_REQ_CCID        0xA1
 
+extern uint16_t usb_read(uint8_t *buffer, size_t buffer_size);
+extern uint16_t usb_read_available();
+extern uint32_t usb_write(uint8_t *buffer, size_t buffer_size);
+extern bool usb_is_configured();
+extern void usb_init();
 
 #endif
 

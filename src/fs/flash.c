@@ -79,7 +79,7 @@ uintptr_t allocate_free_addr(uint16_t size) {
             return 0x0;
         }
         //we check if |base-(next_addr+size_next_addr)| > |base-potential_addr| only if fid != 1xxx (not size blocked)
-        else if (addr_alg <= potential_addr && base-(next_base+flash_read_uint16(next_base+sizeof(uintptr_t)+sizeof(uintptr_t)+sizeof(uint16_t))+2*sizeof(uint16_t)+2*sizeof(uintptr_t)) > base-potential_addr && flash_read_uint16(next_base+sizeof(uintptr_t)) & 0x1000 != 0x1000) {
+        else if (addr_alg <= potential_addr && base-(next_base+flash_read_uint16(next_base+sizeof(uintptr_t)+sizeof(uintptr_t)+sizeof(uint16_t))+2*sizeof(uint16_t)+2*sizeof(uintptr_t)) > base-potential_addr && (flash_read_uint16(next_base+sizeof(uintptr_t)) & 0x1000) != 0x1000) {
             flash_program_uintptr(potential_addr, next_base);
             flash_program_uintptr(potential_addr+sizeof(uintptr_t), base);
             flash_program_uintptr(base, potential_addr);

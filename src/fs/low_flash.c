@@ -138,7 +138,6 @@ page_flash_t *find_free_page(uintptr_t addr) {
 }
 
 int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
-    uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
     page_flash_t *p = NULL;
     
     if (!data || len == 0)
@@ -213,7 +212,6 @@ uint8_t flash_read_uint8(uintptr_t addr) {
 }
 
 int flash_erase_page (uintptr_t addr, size_t page_size) {
-    uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
     page_flash_t *p = NULL;
     
     mutex_enter_blocking(&mtx_flash);

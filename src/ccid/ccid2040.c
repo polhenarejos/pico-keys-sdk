@@ -42,8 +42,6 @@
 extern void do_flash();
 extern void low_flash_init();
 
-static uint8_t itf_num;
-
 #define USB_CCID_TIMEOUT (50)
 static bool waiting_timeout = false;
 const uint8_t *ccid_atr = NULL;
@@ -204,7 +202,8 @@ queue_t card_to_ccid_q;
 uint8_t ccid_status = 1;
 
 void ccid_write_offset(uint16_t size, uint16_t offset) {
-    DEBUG_PAYLOAD(usb_get_tx()+offset,size+10);
+    if (*usb_get_tx() != 0x81)
+        DEBUG_PAYLOAD(usb_get_tx()+offset,size+10);
     usb_write_offset(size+10, offset);
 }
 
@@ -218,14 +217,16 @@ struct ccid_header *ccid_response;
 struct ccid_header *ccid_header;
 uint8_t *rdata_gr = NULL;
 uint16_t rdata_bk = 0x0;
+
 static int usb_event_handle() {
     uint16_t rx_read = usb_read_available();
     if (rx_read >= 10) {
-        struct ccid_header *tccid = usb_get_rx();
-        printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
+        struct ccid_header *tccid = (struct ccid_header *)usb_get_rx();
+        //printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
         if (tccid->dwLength <= rx_read-10) {
             usb_read(rx_copy, sizeof(rx_copy));
-            DEBUG_PAYLOAD(rx_copy,rx_read);
+            if (ccid_header->bMessageType != 0x65)
+                DEBUG_PAYLOAD(rx_copy,rx_read);
             if (ccid_header->bMessageType == 0x65) {
                 ccid_response->bMessageType = CCID_SLOT_STATUS_RET;
                 ccid_response->dwLength = 0;
@@ -243,13 +244,10 @@ static int usb_event_handle() {
                 ccid_response->bSeq = ccid_header->bSeq;
                 ccid_response->abRFU0 = 0;
                 ccid_response->abRFU1 = 0;
-                printf("1 %x %x %x || %x %x %x\r\n",ccid_response->apdu,apdu.rdata,ccid_response,ccid_header,ccid_header->apdu,apdu.data);
+                //printf("1 %x %x %x || %x %x %x\r\n",ccid_response->apdu,apdu.rdata,ccid_response,ccid_header,ccid_header->apdu,apdu.data);
                 memcpy(apdu.rdata, ccid_atr+1, size_atr);
-                printf("1\r\n");
                 multicore_reset_core1();
-                printf("1\r\n");
                 multicore_launch_core1(card_thread);
-                printf("1\r\n");
                 led_set_blink(BLINK_MOUNTED);
                 ccid_status = 0;
                 ccid_write(size_atr);
@@ -269,8 +267,6 @@ static int usb_event_handle() {
             }
             else if (ccid_header->bMessageType == 0x6F) {
                 apdu.nc = apdu.ne = 0;
-                printf("6f %d %x\n",ccid_header->dwLength,ccid_header->apdu);
-                DEBUG_PAYLOAD(apdu.header,10);
                 if (ccid_header->dwLength == 4) {
                     apdu.nc = apdu.ne = 0;
                     if (apdu.ne == 0)
@@ -307,10 +303,10 @@ static int usb_event_handle() {
                             apdu.ne = 256;
                     }
                 }
-                printf("apdu.nc %d, apdu.ne %d\r\n",apdu.nc,apdu.ne);
+                //printf("apdu.nc %d, apdu.ne %d\r\n",apdu.nc,apdu.ne);
                 if (apdu.header[1] == 0xc0) {
-                    printf("apdu.ne %d, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
-                    ccid_response = rdata_gr-10;
+                    //printf("apdu.ne %d, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
+                    ccid_response = (struct ccid_header *)(rdata_gr-10);
                     *(uint16_t *)rdata_gr = rdata_bk;
                     if (apdu.rlen <= apdu.ne) {
                         ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
@@ -342,7 +338,7 @@ static int usb_event_handle() {
                 else {
                     apdu.sw = 0;
                     apdu.rlen = 0;
-                    ccid_response = usb_get_tx();
+                    ccid_response = (struct ccid_header *)usb_get_tx();
                     ccid_response->apdu = usb_get_tx()+10;
                     apdu.rdata = ccid_response->apdu;
                     rdata_gr = apdu.rdata;
@@ -408,8 +404,9 @@ void card_thread() {
 	        goto done;
 	    }
         else if (m == EV_EXIT) {
-            if (current_app && current_app->unload)
+            if (current_app && current_app->unload) {
                 current_app->unload();
+            }
 	        break;
 	    }
 
@@ -436,10 +433,10 @@ void ccid_task(void) {
         uint32_t m = 0x0;
         bool has_m = queue_try_remove(&card_to_ccid_q, &m);
         if (m != 0)
-            printf("\r\n ------ M = %d\r\n",m);
+            printf("\r\n ------ M = %lu\r\n",m);
         if (has_m) {
             if (m == EV_EXEC_FINISHED) {
-                printf("sw %x %d, %d\r\n",apdu.sw,apdu.rlen,apdu.ne);
+                //printf("sw %x %d, %d\r\n",apdu.sw,apdu.rlen,apdu.ne);
                 apdu.rdata[apdu.rlen] = apdu.sw >> 8;
                 apdu.rdata[apdu.rlen+1] = apdu.sw & 0xff;
                 waiting_timeout = false;
@@ -471,6 +468,10 @@ void ccid_task(void) {
                 }
                 led_set_blink(BLINK_MOUNTED);
             }
+        	else if (m == EV_PRESS_BUTTON) {
+        	    uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
+        	    queue_try_add(&ccid_to_card_q, &flag);
+        	}
             /*
             if (m == EV_RX_DATA_READY) {
         	    c->ccid_state = ccid_handle_data(c);
@@ -518,10 +519,6 @@ void ccid_task(void) {
         	        c->tx_busy = 0;
         	    if (c->state == APDU_STATE_WAIT_COMMAND || c->state == APDU_STATE_COMMAND_CHAINING || c->state == APDU_STATE_RESULT_GET_RESPONSE)
         	        ccid_prepare_receive(c);
-        	}
-        	else if (m == EV_PRESS_BUTTON) {
-        	    uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
-        	    queue_try_add(&c->card_comm, &flag);
         	}
         	*/
         }
@@ -660,12 +657,12 @@ void execute_tasks() {
 }
 
 int main(void) {
-    ccid_header = rx_copy;
+    ccid_header = (struct ccid_header *)rx_copy;
     ccid_header->apdu = rx_copy+10;
     
     apdu.header = ccid_header->apdu;
         
-    ccid_response = usb_get_tx();
+    ccid_response = (struct ccid_header *)usb_get_tx();
     ccid_response->apdu = usb_get_tx()+10;
     apdu.rdata = ccid_response->apdu;
     

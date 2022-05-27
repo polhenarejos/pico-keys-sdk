@@ -144,9 +144,7 @@ void *neug_task() {
 void neug_init(uint32_t *buf, uint8_t size) {
     pico_unique_board_id_t unique_id;
     pico_get_unique_board_id(&unique_id);
-    const uint32_t *u = (const uint32_t *)unique_id.id;
     struct rng_rb *rb = &the_ring_buffer;
-    int i;
 
     rb_init(rb, buf, size);
     

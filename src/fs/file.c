@@ -36,8 +36,6 @@ extern void low_flash_available();
 
 //puts FCI in the RAPDU
 void process_fci(const file_t *pe, int fmd) {
-    uint8_t *p = res_APDU;
-    uint8_t buf[64];
     res_APDU_size = 0;
     if (fmd) {
         res_APDU[res_APDU_size++] = 0x6f;
@@ -185,7 +183,7 @@ bool authenticate_action(const file_t *ef, uint8_t op) {
         return true;
     else if (acl == 0xff)
         return false;
-    else if (acl == 0x90 || acl & 0x9F == 0x10) {
+    else if (acl == 0x90 || (acl & 0x9F) == 0x10) {
             // PIN required.
         if (isUserAuthenticated) {
             return true;
@@ -222,7 +220,6 @@ void scan_flash() {
     }
     printf("SCAN\r\n");
 
-    uintptr_t base = flash_read_uintptr(end_data_pool);
     for (uintptr_t base = flash_read_uintptr(end_data_pool); base >= start_data_pool; base = flash_read_uintptr(base)) {
         if (base == 0x0) //all is empty
             break;

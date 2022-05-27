@@ -45,7 +45,7 @@ extern const uint8_t historical_bytes[];
 #define DEBUG_PAYLOAD(p,s) { \
     printf("Payload %s (%d bytes):\r\n", #p,s);\
     for (int i = 0; i < s; i += 16) {\
-        printf("%07Xh : ",i+p);\
+        printf("%07Xh : ",(unsigned int)(i+p));\
         for (int j = 0; j < 16; j++) {\
             if (j < s-i) printf("%02X ",(p)[i+j]);\
             else printf("   ");\

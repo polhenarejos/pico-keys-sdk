@@ -45,6 +45,15 @@ static volatile bool configured = false;
 // Global data buffer for EP0
 static uint8_t ep0_buf[64];
 
+
+static const unsigned char *descriptor_strings[] = {
+        (unsigned char *) "Virtual SC",    // Vendor
+        (unsigned char *) "CCID", // Product
+        (unsigned char *) "11223344",
+        (unsigned char *) "Config rocks",
+        (unsigned char *) "Interface rocks"
+};
+
 // Struct defining the device configuration
 static struct usb_device_configuration dev_config = {
         .device_descriptor = &device_descriptor,
@@ -238,22 +247,26 @@ static inline bool ep_is_tx(struct usb_endpoint_configuration *ep) {
  * @param buf, the data buffer to send. Only applicable if the endpoint is TX
  * @param len, the length of the data in buf (this example limits max len to one packet - 64 bytes)
  */
-void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uint16_t len) {
+void usb_start_transfer_last(struct usb_endpoint_configuration *ep, uint8_t *buf, uint16_t len, bool last) {
     // We are asserting that the length is <= 64 bytes for simplicity of the example.
     // For multi packet transfers see the tinyusb port.
     assert(len <= 64);
-
-    //printf("Start transfer of len %d on ep addr 0x%x\n", len, ep->descriptor->bEndpointAddress);
+    
+    //if (configured == false || len == 64)
+        printf("Start transfer\n");
 
     // Prepare buffer control register value
-    uint32_t val = len | USB_BUF_CTRL_AVAIL;
-    printf("VAL %d (%x)\n",val,val);
+    uint32_t val = len | USB_BUF_CTRL_AVAIL | USB_BUF_CTRL_SEL;
+    //printf("VAL %d (%x)\n",val,val);
 
     if (ep_is_tx(ep)) {
         // Need to copy the data from the user buffer to the usb memory
-        memcpy((void *) ep->data_buffer, (void *) buf, len);
+        if (buf)
+            memcpy((void *) ep->data_buffer, (void *) buf, len);
         // Mark as full
         val |= USB_BUF_CTRL_FULL;
+        if (last)
+            val |= USB_BUF_CTRL_LAST;
     }
 
     // Set pid and flip for next transfer
@@ -261,6 +274,9 @@ void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uin
     ep->next_pid ^= 1u;
 
     *ep->buffer_control = val;
+}
+void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uint16_t len) {
+    usb_start_transfer_last(ep, buf, len, true);
 }
 
 /**
@@ -281,6 +297,7 @@ void usb_handle_device_descriptor(volatile struct usb_setup_packet *pkt) {
  *
  * @param pkt, the setup packet received from the host.
  */
+ 
 void usb_handle_config_descriptor(volatile struct usb_setup_packet *pkt) {
     uint8_t b[128];
     uint8_t *buf = &b[0];
@@ -305,14 +322,26 @@ void usb_handle_config_descriptor(volatile struct usb_setup_packet *pkt) {
                 buf += sizeof(struct usb_endpoint_descriptor);
             }
         }
-
     }
 
     // Send data
     // Get len by working out end of buffer subtract start of buffer
+    
     uint32_t len = (uint32_t) buf - (uint32_t) &b[0];
     for (int off = 0; off < len; off += 64)
-        usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), &b[off], MIN(MIN(len-off,64),pkt->wLength));
+        usb_start_transfer_last(usb_get_endpoint_configuration(EP0_IN_ADDR), b+off, MIN(len, 64),off+64>=len);
+    //if (len >= 64)
+    //    usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
+    //usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
+    //usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 64);
+    //usb_start_transfer(usb_get_endpoint_configuration(EP0_OUT_ADDR), NULL, 0);
+    usb_start_transfer(usb_get_endpoint_configuration(EP0_OUT_ADDR), NULL, 64);
+    /*
+    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 0);
+    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
+    usb_start_transfer(usb_get_endpoint_configuration(EP2_IN_ADDR), NULL, 0);
+    usb_start_transfer(usb_get_endpoint_configuration(EP2_IN_ADDR), NULL, 64);
+    */
 }
 
 /**
@@ -380,7 +409,7 @@ void usb_set_device_address(volatile struct usb_setup_packet *pkt) {
     // Set address is a bit of a strange case because we have to send a 0 length status packet first with
     // address 0
     dev_addr = (pkt->wValue & 0xff);
-    printf("Set address %d\r\n", dev_addr);
+    //printf("Set address %d\r\n", dev_addr);
     // Will set address in the callback phase
     should_set_address = true;
     usb_acknowledge_out_request();
@@ -394,7 +423,7 @@ void usb_set_device_address(volatile struct usb_setup_packet *pkt) {
  */
 void usb_set_device_configuration(volatile struct usb_setup_packet *pkt) {
     // Only one configuration so just acknowledge the request
-    printf("Device Enumerated\r\n");
+    //usb_get_endpoint_configuration(EP0_OUT_ADDR)printf("Device Enumerated\r\n");
     usb_acknowledge_out_request();
     configured = true;
 }
@@ -413,19 +442,19 @@ void usb_handle_setup_packet(void) {
     usb_get_endpoint_configuration(EP0_IN_ADDR)->next_pid = 1u;
     
     if (req_type != USB_REQ_TYPE_STANDARD) {
-        printf("NON STANDARD TYPE REQUEST\r\n");
+        //printf("NON STANDARD TYPE REQUEST\r\n");
     }
     else {
         if (req_direction == USB_DIR_OUT) {
             if (req == USB_REQUEST_SET_ADDRESS) {
                 usb_set_device_address(pkt);
-                printf("SET ADDRESS\r\n");
+                //printf("SET ADDRESS\r\n");
             } else if (req == USB_REQUEST_SET_CONFIGURATION) {
                 usb_set_device_configuration(pkt);
-                printf("SET CONFIGURATION\r\n");
+                //printf("SET CONFIGURATION\r\n");
             } else {
                 usb_acknowledge_out_request();
-                printf("Other OUT request (0x%x)\r\n", pkt->bRequest);
+                //printf("Other OUT request (0x%x)\r\n", pkt->bRequest);
             }
         } else if (req_direction == USB_DIR_IN) {
             if (req == USB_REQUEST_GET_DESCRIPTOR) {
@@ -434,28 +463,28 @@ void usb_handle_setup_packet(void) {
                 switch (descriptor_type) {
                     case USB_DT_DEVICE:
                         usb_handle_device_descriptor(pkt);
-                        printf("GET DEVICE DESCRIPTOR\r\n");
+                        //printf("GET DEVICE DESCRIPTOR\r\n");
                         break;
     
                     case USB_DT_CONFIG:
                         usb_handle_config_descriptor(pkt);
-                        printf("GET CONFIG DESCRIPTOR\r\n");
+                        //printf("GET CONFIG DESCRIPTOR\r\n");
                         break;
     
                     case USB_DT_STRING:
                         usb_handle_string_descriptor(pkt);
-                        printf("GET STRING DESCRIPTOR\r\n");
+                        //printf("GET STRING DESCRIPTOR\r\n");
                         break;
     
                     default:
-                        printf("Unhandled GET_DESCRIPTOR type 0x%x\r\n", descriptor_type);
+                        //printf("Unhandled GET_DESCRIPTOR type 0x%x\r\n", descriptor_type);
                         usb_acknowledge_out_request();
                 }
             } else if (req == USB_REQUEST_GET_STATUS) {
                 uint16_t status = 2;
                 usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), (uint8_t *) &status, MIN(sizeof(uint16_t),pkt->wLength));
             } else {
-                printf("Other IN request (0x%x)\r\n", pkt->bRequest);
+                //printf("Other IN request (0x%x)\r\n", pkt->bRequest);
                 usb_acknowledge_out_request();
             }
         }
@@ -579,30 +608,13 @@ void ep0_out_handler(uint8_t *buf, uint16_t len) {
     ;
 }
 
-#define DEBUG_PAYLOAD(p,s) { \
-    printf("Payload %s (%d bytes):\r\n", #p,s);\
-    for (int i = 0; i < s; i += 16) {\
-        printf("%07Xh : ",i+p);\
-        for (int j = 0; j < 16; j++) {\
-            if (j < s-i) printf("%02X ",(p)[i+j]);\
-            else printf("   ");\
-            if (j == 7) printf(" ");\
-            } printf(":  "); \
-        for (int j = 0; j < MIN(16,s-i); j++) {\
-            printf("%c",(p)[i+j] == 0x0a || (p)[i+j] == 0x0d ? '\\' : (p)[i+j]);\
-            if (j == 7) printf(" ");\
-            }\
-            printf("\r\n");\
-        } printf("\r\n"); \
-    }
-    
 // Device specific functions
 static uint8_t rx_buffer[4096], tx_buffer[4096];
 static uint16_t w_offset = 0, r_offset = 0;
 
 void ep1_out_handler(uint8_t *buf, uint16_t len) {
-    printf("RX %d bytes from host\n", len);
-    DEBUG_PAYLOAD(buf,len);
+    //printf("RX %d bytes from host\n", len);
+    //DEBUG_PAYLOAD(buf,len);
     // Send data back to host
     uint16_t size = MIN(sizeof(rx_buffer)-w_offset,len);
     if (size > 0) {
@@ -622,6 +634,9 @@ uint32_t usb_write_offset(uint16_t size, uint16_t roffset) {
     struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP2_IN_ADDR);
     for (uint16_t offset = roffset; offset-roffset < size; offset += 64) {
         usb_start_transfer(ep, tx_buffer+offset, MIN(size-offset, 64));
+        if (size-offset == 64) {
+            usb_start_transfer(ep, NULL, 0);
+        }
     }
     usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
     return size;

@@ -305,13 +305,6 @@ static const unsigned char lang_descriptor[] = {
         0x09, 0x04 // language id = us english
 };
 
-static const unsigned char *descriptor_strings[] = {
-        (unsigned char *) "Virtual SC",    // Vendor
-        (unsigned char *) "CCID", // Product
-        (unsigned char *) "11223344",
-        (unsigned char *) "Configuration rocks",
-        (unsigned char *) "Interface rocks"
-};
 
 #define USB_REQ_CCID        0xA1
 

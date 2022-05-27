@@ -21,7 +21,6 @@
 #include "mbedtls/cmac.h"
 
 static uint8_t nonce[8];
-static uint8_t auth_token[8];
 static uint8_t sm_kmac[16];
 static uint8_t sm_kenc[16];
 static MSE_protocol sm_protocol = MSE_NONE;
@@ -113,7 +112,7 @@ int sm_unwrap() {
     aes_decrypt(sm_kenc, sm_iv, 128, HSM_AES_MODE_CBC, body, body_size);
     memmove(apdu.data, body, body_size);
     apdu.nc = sm_remove_padding(apdu.data, body_size);
-    DEBUG_PAYLOAD(apdu.data, apdu.nc);
+    DEBUG_PAYLOAD(apdu.data, (int)apdu.nc);
     return CCID_OK;
 }
 
@@ -129,6 +128,8 @@ int sm_wrap() {
     mbedtls_mpi_add_int(&ssc, &sm_mSSC, 1);
     mbedtls_mpi_copy(&sm_mSSC, &ssc);
     int r = mbedtls_mpi_write_binary(&ssc, input, sm_blocksize);
+    if (r != 0)
+        return CCID_EXEC_ERROR;
     input_len += sm_blocksize;
     mbedtls_mpi_free(&ssc);
     if (res_APDU_size > 0) {

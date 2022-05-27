@@ -282,9 +282,9 @@ static int usb_event_handle() {
                     if (apdu.ne == 0)
                         apdu.ne = 256;
                 }
-                else if (ccid_header->dwLength == 9) {
+                else if (ccid_header->dwLength == 7) {
                     apdu.nc = 0;
-                    apdu.ne = (apdu.header[8] << 8) | apdu.header[9];
+                    apdu.ne = (apdu.header[5] << 8) | apdu.header[6];
                     if (apdu.ne == 0)
                         apdu.ne = 65536;
                 }
@@ -309,9 +309,9 @@ static int usb_event_handle() {
                 }
                 printf("apdu.nc %d, apdu.ne %d\r\n",apdu.nc,apdu.ne);
                 if (apdu.header[1] == 0xc0) {
-                    printf("apdu.ne %d, apdu.rlen %d\r\n",apdu.ne,apdu.rlen);
+                    printf("apdu.ne %d, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
                     ccid_response = rdata_gr-10;
-                    *rdata_gr = rdata_bk;
+                    *(uint16_t *)rdata_gr = rdata_bk;
                     if (apdu.rlen <= apdu.ne) {
                         ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
                         ccid_response->dwLength = apdu.rlen+2;
@@ -460,7 +460,7 @@ void ccid_task(void) {
                     ccid_response->abRFU0 = ccid_status;
                     ccid_response->abRFU1 = 0;
                     rdata_gr = apdu.rdata+apdu.ne;
-                    rdata_bk = *rdata_gr;
+                    rdata_bk = *(uint16_t *)rdata_gr;
                     rdata_gr[0] = 0x61;
                     if (apdu.rlen - apdu.ne >= 256)
                         rdata_gr[1] = 0;

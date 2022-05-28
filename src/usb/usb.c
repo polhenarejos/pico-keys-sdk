@@ -1,648 +1,91 @@
-/**
- * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+
+/* 
+ * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
+ * Copyright (c) 2022 Pol Henarejos.
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include "pico/unique_id.h"
+#include "ccid_version.h"
 
 #include <stdio.h>
 
 // Pico
 #include "pico/stdlib.h"
+#include "tusb.h"
+#include "device/usbd_pvt.h"
 
 // For memcpy
 #include <string.h>
-
-// Include descriptor struct definitions
-#include "usb_common.h"
-// USB register definitions from pico-sdk
-#include "hardware/regs/usb.h"
-// USB hardware struct definitions from pico-sdk
-#include "hardware/structs/usb.h"
-// For interrupt enable and numbers
-#include "hardware/irq.h"
-// For resetting the USB controller
-#include "hardware/resets.h"
-
-extern void led_blinking_task();
-
-// Device descriptors
-
-#define usb_hw_set hw_set_alias(usb_hw)
-#define usb_hw_clear hw_clear_alias(usb_hw)
-
-// Function prototypes for our device specific endpoint handlers defined
-// later on
-void ep0_in_handler(uint8_t *buf, uint16_t len);
-void ep0_out_handler(uint8_t *buf, uint16_t len);
-void ep1_out_handler(uint8_t *buf, uint16_t len);
-void ep2_in_handler(uint8_t *buf, uint16_t len);
-
-// Global device address
-static bool should_set_address = false;
-static uint8_t dev_addr = 0;
-static volatile bool configured = false;
-
-// Global data buffer for EP0
-static uint8_t ep0_buf[64];
-
-
-static const unsigned char *descriptor_strings[] = {
-        (unsigned char *) "Virtual SC",    // Vendor
-        (unsigned char *) "CCID", // Product
-        (unsigned char *) "11223344",
-        (unsigned char *) "Config rocks",
-        (unsigned char *) "Interface rocks"
-};
-
-// Struct defining the device configuration
-static struct usb_device_configuration dev_config = {
-        .device_descriptor = &device_descriptor,
-        .interface_descriptor = &interface_descriptor,
-        .config_descriptor = &config_descriptor,
-        .ccid_descriptor = &ccid_desc,
-        .lang_descriptor = lang_descriptor,
-        .descriptor_strings = descriptor_strings,
-        .endpoints = {
-                {
-                        .descriptor = &ep0_out,
-                        .handler = &ep0_out_handler,
-                        .endpoint_control = NULL, // NA for EP0
-                        .buffer_control = &usb_dpram->ep_buf_ctrl[0].out,
-                        // EP0 in and out share a data buffer
-                        .data_buffer = &usb_dpram->ep0_buf_a[0],
-                },
-                {
-                        .descriptor = &ep0_in,
-                        .handler = &ep0_in_handler,
-                        .endpoint_control = NULL, // NA for EP0,
-                        .buffer_control = &usb_dpram->ep_buf_ctrl[0].in,
-                        // EP0 in and out share a data buffer
-                        .data_buffer = &usb_dpram->ep0_buf_a[0],
-                },
-                {
-                        .descriptor = &ep1_out,
-                        .handler = &ep1_out_handler,
-                        // EP1 starts at offset 0 for endpoint control
-                        .endpoint_control = &usb_dpram->ep_ctrl[0].out,
-                        .buffer_control = &usb_dpram->ep_buf_ctrl[1].out,
-                        // First free EPX buffer
-                        .data_buffer = &usb_dpram->epx_data[0 * 64],
-                },
-                {
-                        .descriptor = &ep2_in,
-                        .handler = &ep2_in_handler,
-                        .endpoint_control = &usb_dpram->ep_ctrl[1].in,
-                        .buffer_control = &usb_dpram->ep_buf_ctrl[2].in,
-                        // Second free EPX buffer
-                        .data_buffer = &usb_dpram->epx_data[1 * 64],
-                }
-        }
-};
-
-/**
- * @brief Given an endpoint address, return the usb_endpoint_configuration of that endpoint. Returns NULL
- * if an endpoint of that address is not found.
- *
- * @param addr
- * @return struct usb_endpoint_configuration*
- */
-struct usb_endpoint_configuration *usb_get_endpoint_configuration(uint8_t addr) {
-    struct usb_endpoint_configuration *endpoints = dev_config.endpoints;
-    for (int i = 0; i < USB_NUM_ENDPOINTS; i++) {
-        if (endpoints[i].descriptor && (endpoints[i].descriptor->bEndpointAddress == addr)) {
-            return &endpoints[i];
-        }
-    }
-    return NULL;
-}
-
-/**
- * @brief Given a C string, fill the EP0 data buf with a USB string descriptor for that string.
- *
- * @param C string you would like to send to the USB host
- * @return the length of the string descriptor in EP0 buf
- */
-uint8_t usb_prepare_string_descriptor(const unsigned char *str) {
-    // 2 for bLength + bDescriptorType + strlen * 2 because string is unicode. i.e. other byte will be 0
-    uint8_t bLength = 2 + (strlen((const char *)str) * 2);
-    static const uint8_t bDescriptorType = 0x03;
-
-    volatile uint8_t *buf = &ep0_buf[0];
-    *buf++ = bLength;
-    *buf++ = bDescriptorType;
-
-    uint8_t c;
-
-    do {
-        c = *str++;
-        *buf++ = c;
-        *buf++ = 0;
-    } while (c != '\0');
-
-    return bLength;
-}
-
-/**
- * @brief Take a buffer pointer located in the USB RAM and return as an offset of the RAM.
- *
- * @param buf
- * @return uint32_t
- */
-static inline uint32_t usb_buffer_offset(volatile uint8_t *buf) {
-    return (uint32_t) buf ^ (uint32_t) usb_dpram;
-}
-
-/**
- * @brief Set up the endpoint control register for an endpoint (if applicable. Not valid for EP0).
- *
- * @param ep
- */
-void usb_setup_endpoint(const struct usb_endpoint_configuration *ep) {
-    //printf("Set up endpoint 0x%x with buffer address 0x%p\n", ep->descriptor->bEndpointAddress, ep->data_buffer);
-
-    // EP0 doesn't have one so return if that is the case
-    if (!ep->endpoint_control) {
-        return;
-    }
-
-    // Get the data buffer as an offset of the USB controller's DPRAM
-    uint32_t dpram_offset = usb_buffer_offset(ep->data_buffer);
-    uint32_t reg = EP_CTRL_ENABLE_BITS
-                   | EP_CTRL_INTERRUPT_PER_BUFFER
-                   | (ep->descriptor->bmAttributes << EP_CTRL_BUFFER_TYPE_LSB)
-                   | dpram_offset;
-    *ep->endpoint_control = reg;
-}
-
-/**
- * @brief Set up the endpoint control register for each endpoint.
- *
- */
-void usb_setup_endpoints() {
-    const struct usb_endpoint_configuration *endpoints = dev_config.endpoints;
-    for (int i = 0; i < USB_NUM_ENDPOINTS; i++) {
-        if (endpoints[i].descriptor && endpoints[i].handler) {
-            usb_setup_endpoint(&endpoints[i]);
-        }
-    }
-}
-
-/**
- * @brief Set up the USB controller in device mode, clearing any previous state.
- *
- */
-void usb_device_init() {
-    // Reset usb controller
-    reset_block(RESETS_RESET_USBCTRL_BITS);
-    unreset_block_wait(RESETS_RESET_USBCTRL_BITS);
-
-    // Clear any previous state in dpram just in case
-    memset(usb_dpram, 0, sizeof(*usb_dpram)); // <1>
-
-    // Enable USB interrupt at processor
-    irq_set_enabled(USBCTRL_IRQ, true);
-
-    // Mux the controller to the onboard usb phy
-    usb_hw->muxing = USB_USB_MUXING_TO_PHY_BITS | USB_USB_MUXING_SOFTCON_BITS;
-
-    // Force VBUS detect so the device thinks it is plugged into a host
-    usb_hw->pwr = USB_USB_PWR_VBUS_DETECT_BITS | USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS;
-
-    // Enable the USB controller in device mode.
-    usb_hw->main_ctrl = USB_MAIN_CTRL_CONTROLLER_EN_BITS;
-
-    // Enable an interrupt per EP0 transaction
-    usb_hw->sie_ctrl = USB_SIE_CTRL_EP0_INT_1BUF_BITS; // <2>
-
-    // Enable interrupts for when a buffer is done, when the bus is reset,
-    // and when a setup packet is received
-    usb_hw->inte = USB_INTS_BUFF_STATUS_BITS |
-                   USB_INTS_BUS_RESET_BITS |
-                   USB_INTS_SETUP_REQ_BITS;
-
-    // Set up endpoints (endpoint control registers)
-    // described by device configuration
-    usb_setup_endpoints();
-
-    // Present full speed device by enabling pull up on DP
-    usb_hw_set->sie_ctrl = USB_SIE_CTRL_PULLUP_EN_BITS;
-}
-
-/**
- * @brief Given an endpoint configuration, returns true if the endpoint
- * is transmitting data to the host (i.e. is an IN endpoint)
- *
- * @param ep, the endpoint configuration
- * @return true
- * @return false
- */
-static inline bool ep_is_tx(struct usb_endpoint_configuration *ep) {
-    return ep->descriptor->bEndpointAddress & USB_DIR_IN;
-}
-
-/**
- * @brief Starts a transfer on a given endpoint.
- *
- * @param ep, the endpoint configuration.
- * @param buf, the data buffer to send. Only applicable if the endpoint is TX
- * @param len, the length of the data in buf (this example limits max len to one packet - 64 bytes)
- */
-void usb_start_transfer_last(struct usb_endpoint_configuration *ep, uint8_t *buf, uint16_t len, bool last) {
-    // We are asserting that the length is <= 64 bytes for simplicity of the example.
-    // For multi packet transfers see the tinyusb port.
-    assert(len <= 64);
-    
-    //if (configured == false || len == 64)
-        printf("Start transfer\n");
-
-    // Prepare buffer control register value
-    uint32_t val = len | USB_BUF_CTRL_AVAIL | USB_BUF_CTRL_SEL;
-    //printf("VAL %d (%x)\n",val,val);
-
-    if (ep_is_tx(ep)) {
-        // Need to copy the data from the user buffer to the usb memory
-        if (buf)
-            memcpy((void *) ep->data_buffer, (void *) buf, len);
-        // Mark as full
-        val |= USB_BUF_CTRL_FULL;
-        if (last)
-            val |= USB_BUF_CTRL_LAST;
-    }
-
-    // Set pid and flip for next transfer
-    val |= ep->next_pid ? USB_BUF_CTRL_DATA1_PID : USB_BUF_CTRL_DATA0_PID;
-    ep->next_pid ^= 1u;
-
-    *ep->buffer_control = val;
-}
-void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uint16_t len) {
-    usb_start_transfer_last(ep, buf, len, true);
-}
-
-/**
- * @brief Send device descriptor to host
- *
- */
-void usb_handle_device_descriptor(volatile struct usb_setup_packet *pkt) {
-    const struct usb_device_descriptor *d = dev_config.device_descriptor;
-    // EP0 in
-    struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP0_IN_ADDR);
-    // Always respond with pid 1
-    ep->next_pid = 1;
-    usb_start_transfer(ep, (uint8_t *) d, MIN(sizeof(struct usb_device_descriptor),pkt->wLength));
-}
-
-/**
- * @brief Send the configuration descriptor (and potentially the configuration and endpoint descriptors) to the host.
- *
- * @param pkt, the setup packet received from the host.
- */
- 
-void usb_handle_config_descriptor(volatile struct usb_setup_packet *pkt) {
-    uint8_t b[128];
-    uint8_t *buf = &b[0];
-
-    // First request will want just the config descriptor
-    const struct usb_configuration_descriptor *d = dev_config.config_descriptor;
-    memcpy((void *) buf, d, sizeof(struct usb_configuration_descriptor));
-    buf += sizeof(struct usb_configuration_descriptor);
-
-    // If we more than just the config descriptor copy it all
-    if (pkt->wLength >= d->wTotalLength) {
-        memcpy((void *) buf, dev_config.interface_descriptor, sizeof(struct usb_interface_descriptor));
-        buf += sizeof(struct usb_interface_descriptor);
-        memcpy((void *) buf, dev_config.ccid_descriptor, sizeof(struct ccid_class_descriptor));
-        buf += sizeof(struct ccid_class_descriptor);
-        const struct usb_endpoint_configuration *ep = dev_config.endpoints;
-
-        // Copy all the endpoint descriptors starting from EP1
-        for (uint i = 2; i < USB_NUM_ENDPOINTS; i++) {
-            if (ep[i].descriptor) {
-                memcpy((void *) buf, ep[i].descriptor, sizeof(struct usb_endpoint_descriptor));
-                buf += sizeof(struct usb_endpoint_descriptor);
-            }
-        }
-    }
-
-    // Send data
-    // Get len by working out end of buffer subtract start of buffer
-    
-    uint32_t len = (uint32_t) buf - (uint32_t) &b[0];
-    for (int off = 0; off < len; off += 64)
-        usb_start_transfer_last(usb_get_endpoint_configuration(EP0_IN_ADDR), b+off, MIN(len, 64),off+64>=len);
-    //if (len >= 64)
-    //    usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
-    //usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
-    //usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 64);
-    //usb_start_transfer(usb_get_endpoint_configuration(EP0_OUT_ADDR), NULL, 0);
-    usb_start_transfer(usb_get_endpoint_configuration(EP0_OUT_ADDR), NULL, 64);
-    /*
-    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 0);
-    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
-    usb_start_transfer(usb_get_endpoint_configuration(EP2_IN_ADDR), NULL, 0);
-    usb_start_transfer(usb_get_endpoint_configuration(EP2_IN_ADDR), NULL, 64);
-    */
-}
-
-/**
- * @brief Handle a BUS RESET from the host by setting the device address back to 0.
- *
- */
-void usb_bus_reset(void) {
-    // Set address back to 0
-    dev_addr = 0;
-    should_set_address = false;
-    usb_hw->dev_addr_ctrl = 0;
-    configured = false;
-}
-
-bool usb_is_configured(void) {
-    return configured;
-}
-
-void usb_init() {
-    usb_device_init();
-    
-    // Wait until configured
-    while (!usb_is_configured()) {
-        tight_loop_contents();
-        led_blinking_task();
-    }
-    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
-}
-
-/**
- * @brief Send the requested string descriptor to the host.
- *
- * @param pkt, the setup packet from the host.
- */
-void usb_handle_string_descriptor(volatile struct usb_setup_packet *pkt) {
-    uint8_t i = pkt->wValue & 0xff;
-    uint8_t len = 0;
-
-    if (i == 0) {
-        len = 4;
-        memcpy(&ep0_buf[0], dev_config.lang_descriptor, len);
-    } else {
-        // Prepare fills in ep0_buf
-        len = usb_prepare_string_descriptor(dev_config.descriptor_strings[i - 1]);
-    }
-
-    usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), &ep0_buf[0], MIN(len,pkt->wLength));
-}
-
-/**
- * @brief Sends a zero length status packet back to the host.
- */
-void usb_acknowledge_out_request(void) {
-    usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0);
-}
-
-/**
- * @brief Handles a SET_ADDR request from the host. The actual setting of the device address in
- * hardware is done in ep0_in_handler. This is because we have to acknowledge the request first
- * as a device with address zero.
- *
- * @param pkt, the setup packet from the host.
- */
-void usb_set_device_address(volatile struct usb_setup_packet *pkt) {
-    // Set address is a bit of a strange case because we have to send a 0 length status packet first with
-    // address 0
-    dev_addr = (pkt->wValue & 0xff);
-    //printf("Set address %d\r\n", dev_addr);
-    // Will set address in the callback phase
-    should_set_address = true;
-    usb_acknowledge_out_request();
-}
-
-/**
- * @brief Handles a SET_CONFIGRUATION request from the host. Assumes one configuration so simply
- * sends a zero length status packet back to the host.
- *
- * @param pkt, the setup packet from the host.
- */
-void usb_set_device_configuration(volatile struct usb_setup_packet *pkt) {
-    // Only one configuration so just acknowledge the request
-    //usb_get_endpoint_configuration(EP0_OUT_ADDR)printf("Device Enumerated\r\n");
-    usb_acknowledge_out_request();
-    configured = true;
-}
-
-/**
- * @brief Respond to a setup packet from the host.
- *
- */
-void usb_handle_setup_packet(void) {
-    volatile struct usb_setup_packet *pkt = (volatile struct usb_setup_packet *) &usb_dpram->setup_packet;
-    uint8_t req_direction = pkt->bmRequestType & USB_DIR_IN;
-    uint8_t req_type = pkt->bmRequestType & USB_REQ_TYPE_TYPE_MASK;
-    uint8_t req = pkt->bRequest;
-
-    // Reset PID to 1 for EP0 IN
-    usb_get_endpoint_configuration(EP0_IN_ADDR)->next_pid = 1u;
-    
-    if (req_type != USB_REQ_TYPE_STANDARD) {
-        //printf("NON STANDARD TYPE REQUEST\r\n");
-    }
-    else {
-        if (req_direction == USB_DIR_OUT) {
-            if (req == USB_REQUEST_SET_ADDRESS) {
-                usb_set_device_address(pkt);
-                //printf("SET ADDRESS\r\n");
-            } else if (req == USB_REQUEST_SET_CONFIGURATION) {
-                usb_set_device_configuration(pkt);
-                //printf("SET CONFIGURATION\r\n");
-            } else {
-                usb_acknowledge_out_request();
-                //printf("Other OUT request (0x%x)\r\n", pkt->bRequest);
-            }
-        } else if (req_direction == USB_DIR_IN) {
-            if (req == USB_REQUEST_GET_DESCRIPTOR) {
-                uint16_t descriptor_type = pkt->wValue >> 8;
-    
-                switch (descriptor_type) {
-                    case USB_DT_DEVICE:
-                        usb_handle_device_descriptor(pkt);
-                        //printf("GET DEVICE DESCRIPTOR\r\n");
-                        break;
-    
-                    case USB_DT_CONFIG:
-                        usb_handle_config_descriptor(pkt);
-                        //printf("GET CONFIG DESCRIPTOR\r\n");
-                        break;
-    
-                    case USB_DT_STRING:
-                        usb_handle_string_descriptor(pkt);
-                        //printf("GET STRING DESCRIPTOR\r\n");
-                        break;
-    
-                    default:
-                        //printf("Unhandled GET_DESCRIPTOR type 0x%x\r\n", descriptor_type);
-                        usb_acknowledge_out_request();
-                }
-            } else if (req == USB_REQUEST_GET_STATUS) {
-                uint16_t status = 2;
-                usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), (uint8_t *) &status, MIN(sizeof(uint16_t),pkt->wLength));
-            } else {
-                //printf("Other IN request (0x%x)\r\n", pkt->bRequest);
-                usb_acknowledge_out_request();
-            }
-        }
-    }
-}
-
-/**
- * @brief Notify an endpoint that a transfer has completed.
- *
- * @param ep, the endpoint to notify.
- */
-static void usb_handle_ep_buff_done(struct usb_endpoint_configuration *ep) {
-    uint32_t buffer_control = *ep->buffer_control;
-    // Get the transfer length for this endpoint
-    uint16_t len = buffer_control & USB_BUF_CTRL_LEN_MASK;
-
-    // Call that endpoints buffer done handler
-    ep->handler((uint8_t *) ep->data_buffer, len);
-}
-
-/**
- * @brief Find the endpoint configuration for a specified endpoint number and
- * direction and notify it that a transfer has completed.
- *
- * @param ep_num
- * @param in
- */
-static void usb_handle_buff_done(uint ep_num, bool in) {
-    uint8_t ep_addr = ep_num | (in ? USB_DIR_IN : 0);
-    //printf("EP %d (in = %d) done\n", ep_num, in);
-    for (uint i = 0; i < USB_NUM_ENDPOINTS; i++) {
-        struct usb_endpoint_configuration *ep = &dev_config.endpoints[i];
-        if (ep->descriptor && ep->handler) {
-            if (ep->descriptor->bEndpointAddress == ep_addr) {
-                usb_handle_ep_buff_done(ep);
-                return;
-            }
-        }
-    }
-}
-
-/**
- * @brief Handle a "buffer status" irq. This means that one or more
- * buffers have been sent / received. Notify each endpoint where this
- * is the case.
- */
-static void usb_handle_buff_status() {
-    uint32_t buffers = usb_hw->buf_status;
-    uint32_t remaining_buffers = buffers;
-
-    uint bit = 1u;
-    for (uint i = 0; remaining_buffers && i < USB_NUM_ENDPOINTS * 2; i++) {
-        if (remaining_buffers & bit) {
-            // clear this in advance
-            usb_hw_clear->buf_status = bit;
-            // IN transfer for even i, OUT transfer for odd i
-            usb_handle_buff_done(i >> 1u, !(i & 1u));
-            remaining_buffers &= ~bit;
-        }
-        bit <<= 1u;
-    }
-}
-
-/**
- * @brief USB interrupt handler
- *
- */
-/// \tag::isr_setup_packet[]
-void isr_usbctrl(void) {
-    // USB interrupt handler
-    uint32_t status = usb_hw->ints;
-    uint32_t handled = 0;
-
-    // Setup packet received
-    if (status & USB_INTS_SETUP_REQ_BITS) {
-        handled |= USB_INTS_SETUP_REQ_BITS;
-        usb_hw_clear->sie_status = USB_SIE_STATUS_SETUP_REC_BITS;
-        usb_handle_setup_packet();
-    }
-/// \end::isr_setup_packet[]
-
-    // Buffer status, one or more buffers have completed
-    if (status & USB_INTS_BUFF_STATUS_BITS) {
-        handled |= USB_INTS_BUFF_STATUS_BITS;
-        usb_handle_buff_status();
-    }
-
-    // Bus is reset
-    if (status & USB_INTS_BUS_RESET_BITS) {
-        //printf("BUS RESET\n");
-        handled |= USB_INTS_BUS_RESET_BITS;
-        usb_hw_clear->sie_status = USB_SIE_STATUS_BUS_RESET_BITS;
-        usb_bus_reset();
-    }
-
-    if (status ^ handled) {
-        panic("Unhandled IRQ 0x%x\n", (uint) (status ^ handled));
-    }
-}
-
-/**
- * @brief EP0 in transfer complete. Either finish the SET_ADDRESS process, or receive a zero
- * length status packet from the host.
- *
- * @param buf the data that was sent
- * @param len the length that was sent
- */
-void ep0_in_handler(uint8_t *buf, uint16_t len) {
-    if (should_set_address) {
-        // Set actual device address in hardware
-        usb_hw->dev_addr_ctrl = dev_addr;
-        should_set_address = false;
-    } else {
-        // Receive a zero length status packet from the host on EP0 OUT
-        struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP0_OUT_ADDR);
-        usb_start_transfer(ep, NULL, 0);
-    }
-}
-
-void ep0_out_handler(uint8_t *buf, uint16_t len) {
-    ;
-}
+#include <stdlib.h>
 
 // Device specific functions
 static uint8_t rx_buffer[4096], tx_buffer[4096];
 static uint16_t w_offset = 0, r_offset = 0;
+static uint8_t itf_num;
+static uint16_t w_len = 0, tx_r_offset = 0;
 
-void ep1_out_handler(uint8_t *buf, uint16_t len) {
-    //printf("RX %d bytes from host\n", len);
-    //DEBUG_PAYLOAD(buf,len);
-    // Send data back to host
-    uint16_t size = MIN(sizeof(rx_buffer)-w_offset,len);
-    if (size > 0) {
-        memcpy(rx_buffer+w_offset, buf, size);
-        w_offset += size;
+uint32_t usb_write_offset(uint16_t len, uint16_t offset) {
+    uint8_t pkt_max = 64;
+    if (len > sizeof(tx_buffer))
+        len = sizeof(tx_buffer);
+    w_len = len;
+    tx_r_offset = offset;
+    tud_vendor_write(tx_buffer+offset, MIN(len, pkt_max));
+    w_len -= MIN(len, pkt_max);
+    tx_r_offset += MIN(len, pkt_max);
+    return MIN(w_len, pkt_max);
+}
+
+#define DEBUG_PAYLOAD(p,s) { \
+    printf("Payload %s (%d bytes):\r\n", #p,s);\
+    for (int i = 0; i < s; i += 16) {\
+        printf("%07Xh : ",(unsigned int)(i+p));\
+        for (int j = 0; j < 16; j++) {\
+            if (j < s-i) printf("%02X ",(p)[i+j]);\
+            else printf("   ");\
+            if (j == 7) printf(" ");\
+            } printf(":  "); \
+        for (int j = 0; j < MIN(16,s-i); j++) {\
+            printf("%c",(p)[i+j] == 0x0a || (p)[i+j] == 0x0d ? '\\' : (p)[i+j]);\
+            if (j == 7) printf(" ");\
+            }\
+            printf("\r\n");\
+        } printf("\r\n"); \
     }
-    //printf("rx_w_offset %d, rx_r_offset %d\r\n",w_offset, r_offset);
-}
+    
 
-uint32_t usb_write(uint16_t size) {
-    return usb_write_offset(size, 0);
-}
-
-uint32_t usb_write_offset(uint16_t size, uint16_t roffset) {
-    if (size > sizeof(tx_buffer))
-        size = sizeof(tx_buffer);
-    struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP2_IN_ADDR);
-    for (uint16_t offset = roffset; offset-roffset < size; offset += 64) {
-        usb_start_transfer(ep, tx_buffer+offset, MIN(size-offset, 64));
-        if (size-offset == 64) {
-            usb_start_transfer(ep, NULL, 0);
-        }
+uint32_t usb_write_flush() {
+    if (w_len > 0 && tud_vendor_write_available() > 0) {
+        printf("w_len %d %d %ld\r\n",w_len,tx_r_offset,tud_vendor_write_available());
+        tud_vendor_write(tx_buffer+tx_r_offset, MIN(w_len, 64));
+        tx_r_offset += MIN(w_len, 64);
+        w_len -= MIN(w_len, 64);
     }
-    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
-    return size;
+    return w_len;
 }
+
+uint32_t usb_write(uint16_t len) {
+    return usb_write_offset(len, 0);
+}
+
 uint16_t usb_read_available() {
     return w_offset - r_offset;
+}
+
+uint16_t usb_write_available() {
+    return w_len > 0;
 }
 
 uint8_t *usb_get_rx() {
@@ -655,7 +98,6 @@ uint8_t *usb_get_tx() {
 void usb_clear_rx() {
     w_offset = r_offset = 0;
 }
-
 
 uint16_t usb_read(uint8_t *buffer, size_t buffer_size) {
     uint16_t size = MIN(buffer_size, w_offset-r_offset);
@@ -670,53 +112,333 @@ uint16_t usb_read(uint8_t *buffer, size_t buffer_size) {
     return 0;
 }
 
-void ep2_in_handler(uint8_t *buf, uint16_t len) {
-    //printf("Sent %d bytes to host\n", len);
-    // Get ready to rx again from host
-    //usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
+void tud_vendor_rx_cb(uint8_t itf) {
+    (void) itf;
+    uint32_t len = tud_vendor_available();
+    uint16_t size = MIN(sizeof(rx_buffer)-w_offset, len);
+    if (size > 0) {
+        size = tud_vendor_read(rx_buffer+w_offset, size);
+        w_offset += size;
+    }
 }
+
+void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
+    //printf("written %ld\n",sent_bytes);
+    usb_write_flush();
+}
+
+#ifndef USB_VID
+#define USB_VID   0xFEFF
+#endif
+#ifndef USB_PID
+#define USB_PID   0xFCFD
+#endif
+
+#define USB_BCD   0x0200
+
+#define USB_CONFIG_ATT_ONE TU_BIT(7)
+
+#define	MAX_USB_POWER		1
+
+struct ccid_class_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t bcdCCID;
+	uint8_t  bMaxSlotIndex;
+	uint8_t  bVoltageSupport;
+	uint32_t dwProtocols;
+	uint32_t dwDefaultClock;
+	uint32_t dwMaximumClock;
+	uint8_t  bNumClockSupport;
+	uint32_t dwDataRate;
+	uint32_t dwMaxDataRate;
+	uint8_t  bNumDataRatesSupported;
+	uint32_t dwMaxIFSD;
+	uint32_t dwSynchProtocols;
+	uint32_t dwMechanical;
+	uint32_t dwFeatures;
+	uint32_t dwMaxCCIDMessageLength;
+	uint8_t  bClassGetResponse;
+	uint8_t  bclassEnvelope;
+	uint16_t wLcdLayout;
+	uint8_t  bPINSupport;
+	uint8_t  bMaxCCIDBusySlots;
+} __attribute__ ((__packed__));
+
+static const struct ccid_class_descriptor desc_ccid = {
+    .bLength                = sizeof(struct ccid_class_descriptor),
+    .bDescriptorType        = 0x21,
+    .bcdCCID                = (0x0110),
+    .bMaxSlotIndex          = 0,
+    .bVoltageSupport        = 0x01,  // 5.0V
+    .dwProtocols            = (
+                              0x01|  // T=0
+                              0x02), // T=1
+    .dwDefaultClock         = (0xDFC),
+    .dwMaximumClock         = (0xDFC),
+    .bNumClockSupport       = 0,
+    .dwDataRate             = (0x2580),
+    .dwMaxDataRate          = (0x2580),
+    .bNumDataRatesSupported = 0,
+    .dwMaxIFSD              = (0xFE), // IFSD is handled by the real reader driver
+    .dwSynchProtocols       = (0),
+    .dwMechanical           = (0),
+    .dwFeatures             = 0x40840, //USB-ICC, short & extended APDU
+    .dwMaxCCIDMessageLength = 65544+10,
+    .bClassGetResponse      = 0xFF,
+    .bclassEnvelope         = 0xFF,
+    .wLcdLayout             = 0x0,
+    .bPINSupport            = 0x0,
+    .bMaxCCIDBusySlots      = 0x01,
+};
+
+//--------------------------------------------------------------------+
+// Device Descriptors
+//--------------------------------------------------------------------+
+tusb_desc_device_t const desc_device =
+{
+    .bLength            = sizeof(tusb_desc_device_t),
+    .bDescriptorType    = TUSB_DESC_DEVICE,
+    .bcdUSB             = (USB_BCD),
+
+    .bDeviceClass       = 0x00,
+    .bDeviceSubClass    = 0,
+    .bDeviceProtocol    = 0,
+    .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
+
+    .idVendor           = (USB_VID),
+    .idProduct          = (USB_PID),
+    .bcdDevice          = CCID_VERSION,
+
+    .iManufacturer      = 1,
+    .iProduct           = 2,
+    .iSerialNumber      = 3,
+
+    .bNumConfigurations = 1
+};
+
+uint8_t const * tud_descriptor_device_cb(void)
+{
+    return (uint8_t const *) &desc_device;
+}
+
+tusb_desc_interface_t const desc_interface = 
+{
+    .bLength            = sizeof(tusb_desc_interface_t),
+    .bDescriptorType    = TUSB_DESC_INTERFACE,
+    .bInterfaceNumber   = 0,
+    .bAlternateSetting  = 0,
+    .bNumEndpoints      = 2,
+    .bInterfaceClass    = TUSB_CLASS_SMART_CARD,
+    .bInterfaceSubClass = 0,
+    .bInterfaceProtocol = 0,
+    .iInterface         = 5,
+};
+
+//--------------------------------------------------------------------+
+// Configuration Descriptor
+//--------------------------------------------------------------------+
+
+tusb_desc_configuration_t const desc_config  = 
+{
+    .bLength             = sizeof(tusb_desc_configuration_t),
+  	.bDescriptorType     = TUSB_DESC_CONFIGURATION,
+    .wTotalLength        = (sizeof(tusb_desc_configuration_t) + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)),
+  	.bNumInterfaces      = 1,
+  	.bConfigurationValue = 1,
+  	.iConfiguration      = 4,
+  	.bmAttributes        = USB_CONFIG_ATT_ONE | TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP,
+  	.bMaxPower           = TUSB_DESC_CONFIG_POWER_MA(MAX_USB_POWER+1),
+};
+
+tusb_desc_endpoint_t const desc_ep1 = 
+{
+    .bLength             = sizeof(tusb_desc_endpoint_t),
+	.bDescriptorType     = TUSB_DESC_ENDPOINT,
+	.bEndpointAddress    = TUSB_DIR_IN_MASK | 1,
+	.bmAttributes.xfer   = TUSB_XFER_BULK,
+	.wMaxPacketSize.size = (64),
+	.bInterval           = 0
+};
+
+tusb_desc_endpoint_t const desc_ep2 = 
+{
+    .bLength             = sizeof(tusb_desc_endpoint_t),
+	.bDescriptorType     = TUSB_DESC_ENDPOINT,
+	.bEndpointAddress    = 2,
+	.bmAttributes.xfer   = TUSB_XFER_BULK,
+	.wMaxPacketSize.size = (64),
+	.bInterval           = 0
+};
+
+static uint8_t desc_config_extended[sizeof(tusb_desc_configuration_t) + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)];
+
+uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
+{
+    (void) index; // for multiple configurations
+  
+    static uint8_t initd = 0;
+    if (initd == 0)
+    {
+        uint8_t *p = desc_config_extended;
+        memcpy(p, &desc_config, sizeof(tusb_desc_configuration_t)); p += sizeof(tusb_desc_configuration_t);
+        memcpy(p, &desc_interface, sizeof(tusb_desc_interface_t)); p += sizeof(tusb_desc_interface_t);
+        memcpy(p, &desc_ccid, sizeof(struct ccid_class_descriptor)); p += sizeof(struct ccid_class_descriptor);
+        memcpy(p, &desc_ep1, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
+        memcpy(p, &desc_ep2, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
+        initd = 1;
+    }
+    return (const uint8_t *)desc_config_extended;
+}
+
+//--------------------------------------------------------------------+
+// String Descriptors
+//--------------------------------------------------------------------+
+
+// array of pointer to string descriptors
+char const* string_desc_arr [] =
+{
+    (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
+    "Pol Henarejos",                     // 1: Manufacturer
+    "Pico HSM",                       // 2: Product
+    "11223344",                      // 3: Serials, should use chip ID
+    "Pico HSM Config",               // 4: Vendor Interface
+    "Pico HSM Interface"
+};
+
+static uint16_t _desc_str[32];
+
+uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
+{
+    (void) langid;
+
+    uint8_t chr_count;
+
+    if (index == 0) {
+        memcpy(&_desc_str[1], string_desc_arr[0], 2);
+        chr_count = 1;
+    }
+    else  {
+        // Note: the 0xEE index string is a Microsoft OS 1.0 Descriptors.
+        // https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/microsoft-defined-usb-descriptors
+
+        if ( !(index < sizeof(string_desc_arr)/sizeof(string_desc_arr[0])) ) 
+            return NULL;
+
+        const char* str = string_desc_arr[index];
+        char unique_id_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+        if (index == 3) {
+            pico_unique_board_id_t unique_id;
+            pico_get_unique_board_id(&unique_id);
+            pico_get_unique_board_id_string(unique_id_str, 2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1);
+            str = unique_id_str;
+        }
+
+        chr_count = strlen(str);
+        if ( chr_count > 31 ) 
+            chr_count = 31;
+
+        // Convert ASCII string into UTF-16
+        for(uint8_t i=0; i<chr_count; i++) {
+            _desc_str[1+i] = str[i];
+        }
+    }
+
+    _desc_str[0] = (TUSB_DESC_STRING << 8 ) | (2*chr_count + 2);
+
+    return _desc_str;
+}
+
+static void ccid_init_cb(void) {
+    TU_LOG1("-------- CCID INIT\r\n");
+    vendord_init();
+
+    //ccid_notify_slot_change(c);
+}
+
+static void ccid_reset_cb(uint8_t rhport) {
+    TU_LOG1("-------- CCID RESET\r\n");
+    itf_num = 0;
+    vendord_reset(rhport);
+}
+
+static uint16_t ccid_open(uint8_t rhport, tusb_desc_interface_t const *itf_desc, uint16_t max_len) {
+    uint8_t *itf_vendor = (uint8_t *)malloc(sizeof(uint8_t)*max_len);
+    TU_LOG1("-------- CCID OPEN\r\n");
+    TU_VERIFY(itf_desc->bInterfaceClass == TUSB_CLASS_SMART_CARD && itf_desc->bInterfaceSubClass == 0 && itf_desc->bInterfaceProtocol == 0, 0);
+
+    //vendord_open expects a CLASS_VENDOR interface class
+    memcpy(itf_vendor, itf_desc, sizeof(uint8_t)*max_len);
+    ((tusb_desc_interface_t *)itf_vendor)->bInterfaceClass = TUSB_CLASS_VENDOR_SPECIFIC;
+    vendord_open(rhport, (tusb_desc_interface_t *)itf_vendor, max_len);
+    free(itf_vendor);
+
+    uint16_t const drv_len = sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t);
+    TU_VERIFY(max_len >= drv_len, 0);
+
+    itf_num = itf_desc->bInterfaceNumber;
+    return drv_len;
+}
+
+// Support for parameterized reset via vendor interface control request
+static bool ccid_control_xfer_cb(uint8_t __unused rhport, uint8_t stage, tusb_control_request_t const * request) {
+    // nothing to do with DATA & ACK stage
+    TU_LOG2("-------- CCID CTRL XFER\r\n");
+    if (stage != CONTROL_STAGE_SETUP) return true;
+
+    if (request->wIndex == itf_num)
+    {
+        TU_LOG2("-------- bmRequestType %x, bRequest %x, wValue %x, wLength %x\r\n",request->bmRequestType,request->bRequest, request->wValue, request->wLength);
 /*
-int main(void) {
-    stdio_init_all();
-    printf("USB Device Low-Level hardware example\n");
-    usb_device_init();
-    
-    gpio_init(18);
-    gpio_set_dir(18, GPIO_OUT);
-    gpio_init(19);
-    gpio_set_dir(19, GPIO_OUT);
-    gpio_init(20);
-    gpio_set_dir(20, GPIO_OUT);
-    gpio_put(18, 1);
-    gpio_put(19, 1);
-    gpio_put(20, 1);
-    
-
-    // Wait until configured
-    while (!configured) {
-        tight_loop_contents();
-        gpio_put(18, 1);
-        sleep_ms(250);
-        gpio_put(18, 0);
-        sleep_ms(250);
-    }
-
-    // Get ready to rx from host
-    usb_start_transfer(usb_get_endpoint_configuration(EP1_OUT_ADDR), NULL, 64);
-    gpio_put(18, 1);
-    gpio_put(19, 1);
-    gpio_put(20, 1);
-
-    // Everything is interrupt driven so just loop here
-    while (1) {
-        tight_loop_contents();
-        
-        gpio_put(19, 1);
-        sleep_ms(250);
-        gpio_put(19, 0);
-        sleep_ms(250);
-    }
-
-    return 0;
-}
+#if PICO_STDIO_USB_RESET_INTERFACE_SUPPORT_RESET_TO_BOOTSEL
+        if (request->bRequest == RESET_REQUEST_BOOTSEL) {
+#ifdef PICO_STDIO_USB_RESET_BOOTSEL_ACTIVITY_LED
+            uint gpio_mask = 1u << PICO_STDIO_USB_RESET_BOOTSEL_ACTIVITY_LED;
+#else
+            uint gpio_mask = 0u;
+#endif
+#if !PICO_STDIO_USB_RESET_BOOTSEL_FIXED_ACTIVITY_LED
+            if (request->wValue & 0x100) {
+                gpio_mask = 1u << (request->wValue >> 9u);
+            }
+#endif
+            reset_usb_boot(gpio_mask, (request->wValue & 0x7f) | PICO_STDIO_USB_RESET_BOOTSEL_INTERFACE_DISABLE_MASK);
+            // does not return, otherwise we'd return true
+        }
+#endif
+#if PICO_STDIO_USB_RESET_INTERFACE_SUPPORT_RESET_TO_FLASH_BOOT
+        if (request->bRequest == RESET_REQUEST_FLASH) {
+            watchdog_reboot(0, 0, PICO_STDIO_USB_RESET_RESET_TO_FLASH_DELAY_MS);
+            return true;
+        }
+#endif
 */
+        return true;
+    }
+    return false;
+}
+
+static bool ccid_xfer_cb(uint8_t rhport, uint8_t ep_addr, xfer_result_t result, uint32_t xferred_bytes) {
+    //printf("------ CALLED XFER_CB\r\n");
+    return vendord_xfer_cb(rhport, ep_addr, result, xferred_bytes);
+    //return true;
+}
+
+
+static const usbd_class_driver_t ccid_driver = {
+#if CFG_TUSB_DEBUG >= 2
+    .name = "CCID",
+#endif
+    .init             = ccid_init_cb,
+    .reset            = ccid_reset_cb,
+    .open             = ccid_open,
+    .control_xfer_cb  = ccid_control_xfer_cb,
+    .xfer_cb          = ccid_xfer_cb,
+    .sof              = NULL
+};
+
+// Implement callback to add our custom driver
+usbd_class_driver_t const *usbd_app_driver_get_cb(uint8_t *driver_count) {
+    *driver_count = 1;
+    return &ccid_driver;
+}

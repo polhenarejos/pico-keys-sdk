@@ -23,12 +23,6 @@
 #include "pico/util/queue.h"
 #include <string.h> 
 
-#include "pico/time.h"
-static inline uint32_t board_millis(void)
-{
-    return to_ms_since_boot(get_absolute_time());
-}
-
 #define USB_REQ_CCID        0xA1
 
 typedef struct app {

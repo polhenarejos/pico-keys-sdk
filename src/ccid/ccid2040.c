@@ -38,6 +38,8 @@
 #include "random.h"
 #include "ccid2040.h"
 #include "hardware/rtc.h"
+#include "bsp/board.h"
+#include "tusb.h"
 
 extern void do_flash();
 extern void low_flash_init();
@@ -120,44 +122,6 @@ void led_set_blink(uint32_t mode) {
 
 void execute_tasks();
 
-#include "hardware/structs/ioqspi.h"
-#define BUTTON_STATE_ACTIVE   0
-
-bool __no_inline_not_in_flash_func(get_bootsel_button)() {
-    const uint CS_PIN_INDEX = 1;
-
-    // Must disable interrupts, as interrupt handlers may be in flash, and we
-    // are about to temporarily disable flash access!
-    uint32_t flags = save_and_disable_interrupts();
-
-    // Set chip select to Hi-Z
-    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
-                    GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
-                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
-
-    // Note we can't call into any sleep functions in flash right now
-    for (volatile int i = 0; i < 1000; ++i);
-
-    // The HI GPIO registers in SIO can observe and control the 6 QSPI pins.
-    // Note the button pulls the pin *low* when pressed.
-    bool button_state = (sio_hw->gpio_hi_in & (1u << CS_PIN_INDEX));
-
-    // Need to restore the state of chip select, else we are going to have a
-    // bad time when we return to code in flash!
-    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
-                    GPIO_OVERRIDE_NORMAL << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
-                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
-
-    restore_interrupts(flags);
-
-    return button_state;
-}
-
-static uint32_t board_button_read(void)
-{
-    return BUTTON_STATE_ACTIVE == get_bootsel_button();
-}
-
 static bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
@@ -221,10 +185,10 @@ uint16_t rdata_bk = 0x0;
 static int usb_event_handle() {
     uint16_t rx_read = usb_read_available();
     if (rx_read >= 10) {
-        struct ccid_header *tccid = (struct ccid_header *)usb_get_rx();
+        usb_read(rx_copy, sizeof(rx_copy));
+        
         //printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
-        if (tccid->dwLength <= rx_read-10) {
-            usb_read(rx_copy, sizeof(rx_copy));
+        if (ccid_header->dwLength <= rx_read-10) {
             if (ccid_header->bMessageType != 0x65)
                 DEBUG_PAYLOAD(rx_copy,rx_read);
             if (ccid_header->bMessageType == 0x65) {
@@ -416,24 +380,25 @@ void card_thread() {
         uint32_t flag = EV_EXEC_FINISHED;
         queue_add_blocking(&card_to_ccid_q, &flag);
     }
-    printf("EXIT !!!!!!\r\n");
+    //printf("EXIT !!!!!!\r\n");
     if (current_app && current_app->unload)
         current_app->unload();
 }
 
 void ccid_task(void) {
-    if (usb_is_configured()) {
+    if (tud_vendor_mounted()) {
         if (usb_event_handle() != 0) {
             
         }
+        usb_write_flush();
         if (timeout == 0) {
     	    timeout = USB_CCID_TIMEOUT;
     	    timeout_cnt++;
         }
         uint32_t m = 0x0;
         bool has_m = queue_try_remove(&card_to_ccid_q, &m);
-        if (m != 0)
-            printf("\r\n ------ M = %lu\r\n",m);
+        //if (m != 0)
+        //    printf("\r\n ------ M = %lu\r\n",m);
         if (has_m) {
             if (m == EV_EXEC_FINISHED) {
                 //printf("sw %x %d, %d\r\n",apdu.sw,apdu.rlen,apdu.ne);
@@ -652,7 +617,7 @@ pico_unique_board_id_t unique_id;
 void execute_tasks() {
     prev_millis = board_millis();
     ccid_task();
-    //tud_task(); // tinyusb device task
+    tud_task(); // tinyusb device task
     led_blinking_task();
 }
 
@@ -669,7 +634,7 @@ int main(void) {
     queue_init(&card_to_ccid_q, sizeof(uint32_t), 64);
     queue_init(&ccid_to_card_q, sizeof(uint32_t), 64);
 
-    //board_init();
+    board_init();
     stdio_init_all();
 
 #ifdef PIMORONI_TINY2040
@@ -688,7 +653,7 @@ int main(void) {
 
     led_off_all();
 
-    usb_init();
+    tusb_init();
 
     //prepare_ccid();
     

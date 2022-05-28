@@ -318,6 +318,8 @@ extern uint8_t *usb_get_rx();
 extern uint32_t usb_send_tx_buffer();
 extern uint8_t *usb_get_tx();
 extern void usb_clear_rx();
+extern bool usb_write_available();
+extern uint32_t usb_write_flush();
 
 #endif
 

@@ -48,27 +48,9 @@ uint32_t usb_write_offset(uint16_t len, uint16_t offset) {
     return MIN(w_len, pkt_max);
 }
 
-#define DEBUG_PAYLOAD(p,s) { \
-    printf("Payload %s (%d bytes):\r\n", #p,s);\
-    for (int i = 0; i < s; i += 16) {\
-        printf("%07Xh : ",(unsigned int)(i+p));\
-        for (int j = 0; j < 16; j++) {\
-            if (j < s-i) printf("%02X ",(p)[i+j]);\
-            else printf("   ");\
-            if (j == 7) printf(" ");\
-            } printf(":  "); \
-        for (int j = 0; j < MIN(16,s-i); j++) {\
-            printf("%c",(p)[i+j] == 0x0a || (p)[i+j] == 0x0d ? '\\' : (p)[i+j]);\
-            if (j == 7) printf(" ");\
-            }\
-            printf("\r\n");\
-        } printf("\r\n"); \
-    }
-    
-
 uint32_t usb_write_flush() {
     if (w_len > 0 && tud_vendor_write_available() > 0) {
-        printf("w_len %d %d %ld\r\n",w_len,tx_r_offset,tud_vendor_write_available());
+        //printf("w_len %d %d %ld\r\n",w_len,tx_r_offset,tud_vendor_write_available());
         tud_vendor_write(tx_buffer+tx_r_offset, MIN(w_len, 64));
         tx_r_offset += MIN(w_len, 64);
         w_len -= MIN(w_len, 64);

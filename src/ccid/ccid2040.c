@@ -166,8 +166,8 @@ queue_t card_to_ccid_q;
 uint8_t ccid_status = 1;
 
 void ccid_write_offset(uint16_t size, uint16_t offset) {
-    if (*usb_get_tx() != 0x81)
-        DEBUG_PAYLOAD(usb_get_tx()+offset,size+10);
+    //if (*usb_get_tx() != 0x81)
+    //    DEBUG_PAYLOAD(usb_get_tx()+offset,size+10);
     usb_write_offset(size+10, offset);
 }
 
@@ -189,8 +189,8 @@ static int usb_event_handle() {
         
         //printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
         if (ccid_header->dwLength <= rx_read-10) {
-            if (ccid_header->bMessageType != 0x65)
-                DEBUG_PAYLOAD(rx_copy,rx_read);
+            //if (ccid_header->bMessageType != 0x65)
+            //    DEBUG_PAYLOAD(rx_copy,rx_read);
             if (ccid_header->bMessageType == 0x65) {
                 ccid_response->bMessageType = CCID_SLOT_STATUS_RET;
                 ccid_response->dwLength = 0;
@@ -401,10 +401,12 @@ void ccid_task(void) {
         //    printf("\r\n ------ M = %lu\r\n",m);
         if (has_m) {
             if (m == EV_EXEC_FINISHED) {
-                //printf("sw %x %d, %d\r\n",apdu.sw,apdu.rlen,apdu.ne);
                 apdu.rdata[apdu.rlen] = apdu.sw >> 8;
                 apdu.rdata[apdu.rlen+1] = apdu.sw & 0xff;
                 waiting_timeout = false;
+                if ((apdu.rlen+2+10) % 64 == 0) {
+                    apdu.ne = apdu.rlen - 2;
+                }
                 if (apdu.rlen <= apdu.ne) {
                     ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
                     ccid_response->dwLength = apdu.rlen+2;

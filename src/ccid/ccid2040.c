@@ -234,19 +234,21 @@ static int usb_event_handle() {
                     if (apdu.ne == 0)
                         apdu.ne = 256;
                 }
-                else if (ccid_header->dwLength == 7) {
-                    apdu.nc = 0;
-                    apdu.ne = (apdu.header[5] << 8) | apdu.header[6];
-                    if (apdu.ne == 0)
-                        apdu.ne = 65536;
-                }
-                else if (apdu.header[4] == 0x0) {
-                    apdu.nc = (apdu.header[5] << 8) | apdu.header[6];
-                    apdu.data = apdu.header+7;
-                    if (apdu.nc+7+2 == ccid_header->dwLength) {
-                        apdu.ne = (apdu.header[ccid_header->dwLength-2] << 8) | apdu.header[ccid_header->dwLength-1];
+                else if (apdu.header[4] == 0x0 && ccid_header->dwLength >= 7) {
+                    if (ccid_header->dwLength == 7) {
+                        apdu.ne = (apdu.header[5] << 8) | apdu.header[6];
                         if (apdu.ne == 0)
                             apdu.ne = 65536;
+                    }
+                    else {
+                        apdu.ne = 0;
+                        apdu.nc = (apdu.header[5] << 8) | apdu.header[6];
+                        apdu.data = apdu.header+7;
+                        if (apdu.nc+7+2 == ccid_header->dwLength) {
+                            apdu.ne = (apdu.header[ccid_header->dwLength-2] << 8) | apdu.header[ccid_header->dwLength-1];
+                            if (apdu.ne == 0)
+                                apdu.ne = 65536;
+                        }
                     }
                 }
                 else {

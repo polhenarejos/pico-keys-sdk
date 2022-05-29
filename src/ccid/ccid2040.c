@@ -44,12 +44,8 @@
 extern void do_flash();
 extern void low_flash_init();
 
-#define USB_CCID_TIMEOUT (50)
-static bool waiting_timeout = false;
 const uint8_t *ccid_atr = NULL;
-static uint32_t timeout = USB_CCID_TIMEOUT;
-static uint32_t timeout_cnt = 0;
-static uint32_t prev_millis = 0;
+static uint32_t timeout = 0;
 
 #if MAX_RES_APDU_DATA_SIZE > MAX_CMD_APDU_DATA_SIZE
 #define USB_BUF_SIZE (MAX_RES_APDU_DATA_SIZE+20+9)
@@ -162,12 +158,11 @@ struct ccid_header {
 queue_t ccid_to_card_q;
 queue_t card_to_ccid_q;
 
-
 uint8_t ccid_status = 1;
 
 void ccid_write_offset(uint16_t size, uint16_t offset) {
-    //if (*usb_get_tx() != 0x81)
-    //    DEBUG_PAYLOAD(usb_get_tx()+offset,size+10);
+    if (*usb_get_tx() != 0x81)
+        DEBUG_PAYLOAD(usb_get_tx()+offset,size+10);
     usb_write_offset(size+10, offset);
 }
 
@@ -175,7 +170,6 @@ void ccid_write(uint16_t size) {
     ccid_write_offset(size, 0);
 }
 
-uint8_t rx_copy[4096];
 struct apdu apdu;
 struct ccid_header *ccid_response;
 struct ccid_header *ccid_header;
@@ -185,12 +179,10 @@ uint16_t rdata_bk = 0x0;
 static int usb_event_handle() {
     uint16_t rx_read = usb_read_available();
     if (rx_read >= 10) {
-        usb_read(rx_copy, sizeof(rx_copy));
-        
         //printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
         if (ccid_header->dwLength <= rx_read-10) {
-            //if (ccid_header->bMessageType != 0x65)
-            //    DEBUG_PAYLOAD(rx_copy,rx_read);
+            if (ccid_header->bMessageType != 0x65)
+                DEBUG_PAYLOAD(usb_get_rx(),usb_read_available());
             if (ccid_header->bMessageType == 0x65) {
                 ccid_response->bMessageType = CCID_SLOT_STATUS_RET;
                 ccid_response->dwLength = 0;
@@ -308,11 +300,10 @@ static int usb_event_handle() {
                     rdata_gr = apdu.rdata;
                     uint32_t flag = EV_CMD_AVAILABLE;
                     queue_add_blocking(&ccid_to_card_q, &flag);
-                    timeout = 0;
-            	    timeout_cnt = 0;
-            	    waiting_timeout = true;
+                    timeout = board_millis();
                 }
             }
+            usb_clear_rx();
         }
     }
     /*
@@ -391,10 +382,6 @@ void ccid_task(void) {
             
         }
         usb_write_flush();
-        if (timeout == 0) {
-    	    timeout = USB_CCID_TIMEOUT;
-    	    timeout_cnt++;
-        }
         uint32_t m = 0x0;
         bool has_m = queue_try_remove(&card_to_ccid_q, &m);
         //if (m != 0)
@@ -403,7 +390,7 @@ void ccid_task(void) {
             if (m == EV_EXEC_FINISHED) {
                 apdu.rdata[apdu.rlen] = apdu.sw >> 8;
                 apdu.rdata[apdu.rlen+1] = apdu.sw & 0xff;
-                waiting_timeout = false;
+                timeout = 0;
                 if ((apdu.rlen+2+10) % 64 == 0) {
                     apdu.ne = apdu.rlen - 2;
                 }
@@ -490,21 +477,16 @@ void ccid_task(void) {
         	*/
         }
         else {
-            if (waiting_timeout) {
-                timeout -= MIN(board_millis()-prev_millis,timeout);
-                if (timeout == 0) {
-                    if (timeout_cnt == 7) {
-        
-                    }
-                    else {
-                        ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
-                        ccid_response->dwLength = 0;
-                        ccid_response->bSlot = 0;
-                        ccid_response->bSeq = ccid_header->bSeq;
-                        ccid_response->abRFU0 = CCID_CMD_STATUS_TIMEEXT;
-                        ccid_response->abRFU1 = 0;
-                        ccid_write(0);
-                    }
+            if (timeout > 0) {
+                if (timeout + 1500 < board_millis()) {
+                    ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
+                    ccid_response->dwLength = 0;
+                    ccid_response->bSlot = 0;
+                    ccid_response->bSeq = ccid_header->bSeq;
+                    ccid_response->abRFU0 = CCID_CMD_STATUS_TIMEEXT;
+                    ccid_response->abRFU1 = 0;
+                    ccid_write(0);
+                    timeout = board_millis();
                 }
             }
         }
@@ -617,16 +599,14 @@ extern void neug_task();
 pico_unique_board_id_t unique_id;
 
 void execute_tasks() {
-    prev_millis = board_millis();
     ccid_task();
     tud_task(); // tinyusb device task
     led_blinking_task();
 }
 
 int main(void) {
-    ccid_header = (struct ccid_header *)rx_copy;
-    ccid_header->apdu = rx_copy+10;
-    
+    ccid_header = (struct ccid_header *)usb_get_rx();
+    ccid_header->apdu = usb_get_rx()+10;
     apdu.header = ccid_header->apdu;
         
     ccid_response = (struct ccid_header *)usb_get_tx();

@@ -305,7 +305,8 @@ int meta_find(uint16_t fid, uint8_t **out) {
     file_t *ef = search_by_fid(EF_META, NULL, SPECIFY_EF);
     if (!ef)
         return CCID_ERR_FILE_NOT_FOUND;
-    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL, *data = file_get_data(ef);
+    uint16_t tag = 0x0;
+    uint8_t *tag_data = NULL, *p = NULL, *data = file_get_data(ef);
     size_t tag_len = 0, data_len = file_get_size(ef);
     while (walk_tlv(data, data_len, &p, &tag, &tag_len, &tag_data)) {
         if (tag_len < 2)
@@ -323,7 +324,8 @@ int meta_delete(uint16_t fid) {
     file_t *ef = search_by_fid(EF_META, NULL, SPECIFY_EF);
     if (!ef)
         return CCID_ERR_FILE_NOT_FOUND;
-    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL, *data = file_get_data(ef);
+    uint16_t tag = 0x0;
+    uint8_t *tag_data = NULL, *p = NULL, *data = file_get_data(ef);
     size_t tag_len = 0, data_len = file_get_size(ef);
     uint8_t *fdata = NULL;
     while (walk_tlv(data, data_len, &p, &tag, &tag_len, &tag_data)) {
@@ -358,7 +360,8 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     uint16_t ef_size = file_get_size(ef);
     uint8_t *fdata = (uint8_t *)calloc(1, ef_size);
     memcpy(fdata, file_get_data(ef), ef_size);
-    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL;
+    uint16_t tag = 0x0;
+    uint8_t *tag_data = NULL, *p = NULL;
     size_t tag_len = 0;
     while (walk_tlv(fdata, ef_size, &p, &tag, &tag_len, &tag_data)) {
         if (tag_len < 2)
@@ -399,7 +402,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     }
     fdata = (uint8_t *)realloc(fdata, ef_size+1+format_tlv_len(len+2,NULL)+2+len);
     uint8_t *f = fdata+ef_size;
-    *f++ = fid & 0xff;
+    *f++ = fid & 0x1f;
     f += format_tlv_len(len+2, f);
     *f++ = fid >> 8;
     *f++ = fid & 0xff;

@@ -553,16 +553,20 @@ int format_tlv_len(size_t len, uint8_t *out) {
     return 0;
 }
 
-int walk_tlv(const uint8_t *cdata, size_t cdata_len, uint8_t **p, uint8_t *tag, size_t *tag_len, uint8_t **data) {
+int walk_tlv(const uint8_t *cdata, size_t cdata_len, uint8_t **p, uint16_t *tag, size_t *tag_len, uint8_t **data) {
     if (!p)
         return 0;
     if (!*p)
         *p = (uint8_t *)cdata;
     if (*p-cdata >= cdata_len)
         return 0;
-    uint8_t tg = 0x0;
+    uint16_t tg = 0x0;
     size_t tgl = 0;
     tg = *(*p)++;
+    if ((tg & 0x1f) == 0x1f) {
+        tg <<= 8;
+        tg |= *(*p)++;
+    }    
     tgl = *(*p)++;
     if (tgl == 0x82) {
         tgl = *(*p)++ << 8;
@@ -579,6 +583,16 @@ int walk_tlv(const uint8_t *cdata, size_t cdata_len, uint8_t **p, uint8_t *tag, 
         *data = *p;
     *p = *p+tgl;
     return 1;
+}
+
+bool asn1_find_tag(const uint8_t *data, size_t data_len, uint16_t itag, size_t *tag_len, uint8_t **tag_data) {
+    uint16_t tag = 0x0;
+    uint8_t *p = NULL;
+    while (walk_tlv(data, data_len, &p, &tag, tag_len, tag_data)) {
+        if (itag == tag)
+            return true;
+    }
+    return false;
 }
 
 void init_rtc() {

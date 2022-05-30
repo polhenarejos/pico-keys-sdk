@@ -91,7 +91,8 @@ int sm_unwrap() {
     uint8_t *body = NULL;
     size_t body_size = 0;
     bool is87 = false;
-    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL;
+    uint16_t tag = 0x0;
+    uint8_t *tag_data = NULL, *p = NULL;
     size_t tag_len = 0;    
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x87 || tag == 0x85) {
@@ -180,7 +181,8 @@ int sm_wrap() {
 }
 
 int sm_get_le() {
-    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL;
+    uint16_t tag = 0x0;
+    uint8_t *tag_data = NULL, *p = NULL;
     size_t tag_len = 0;    
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x97) {
@@ -231,7 +233,8 @@ int sm_verify() {
     bool some_added = false;
     const uint8_t *mac = NULL;
     size_t mac_len = 0;
-    uint8_t tag = 0x0, *tag_data = NULL, *p = NULL;
+    uint16_t tag = 0x0;
+    uint8_t *tag_data = NULL, *p = NULL;
     size_t tag_len = 0;    
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag & 0x1) {

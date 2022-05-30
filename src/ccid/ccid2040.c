@@ -255,7 +255,7 @@ static int usb_event_handle() {
                     apdu.nc = apdu.header[4];
                     apdu.data = apdu.header+5;
                     apdu.ne = 0;
-                    if (apdu.nc+5+2 == ccid_header->dwLength) {
+                    if (apdu.nc+5+1 == ccid_header->dwLength) {
                         apdu.ne = apdu.header[ccid_header->dwLength-1];
                         if (apdu.ne == 0)
                             apdu.ne = 256;

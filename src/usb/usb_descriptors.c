@@ -17,10 +17,8 @@
 
 #include "tusb.h"
 #include "usb_descriptors.h"
-#include "ccid.h"
 #include "pico/unique_id.h"
 #include "ccid_version.h"
-
 
 #ifndef USB_VID
 #define USB_VID   0xFEFF
@@ -35,6 +33,32 @@
 
 #define	MAX_USB_POWER		1
 
+static const struct ccid_class_descriptor desc_ccid = {
+    .bLength                = sizeof(struct ccid_class_descriptor),
+    .bDescriptorType        = 0x21,
+    .bcdCCID                = (0x0110),
+    .bMaxSlotIndex          = 0,
+    .bVoltageSupport        = 0x01,  // 5.0V
+    .dwProtocols            = (
+                              0x01|  // T=0
+                              0x02), // T=1
+    .dwDefaultClock         = (0xDFC),
+    .dwMaximumClock         = (0xDFC),
+    .bNumClockSupport       = 0,
+    .dwDataRate             = (0x2580),
+    .dwMaxDataRate          = (0x2580),
+    .bNumDataRatesSupported = 0,
+    .dwMaxIFSD              = (0xFE), // IFSD is handled by the real reader driver
+    .dwSynchProtocols       = (0),
+    .dwMechanical           = (0),
+    .dwFeatures             = 0x40840, //USB-ICC, short & extended APDU
+    .dwMaxCCIDMessageLength = 65544+10,
+    .bClassGetResponse      = 0xFF,
+    .bclassEnvelope         = 0xFF,
+    .wLcdLayout             = 0x0,
+    .bPINSupport            = 0x0,
+    .bMaxCCIDBusySlots      = 0x01,
+};
 
 //--------------------------------------------------------------------+
 // Device Descriptors

@@ -18,12 +18,29 @@
 #ifndef USB_DESCRIPTORS_H_
 #define USB_DESCRIPTORS_H_
 
-enum
-{
-  VENDOR_REQUEST_WEBUSB = 1,
-  VENDOR_REQUEST_MICROSOFT = 2
-};
-
-extern uint8_t const desc_ms_os_20[];
+struct ccid_class_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t bcdCCID;
+	uint8_t  bMaxSlotIndex;
+	uint8_t  bVoltageSupport;
+	uint32_t dwProtocols;
+	uint32_t dwDefaultClock;
+	uint32_t dwMaximumClock;
+	uint8_t  bNumClockSupport;
+	uint32_t dwDataRate;
+	uint32_t dwMaxDataRate;
+	uint8_t  bNumDataRatesSupported;
+	uint32_t dwMaxIFSD;
+	uint32_t dwSynchProtocols;
+	uint32_t dwMechanical;
+	uint32_t dwFeatures;
+	uint32_t dwMaxCCIDMessageLength;
+	uint8_t  bClassGetResponse;
+	uint8_t  bclassEnvelope;
+	uint16_t wLcdLayout;
+	uint8_t  bPINSupport;
+	uint8_t  bMaxCCIDBusySlots;
+} __attribute__ ((__packed__));
 
 #endif /* USB_DESCRIPTORS_H_ */

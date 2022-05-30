@@ -44,6 +44,8 @@ set_source_files_properties(
         
 target_sources(pico_ccid PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/ccid/ccid2040.c
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/flash.c
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/low_flash.c
@@ -61,9 +63,14 @@ target_include_directories(pico_ccid PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library
         )
-        
+
+target_compile_options(pico_ccid PUBLIC
+    -Wall
+    -Werror
+)
+    
 pico_add_extra_outputs(pico_ccid)
 
 #target_compile_definitions(pico_ccid PRIVATE MBEDTLS_ECDSA_DETERMINISTIC=1)
 
-target_link_libraries(pico_ccid PRIVATE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc)
+target_link_libraries(pico_ccid PRIVATE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)

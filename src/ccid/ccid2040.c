@@ -529,6 +529,13 @@ void led_off_all() {
 #endif
 }
 
+size_t asn1_len_tag(uint16_t tag, size_t len) {
+    size_t ret = 1+format_tlv_len(len, NULL)+len;
+    if (tag > 0x00ff)
+        return ret+1;
+    return ret;
+}
+
 int format_tlv_len(size_t len, uint8_t *out) {
     if (len < 128) {
         if (out)

@@ -36,12 +36,8 @@ if (NOT DEFINED USB_PID)
     set(USB_PID 0xFCFD)
 endif()
 add_definitions(-DUSB_PID=${USB_PID})
+configure_file(${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include/mbedtls COPYONLY)
 
-set_source_files_properties(
-        ${CMAKE_CURRENT_LIST_DIR}/OpenSC/src/libopensc/ctx.c
-        PROPERTIES COMPILE_DEFINITIONS "PACKAGE_VERSION=\"0.22.0\";OPENSC_CONF_PATH=\".\"" 
-        )
-        
 target_sources(pico_ccid PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
@@ -71,7 +67,5 @@ target_compile_options(pico_ccid PUBLIC
 )
     
 pico_add_extra_outputs(pico_ccid)
-
-#target_compile_definitions(pico_ccid PRIVATE MBEDTLS_ECDSA_DETERMINISTIC=1)
 
 target_link_libraries(pico_ccid PRIVATE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)

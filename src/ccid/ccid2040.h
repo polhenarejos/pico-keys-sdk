@@ -244,9 +244,4 @@ extern void led_set_blink(uint32_t mode);
 #define CCID_WRONG_PADDING                   -1011
 #define CCID_VERIFICATION_FAILED             -1012
 
-extern int walk_tlv(const uint8_t *cdata, size_t cdata_len, uint8_t **p, uint16_t *tag, size_t *tag_len, uint8_t **data);
-extern int format_tlv_len(size_t len, uint8_t *out);
-extern bool asn1_find_tag(const uint8_t *data, size_t data_len, uint16_t itag, size_t *tag_len, uint8_t **tag_data);
-extern size_t asn1_len_tag(uint16_t tag, size_t len);
-
 #endif

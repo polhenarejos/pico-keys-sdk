@@ -53,6 +53,7 @@ target_sources(pico_ccid PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/src/rng/neug.c
         ${CMAKE_CURRENT_LIST_DIR}/src/ccid/eac.c
         ${CMAKE_CURRENT_LIST_DIR}/src/ccid/crypto_utils.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/ccid/asn1.c
         )
 
 target_include_directories(pico_ccid PUBLIC

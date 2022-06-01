@@ -19,6 +19,7 @@
 #include "crypto_utils.h"
 #include "random.h"
 #include "mbedtls/cmac.h"
+#include "asn1.h"
 
 static uint8_t nonce[8];
 static uint8_t sm_kmac[16];

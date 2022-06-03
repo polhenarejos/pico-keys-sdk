@@ -379,7 +379,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 return CCID_OK;
             }
             else { //needs reallocation
-                uint8_t *tpos = p-tag_len-format_tlv_len(tag_len, NULL)-1;
+                uint8_t *tpos = p-asn1_len_tag(tag, tag_len);
                 memmove(tpos, p, fdata+ef_size-p);
                 tpos += fdata+ef_size-p;
                 uintptr_t meta_offset = tpos-fdata;
@@ -401,14 +401,14 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
             }
         }
     }
-    fdata = (uint8_t *)realloc(fdata, ef_size+1+format_tlv_len(len+2,NULL)+2+len);
+    fdata = (uint8_t *)realloc(fdata, ef_size+asn1_len_tag(fid & 0x1f, len+2));
     uint8_t *f = fdata+ef_size;
     *f++ = fid & 0x1f;
     f += format_tlv_len(len+2, f);
     *f++ = fid >> 8;
     *f++ = fid & 0xff;
     memcpy(f, data, len);
-    r = flash_write_data_to_file(ef, fdata, ef_size+1+format_tlv_len(len+2,NULL)+2+len);
+    r = flash_write_data_to_file(ef, fdata, ef_size+asn1_len_tag(fid & 0x1f, len+2));
     free(fdata);
     if (r != CCID_OK)
         return CCID_EXEC_ERROR;

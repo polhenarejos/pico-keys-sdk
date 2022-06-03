@@ -375,7 +375,6 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 free(fdata);
                 if (r != CCID_OK)
                     return CCID_EXEC_ERROR;
-                low_flash_available();
                 return CCID_OK;
             }
             else { //needs reallocation
@@ -396,7 +395,6 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 free(fdata);
                 if (r != CCID_OK)
                     return CCID_EXEC_ERROR;
-                low_flash_available();
                 return CCID_OK;
             }
         }

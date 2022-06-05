@@ -264,6 +264,7 @@ static int usb_event_handle() {
                 //printf("apdu.nc %d, apdu.ne %d\r\n",apdu.nc,apdu.ne);
                 if (apdu.header[1] == 0xc0) {
                     //printf("apdu.ne %d, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
+                    timeout = 0;
                     ccid_response = (struct ccid_header *)(rdata_gr-10);
                     *(uint16_t *)rdata_gr = rdata_bk;
                     if (apdu.rlen <= apdu.ne) {
@@ -274,6 +275,11 @@ static int usb_event_handle() {
                         ccid_response->abRFU0 = ccid_status;
                         ccid_response->abRFU1 = 0;
                         ccid_write_offset(apdu.rlen+2, rdata_gr-10-usb_get_tx());
+                        //Ended. Prepare next RAPDU
+                        apdu.sw = 0;
+                        apdu.rlen = 0;
+                        ccid_response = (struct ccid_header *)usb_get_tx();
+                        ccid_response->apdu = usb_get_tx()+10;
                     }
                     else {
                         ccid_response->bMessageType = CCID_DATA_BLOCK_RET;

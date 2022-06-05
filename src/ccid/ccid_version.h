@@ -18,7 +18,7 @@
 #ifndef __VERSION_H_
 #define __VERSION_H_
 
-#define CCID_VERSION 0x0101
+#define CCID_VERSION 0x0200
 
 #define CCID_VERSION_MAJOR ((CCID_VERSION >> 8) & 0xff)
 #define CCID_VERSION_MINOR (CCID_VERSION & 0xff)

@@ -36,18 +36,18 @@ extern int register_app(app_t * (*)());
 
 extern const uint8_t historical_bytes[];
 
-#define DEBUG_PAYLOAD(p,s) { \
-    printf("Payload %s (%d bytes):\r\n", #p,s);\
-    for (int i = 0; i < s; i += 16) {\
-        printf("%07Xh : ",(unsigned int)(i+p));\
-        for (int j = 0; j < 16; j++) {\
-            if (j < s-i) printf("%02X ",(p)[i+j]);\
+#define DEBUG_PAYLOAD(_p,_s) { \
+    printf("Payload %s (%d bytes):\r\n", #_p,_s);\
+    for (int _i = 0; _i < _s; _i += 16) {\
+        printf("%07Xh : ",(unsigned int)(_i+_p));\
+        for (int _j = 0; _j < 16; _j++) {\
+            if (_j < _s-_i) printf("%02X ",(_p)[_i+_j]);\
             else printf("   ");\
-            if (j == 7) printf(" ");\
+            if (_j == 7) printf(" ");\
             } printf(":  "); \
-        for (int j = 0; j < MIN(16,s-i); j++) {\
-            printf("%c",(p)[i+j] == 0x0a || (p)[i+j] == 0x0d ? '\\' : (p)[i+j]);\
-            if (j == 7) printf(" ");\
+        for (int _j = 0; _j < MIN(16,_s-_i); _j++) {\
+            printf("%c",(_p)[_i+_j] == 0x0a || (_p)[_i+_j] == 0x0d ? '\\' : (_p)[_i+_j]);\
+            if (_j == 7) printf(" ");\
             }\
             printf("\r\n");\
         } printf("\r\n"); \

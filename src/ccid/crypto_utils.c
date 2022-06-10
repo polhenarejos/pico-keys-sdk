@@ -64,14 +64,7 @@ void hash256(const uint8_t *input, size_t len, uint8_t output[32]) {
 }
 
 void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output) {
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(md);
-    mbedtls_md_setup(&ctx, md_info, 0);
-    mbedtls_md_starts(&ctx);
-    mbedtls_md_update(&ctx, input, len);
-    mbedtls_md_finish(&ctx, output);
-    mbedtls_md_free(&ctx);   
+    mbedtls_md(mbedtls_md_info_from_type(md), input, len, output); 
 }
 
 int aes_encrypt(const uint8_t *key, const uint8_t *iv, int key_size, int mode, uint8_t *data, int len) {

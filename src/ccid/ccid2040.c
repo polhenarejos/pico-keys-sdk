@@ -341,12 +341,12 @@ int process_apdu() {
     }
     if (current_app->process_apdu)
         return current_app->process_apdu();
-    return set_res_sw (0x6D, 0x00);
+    return set_res_sw(0x6D, 0x00);
 }
 
 uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
     apdu.sw = (sw1 << 8) | sw2;
-    if (sw1 != 0x90 || sw2 != 0x00)
+    if (sw1 != 0x90)
         res_APDU_size = 0;
     return make_uint16_t(sw1, sw2);
 }

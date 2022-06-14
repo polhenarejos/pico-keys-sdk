@@ -36,6 +36,7 @@ extern int register_app(app_t * (*)());
 
 extern const uint8_t historical_bytes[];
 
+#ifdef DEBUG_APDU
 #define DEBUG_PAYLOAD(_p,_s) { \
     printf("Payload %s (%d bytes):\r\n", #_p,_s);\
     for (int _i = 0; _i < _s; _i += 16) {\
@@ -52,7 +53,9 @@ extern const uint8_t historical_bytes[];
             printf("\r\n");\
         } printf("\r\n"); \
     }
-    
+#else
+#define DEBUG_PAYLOAD(_p,_s)
+#endif    
 
 struct apdu {
     uint8_t *header;

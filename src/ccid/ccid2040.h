@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  * Copyright (c) 2022 Pol Henarejos.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -21,7 +21,7 @@
 #include "file.h"
 #include "pico/unique_id.h"
 #include "pico/util/queue.h"
-#include <string.h> 
+#include <string.h>
 
 #define USB_REQ_CCID        0xA1
 
@@ -55,7 +55,7 @@ extern const uint8_t historical_bytes[];
     }
 #else
 #define DEBUG_PAYLOAD(_p,_s)
-#endif    
+#endif
 
 struct apdu {
     uint8_t *header;
@@ -92,11 +92,11 @@ enum ccid_state {
     CCID_STATE_NOCARD,		/* No card available */
     CCID_STATE_START,		/* Initial */
     CCID_STATE_WAIT,		/* Waiting APDU */
-    
+
     CCID_STATE_EXECUTE,		/* Executing command */
     CCID_STATE_ACK_REQUIRED_0,	/* Ack required (executing)*/
     CCID_STATE_ACK_REQUIRED_1,	/* Waiting user's ACK (execution finished) */
-    
+
     CCID_STATE_EXITED,		/* CCID Thread Terminated */
     CCID_STATE_EXEC_REQUESTED,	/* Exec requested */
 };

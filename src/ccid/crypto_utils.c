@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  * Copyright (c) 2022 Pol Henarejos.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -35,12 +35,12 @@ void hash_multi(const uint8_t *input, size_t len, uint8_t output[32]) {
     mbedtls_sha256_init(&ctx);
     int iters = 256;
     pico_unique_board_id_t unique_id;
-    
+
     pico_get_unique_board_id(&unique_id);
-    
+
     mbedtls_sha256_starts (&ctx, 0);
     mbedtls_sha256_update (&ctx, unique_id.id, sizeof(unique_id.id));
-    
+
     while (iters > len)
     {
         mbedtls_sha256_update (&ctx, input, len);
@@ -55,7 +55,7 @@ void hash_multi(const uint8_t *input, size_t len, uint8_t output[32]) {
 void hash256(const uint8_t *input, size_t len, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
-    
+
     mbedtls_sha256_starts (&ctx, 0);
     mbedtls_sha256_update (&ctx, input, len);
 
@@ -64,7 +64,7 @@ void hash256(const uint8_t *input, size_t len, uint8_t output[32]) {
 }
 
 void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output) {
-    mbedtls_md(mbedtls_md_info_from_type(md), input, len, output); 
+    mbedtls_md(mbedtls_md_info_from_type(md), input, len, output);
 }
 
 int aes_encrypt(const uint8_t *key, const uint8_t *iv, int key_size, int mode, uint8_t *data, int len) {

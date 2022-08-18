@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  * Copyright (c) 2022 Pol Henarejos.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -94,7 +94,7 @@ int sm_unwrap() {
     bool is87 = false;
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
-    size_t tag_len = 0;    
+    size_t tag_len = 0;
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x87 || tag == 0x85) {
             body = tag_data;
@@ -184,7 +184,7 @@ int sm_wrap() {
 int sm_get_le() {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
-    size_t tag_len = 0;    
+    size_t tag_len = 0;
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x97) {
             uint32_t le = 0;
@@ -236,7 +236,7 @@ int sm_verify() {
     size_t mac_len = 0;
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
-    size_t tag_len = 0;    
+    size_t tag_len = 0;
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag & 0x1) {
             input[input_len++] = tag;

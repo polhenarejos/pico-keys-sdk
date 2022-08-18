@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  * Copyright (c) 2022 Pol Henarejos.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -90,7 +90,7 @@ uint8_t const * tud_descriptor_device_cb(void)
     return (uint8_t const *) &desc_device;
 }
 
-tusb_desc_interface_t const desc_interface = 
+tusb_desc_interface_t const desc_interface =
 {
     .bLength            = sizeof(tusb_desc_interface_t),
     .bDescriptorType    = TUSB_DESC_INTERFACE,
@@ -107,7 +107,7 @@ tusb_desc_interface_t const desc_interface =
 // Configuration Descriptor
 //--------------------------------------------------------------------+
 
-tusb_desc_configuration_t const desc_config  = 
+tusb_desc_configuration_t const desc_config  =
 {
     .bLength             = sizeof(tusb_desc_configuration_t),
   	.bDescriptorType     = TUSB_DESC_CONFIGURATION,
@@ -119,7 +119,7 @@ tusb_desc_configuration_t const desc_config  =
   	.bMaxPower           = TUSB_DESC_CONFIG_POWER_MA(MAX_USB_POWER+1),
 };
 
-tusb_desc_endpoint_t const desc_ep1 = 
+tusb_desc_endpoint_t const desc_ep1 =
 {
     .bLength             = sizeof(tusb_desc_endpoint_t),
 	.bDescriptorType     = TUSB_DESC_ENDPOINT,
@@ -129,7 +129,7 @@ tusb_desc_endpoint_t const desc_ep1 =
 	.bInterval           = 0
 };
 
-tusb_desc_endpoint_t const desc_ep2 = 
+tusb_desc_endpoint_t const desc_ep2 =
 {
     .bLength             = sizeof(tusb_desc_endpoint_t),
 	.bDescriptorType     = TUSB_DESC_ENDPOINT,
@@ -144,7 +144,7 @@ static uint8_t desc_config_extended[sizeof(tusb_desc_configuration_t) + sizeof(t
 uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 {
     (void) index; // for multiple configurations
-  
+
     static uint8_t initd = 0;
     if (initd == 0)
     {
@@ -205,7 +205,7 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
         // Note: the 0xEE index string is a Microsoft OS 1.0 Descriptors.
         // https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/microsoft-defined-usb-descriptors
 
-        if ( !(index < sizeof(string_desc_arr)/sizeof(string_desc_arr[0])) ) 
+        if ( !(index < sizeof(string_desc_arr)/sizeof(string_desc_arr[0])) )
             return NULL;
 
         const char* str = string_desc_arr[index];
@@ -218,7 +218,7 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
         }
 
         chr_count = strlen(str);
-        if ( chr_count > 31 ) 
+        if ( chr_count > 31 )
             chr_count = 31;
 
         // Convert ASCII string into UTF-16

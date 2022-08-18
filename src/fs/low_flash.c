@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  * Copyright (c) 2022 Pol Henarejos.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -66,8 +66,8 @@ void do_flash()
                     flash_range_program(flash_pages[r].address-XIP_BASE, flash_pages[r].page, FLASH_SECTOR_SIZE);
                     restore_interrupts (ints);
                     while (multicore_lockout_end_timeout_us(1000) == false);
-                    //printf("WRITEN %X !\r\n",flash_pages[r].address);                    
-                    
+                    //printf("WRITEN %X !\r\n",flash_pages[r].address);
+
                     flash_pages[r].ready = false;
                     ready_pages--;
                 }
@@ -139,10 +139,10 @@ page_flash_t *find_free_page(uintptr_t addr) {
 
 int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
     page_flash_t *p = NULL;
-    
+
     if (!data || len == 0)
         return CCID_ERR_NULL_PARAM;
-    
+
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
@@ -174,7 +174,7 @@ int flash_program_uintptr (uintptr_t addr, uintptr_t data) {
 }
 
 uint8_t *flash_read(uintptr_t addr) {
-    uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;   
+    uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages > 0) {
         for (int r = 0; r < TOTAL_FLASH_PAGES; r++)
@@ -213,7 +213,7 @@ uint8_t flash_read_uint8(uintptr_t addr) {
 
 int flash_erase_page (uintptr_t addr, size_t page_size) {
     page_flash_t *p = NULL;
-    
+
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
@@ -229,7 +229,7 @@ int flash_erase_page (uintptr_t addr, size_t page_size) {
     p->ready = false;
     p->page_size = page_size;
     mutex_exit(&mtx_flash);
-    
+
     return CCID_OK;
 }
 

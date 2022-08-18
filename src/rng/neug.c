@@ -1,20 +1,20 @@
-/* 
+/*
  * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  * Copyright (c) 2022 Pol Henarejos.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
- 
+
 //Part of the code is taken from GnuK (GPLv3)
 
 
@@ -72,7 +72,7 @@ static int ep_process () {
     random_word *= 0x00000100000001B3;
     if (++ep_round == 8) {
         ep_round = 0;
-        return 2; //2 words 
+        return 2; //2 words
     }
     return 0;
 }
@@ -122,7 +122,7 @@ static struct rng_rb the_ring_buffer;
 
 void *neug_task() {
     struct rng_rb *rb = &the_ring_buffer;
- 
+
     int n;
 
     if ((n = ep_process())) {
@@ -147,15 +147,15 @@ void neug_init(uint32_t *buf, uint8_t size) {
     struct rng_rb *rb = &the_ring_buffer;
 
     rb_init(rb, buf, size);
-    
+
     adc_start();
-    
+
     ep_init();
 }
 
 void neug_flush(void) {
     struct rng_rb *rb = &the_ring_buffer;
-    
+
     while (!rb->empty)
         rb_del (rb);
 }

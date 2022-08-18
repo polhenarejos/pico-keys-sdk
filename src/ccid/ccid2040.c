@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  * Copyright (c) 2022 Pol Henarejos.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -122,7 +122,7 @@ static bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
     led_set_blink((1000 << 16) | 100);
-    
+
     while (board_button_read() == false) {
         execute_tasks();
         //sleep_ms(10);
@@ -359,10 +359,10 @@ static void card_init(void) {
 void card_thread() {
     card_init ();
 
-    while (1) {    
+    while (1) {
         uint32_t m;
         queue_remove_blocking(&ccid_to_card_q, &m);
-        
+
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE)
 	    {
 	        set_res_sw (0x6f, 0x00);
@@ -376,7 +376,7 @@ void card_thread() {
 	    }
 
         process_apdu();
-        
+
         done:;
         uint32_t flag = EV_EXEC_FINISHED;
         queue_add_blocking(&card_to_ccid_q, &flag);
@@ -389,7 +389,7 @@ void card_thread() {
 void ccid_task(void) {
     if (tud_vendor_mounted()) {
         if (usb_event_handle() != 0) {
-            
+
         }
         usb_write_flush();
         uint32_t m = 0x0;
@@ -513,7 +513,7 @@ void led_blinking_task() {
 #else
     uint32_t interval = led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
 #endif
-    
+
 
     // Blink every interval ms
     if (board_millis() - start_ms < interval)
@@ -538,7 +538,7 @@ void led_off_all() {
 }
 
 void init_rtc() {
-    
+
     rtc_init();
     datetime_t dt = {
             .year  = 2020,
@@ -566,11 +566,11 @@ int main(void) {
     ccid_header = (struct ccid_header *)usb_get_rx();
     ccid_header->apdu = usb_get_rx()+10;
     apdu.header = ccid_header->apdu;
-        
+
     ccid_response = (struct ccid_header *)usb_get_tx();
     ccid_response->apdu = usb_get_tx()+10;
     apdu.rdata = ccid_response->apdu;
-    
+
     queue_init(&card_to_ccid_q, sizeof(uint32_t), 64);
     queue_init(&ccid_to_card_q, sizeof(uint32_t), 64);
 
@@ -596,15 +596,15 @@ int main(void) {
     tusb_init();
 
     //prepare_ccid();
-    
+
     random_init();
-    
+
     low_flash_init();
-    
+
     init_rtc();
-    
+
     //ccid_prepare_receive(&ccid);
-      
+
     while (1) {
         execute_tasks();
         neug_task();

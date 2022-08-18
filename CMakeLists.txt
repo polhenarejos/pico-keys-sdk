@@ -1,17 +1,17 @@
- # 
+ #
  # This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  # Copyright (c) 2022 Pol Henarejos.
- # 
- # This program is free software: you can redistribute it and/or modify  
- # it under the terms of the GNU General Public License as published by  
+ #
+ # This program is free software: you can redistribute it and/or modify
+ # it under the terms of the GNU General Public License as published by
  # the Free Software Foundation, version 3.
  #
- # This program is distributed in the hope that it will be useful, but 
- # WITHOUT ANY WARRANTY; without even the implied warranty of 
- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ # This program is distributed in the hope that it will be useful, but
+ # WITHOUT ANY WARRANTY; without even the implied warranty of
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  # General Public License for more details.
  #
- # You should have received a copy of the GNU General Public License 
+ # You should have received a copy of the GNU General Public License
  # along with this program. If not, see <http://www.gnu.org/licenses/>.
  #
 
@@ -65,7 +65,7 @@ target_compile_options(pico_ccid PUBLIC
     -Wall
     -Werror
 )
-    
+
 pico_add_extra_outputs(pico_ccid)
 
 target_link_libraries(pico_ccid PRIVATE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)

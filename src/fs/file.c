@@ -1,17 +1,17 @@
-/* 
+/*
  * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
  * Copyright (c) 2022 Pol Henarejos.
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -44,10 +44,10 @@ void process_fci(const file_t *pe, int fmd) {
         res_APDU[res_APDU_size++] = 0x6f;
         res_APDU[res_APDU_size++] = 0x00; //computed later
     }
-    
+
     res_APDU[res_APDU_size++] = 0x62;
     res_APDU[res_APDU_size++] = 0x00; //computed later
-    
+
     res_APDU[res_APDU_size++] = 0x81;
     res_APDU[res_APDU_size++] = 2;
     if (pe->data) {
@@ -65,7 +65,7 @@ void process_fci(const file_t *pe, int fmd) {
         memset(res_APDU+res_APDU_size, 0, 2);
         res_APDU_size += 2;
     }
-    
+
     res_APDU[res_APDU_size++] = 0x82;
     res_APDU[res_APDU_size++] = 1;
     res_APDU[res_APDU_size] = 0;
@@ -75,7 +75,7 @@ void process_fci(const file_t *pe, int fmd) {
         res_APDU[res_APDU_size++] |= pe->ef_structure & 0x7;
     else if (pe->type == FILE_TYPE_DF)
         res_APDU[res_APDU_size++] |= 0x38;
-    
+
     res_APDU[res_APDU_size++] = 0x83;
     res_APDU[res_APDU_size++] = 2;
     put_uint16_t(pe->fid, res_APDU+res_APDU_size);
@@ -130,7 +130,7 @@ file_t *search_by_name(uint8_t *name, uint16_t namelen) {
 }
 
 file_t *search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp) {
-    
+
     for (file_t *p = file_entries; p != file_last; p++) {
         if (p->fid != 0x0000 && p->fid == fid) {
             if (!parent || (parent && is_parent(p, parent))) {
@@ -190,7 +190,7 @@ bool authenticate_action(const file_t *ef, uint8_t op) {
             // PIN required.
         if (isUserAuthenticated) {
             return true;
-        } 
+        }
         else {
             return false;
         }
@@ -220,14 +220,14 @@ void scan_region(bool persistent) {
     for (uintptr_t base = flash_read_uintptr(endp); base >= startp; base = flash_read_uintptr(base)) {
         if (base == 0x0) //all is empty
             break;
-        
+
         uint16_t fid = flash_read_uint16(base+sizeof(uintptr_t)+sizeof(uintptr_t));
         printf("[%x] scan fid %x, len %d\r\n",base,fid,flash_read_uint16(base+sizeof(uintptr_t)+sizeof(uintptr_t)+sizeof(uint16_t)));
         file_t *file = (file_t *)search_by_fid(fid, NULL, SPECIFY_EF);
         if (!file) {
             file = file_new(fid);
         }
-        if (file) 
+        if (file)
             file->data = (uint8_t *)(base+sizeof(uintptr_t)+sizeof(uintptr_t)+sizeof(uint16_t));
         if (flash_read_uintptr(base) == 0x0) {
             break;
@@ -237,7 +237,7 @@ void scan_region(bool persistent) {
 
 void scan_flash() {
     initialize_flash(false); //soft initialization
-    if (*(uintptr_t *)end_data_pool == 0xffffffff && *(uintptr_t *)(end_data_pool+sizeof(uintptr_t)) == 0xffffffff) 
+    if (*(uintptr_t *)end_data_pool == 0xffffffff && *(uintptr_t *)(end_data_pool+sizeof(uintptr_t)) == 0xffffffff)
     {
         printf("First initialization (or corrupted!)\r\n");
         uint8_t empty[sizeof(uintptr_t)*2+sizeof(uint32_t)];

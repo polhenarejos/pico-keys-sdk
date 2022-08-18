@@ -160,7 +160,7 @@ void neug_flush(void) {
         rb_del (rb);
 }
 
-uint32_t neug_get(int kick) {
+uint32_t neug_get() {
     struct rng_rb *rb = &the_ring_buffer;
     uint32_t v;
 
@@ -180,6 +180,6 @@ void neug_wait_full(void) { //should be called only on core1
 }
 
 void neug_fini(void) {
-    neug_get(1);
+    neug_get();
 }
 

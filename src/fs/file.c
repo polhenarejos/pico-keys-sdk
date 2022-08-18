@@ -283,7 +283,7 @@ int delete_dynamic_file(file_t *f) {
 
 file_t *file_new(uint16_t fid) {
     file_t *f;
-    if ((f = search_dynamic_file(fid)))
+    if ((f = search_dynamic_file(fid)) || (f = search_by_fid(fid, NULL, SPECIFY_EF)))
         return f;
     if (dynamic_files == MAX_DYNAMIC_FILES)
         return NULL;

@@ -23,6 +23,8 @@
 
 extern const uintptr_t end_data_pool;
 extern const uintptr_t start_data_pool;
+extern const uintptr_t end_rom_pool;
+extern const uintptr_t start_rom_pool;
 extern int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len);
 extern int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t len, uint16_t offset);
 extern int flash_program_halfword (uintptr_t addr, uint16_t data);
@@ -209,19 +211,13 @@ void initialize_flash(bool hard) {
     dynamic_files = 0;
 }
 
-void scan_flash() {
-    initialize_flash(false); //soft initialization
-    if (*(uintptr_t *)end_data_pool == 0xffffffff && *(uintptr_t *)(end_data_pool+sizeof(uintptr_t)) == 0xffffffff) 
-    {
-        printf("First initialization (or corrupted!)\r\n");
-        const uint8_t empty[8] = { 0 };
-        flash_program_block(end_data_pool, empty, sizeof(empty));
-        //low_flash_available();
-        //wait_flash_finish();
+void scan_region(bool persistent) {
+    uintptr_t endp = end_data_pool, startp = start_data_pool;
+    if (persistent) {
+        endp = end_rom_pool;
+        startp = start_rom_pool;
     }
-    printf("SCAN\r\n");
-
-    for (uintptr_t base = flash_read_uintptr(end_data_pool); base >= start_data_pool; base = flash_read_uintptr(base)) {
+    for (uintptr_t base = flash_read_uintptr(endp); base >= startp; base = flash_read_uintptr(base)) {
         if (base == 0x0) //all is empty
             break;
         
@@ -237,6 +233,23 @@ void scan_flash() {
             break;
         }
     }
+}
+
+void scan_flash() {
+    initialize_flash(false); //soft initialization
+    if (*(uintptr_t *)end_data_pool == 0xffffffff && *(uintptr_t *)(end_data_pool+sizeof(uintptr_t)) == 0xffffffff) 
+    {
+        printf("First initialization (or corrupted!)\r\n");
+        uint8_t empty[sizeof(uintptr_t)*2+sizeof(uint32_t)];
+        memset(empty, 0, sizeof(empty));
+        flash_program_block(end_data_pool, empty, sizeof(empty));
+        flash_program_block(end_rom_pool, empty, sizeof(empty));
+        //low_flash_available();
+        //wait_flash_finish();
+    }
+    printf("SCAN\r\n");
+    scan_region(true);
+    scan_region(false);
 }
 
 uint8_t *file_read(const uint8_t *addr) {

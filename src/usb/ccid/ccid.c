@@ -105,7 +105,7 @@ uint8_t ccid_status = 1;
 static uint8_t itf_num;
 
 void ccid_write_offset(uint16_t size, uint16_t offset) {
-    if (*usb_get_tx() != 0x81)
+    if (*usb_get_tx()+offset != 0x81)
         DEBUG_PAYLOAD(usb_get_tx()+offset,size+10);
     usb_write_offset(size+10, offset);
 }

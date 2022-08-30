@@ -98,7 +98,7 @@ struct ccid_header {
     uint8_t bSeq;
     uint8_t abRFU0;
     uint16_t abRFU1;
-    uint8_t *apdu;
+    uint8_t apdu; //Actually it is an array
 } __packed;
 
 uint8_t ccid_status = 1;
@@ -119,12 +119,10 @@ struct ccid_header *ccid_header;
 
 int driver_init() {
     ccid_header = (struct ccid_header *)usb_get_rx();
-    ccid_header->apdu = usb_get_rx()+10;
-    apdu.header = ccid_header->apdu;
+    apdu.header = &ccid_header->apdu;
 
     ccid_response = (struct ccid_header *)usb_get_tx();
-    ccid_response->apdu = usb_get_tx()+10;
-    apdu.rdata = ccid_response->apdu;
+    apdu.rdata = &ccid_response->apdu;
 
     return CCID_OK;
 }
@@ -137,7 +135,7 @@ void tud_vendor_rx_cb(uint8_t itf) {
 }
 
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
-    //printf("written %ld\n",sent_bytes);
+    printf("written %ld\n",sent_bytes);
     usb_write_flush();
 }
 
@@ -154,7 +152,7 @@ int driver_process_usb_packet(uint16_t rx_read) {
     {
         //printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
         if (ccid_header->dwLength <= rx_read-10) {
-            size_t apdu_size = 0;
+            size_t apdu_sent = 0;
             if (ccid_header->bMessageType != 0x65)
                 DEBUG_PAYLOAD(usb_get_rx(),usb_read_available());
             if (ccid_header->bMessageType == 0x65) {
@@ -192,10 +190,10 @@ int driver_process_usb_packet(uint16_t rx_read) {
                 ccid_write(0);
             }
             else if (ccid_header->bMessageType == 0x6F) {
-                apdu_size = apdu_process(ccid_header->apdu, ccid_header->dwLength);
+                apdu_sent = apdu_process(&ccid_header->apdu, ccid_header->dwLength);
             }
             usb_clear_rx();
-            return apdu_size;
+            return apdu_sent;
         }
     }
     /*
@@ -249,8 +247,7 @@ void driver_exec_finished_cont(size_t size_next, size_t offset) {
 
 uint8_t *driver_prepare_response() {
     ccid_response = (struct ccid_header *)usb_get_tx();
-    ccid_response->apdu = usb_get_tx()+10;
-    return ccid_response->apdu;
+    return &ccid_response->apdu;
 }
 #define USB_CONFIG_ATT_ONE TU_BIT(7)
 

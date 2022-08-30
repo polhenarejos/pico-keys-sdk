@@ -18,6 +18,7 @@
 #include "apdu.h"
 #include "hsm.h"
 #include "usb.h"
+#include <stdio.h>
 
 uint8_t *rdata_gr = NULL;
 uint16_t rdata_bk = 0x0;
@@ -25,7 +26,8 @@ extern uint32_t timeout;
 
 int process_apdu() {
     led_set_blink(BLINK_PROCESSING);
-    if (!current_app) {
+    if (!current_app)
+    {
         if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
             for (int a = 0; a < num_apps; a++) {
                 if ((current_app = apps[a].select_aid(&apps[a]))) {
@@ -111,7 +113,7 @@ size_t apdu_process(const uint8_t *buffer, size_t buffer_size) {
         apdu.rlen = 0;
         apdu.rdata = usb_prepare_response();
         rdata_gr = apdu.rdata;
-        return apdu.nc;
+        return 1;
     }
     return 0;
 }

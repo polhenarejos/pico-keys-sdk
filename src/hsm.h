@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
+ * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,104 +15,23 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CCID2040_H_
-#define _CCID2040_H_
+#ifndef _HSM_H_
+#define _HSM_H_
 
 #include "file.h"
 #include "pico/unique_id.h"
-#include "pico/util/queue.h"
 #include <string.h>
 
-#define USB_REQ_CCID        0xA1
 
-typedef struct app {
-    const uint8_t *aid;
-    int (*process_apdu)();
-    struct app* (*select_aid)();
-    int (*unload)();
-} app_t;
+extern int driver_init();
+extern void driver_task();
+extern bool wait_button();
 
-extern int register_app(app_t * (*)());
+extern void low_flash_init_core1();
 
-extern const uint8_t historical_bytes[];
-
-#ifdef DEBUG_APDU
-#define DEBUG_PAYLOAD(_p,_s) { \
-    printf("Payload %s (%d bytes):\r\n", #_p,_s);\
-    for (int _i = 0; _i < _s; _i += 16) {\
-        printf("%07Xh : ",(unsigned int)(_i+_p));\
-        for (int _j = 0; _j < 16; _j++) {\
-            if (_j < _s-_i) printf("%02X ",(_p)[_i+_j]);\
-            else printf("   ");\
-            if (_j == 7) printf(" ");\
-            } printf(":  "); \
-        for (int _j = 0; _j < MIN(16,_s-_i); _j++) {\
-            printf("%c",(_p)[_i+_j] == 0x0a || (_p)[_i+_j] == 0x0d ? '\\' : (_p)[_i+_j]);\
-            if (_j == 7) printf(" ");\
-            }\
-            printf("\r\n");\
-        } printf("\r\n"); \
-    }
-#else
-#define DEBUG_PAYLOAD(_p,_s)
-#endif
-
-struct apdu {
-    uint8_t *header;
-    uint32_t nc;
-    uint32_t ne;
-    uint8_t *data;
-    uint16_t sw;
-    uint8_t *rdata;
-    uint16_t rlen;
-} __packed;
-
-#define MAX_CMD_APDU_DATA_SIZE (24+4+512*4)
-#define MAX_RES_APDU_DATA_SIZE (5+9+512*4)
-#define CCID_MSG_HEADER_SIZE    10
-#define USB_LL_BUF_SIZE         64
-
-/* CCID thread */
-#define EV_CARD_CHANGE        1
-#define EV_TX_FINISHED        2 /* CCID Tx finished  */
-#define EV_EXEC_ACK_REQUIRED  4 /* OpenPGPcard Execution ACK required */
-#define EV_EXEC_FINISHED      8 /* OpenPGPcard Execution finished */
-#define EV_RX_DATA_READY     16 /* USB Rx data available  */
-#define EV_PRESS_BUTTON      32
-
-/* SC HSM thread */
-#define EV_MODIFY_CMD_AVAILABLE   1
-#define EV_VERIFY_CMD_AVAILABLE   2
-#define EV_CMD_AVAILABLE          4
-#define EV_EXIT                   8
-#define EV_BUTTON_TIMEOUT        16
-#define EV_BUTTON_PRESSED        32
-
-enum ccid_state {
-    CCID_STATE_NOCARD,		/* No card available */
-    CCID_STATE_START,		/* Initial */
-    CCID_STATE_WAIT,		/* Waiting APDU */
-
-    CCID_STATE_EXECUTE,		/* Executing command */
-    CCID_STATE_ACK_REQUIRED_0,	/* Ack required (executing)*/
-    CCID_STATE_ACK_REQUIRED_1,	/* Waiting user's ACK (execution finished) */
-
-    CCID_STATE_EXITED,		/* CCID Thread Terminated */
-    CCID_STATE_EXEC_REQUESTED,	/* Exec requested */
-};
-
-#define CLA(a) a.header[0]
-#define INS(a) a.header[1]
-#define P1(a) a.header[2]
-#define P2(a) a.header[3]
-
-#define res_APDU apdu.rdata
-#define res_APDU_size apdu.rlen
-
-extern struct apdu apdu;
-
-uint16_t set_res_sw (uint8_t sw1, uint8_t sw2);
-
+extern int driver_write(const uint8_t *, size_t);
+extern size_t driver_read(uint8_t *, size_t);
+extern size_t usb_rx(const uint8_t *buffer, size_t len);
 
 static inline const uint16_t make_uint16_t(uint8_t b1, uint8_t b2) {
     return (b1 << 8) | b2;
@@ -124,39 +43,6 @@ static inline const void put_uint16_t(uint16_t n, uint8_t *b) {
     *b++ = (n >> 8) & 0xff;
     *b = n & 0xff;
 }
-
-extern const uint8_t *ccid_atr;
-
-extern queue_t ccid_to_card_q;
-extern queue_t card_to_ccid_q;
-
-
-#ifdef DEBUG
-void stdout_init (void);
-#define DEBUG_MORE 1
-/*
- * Debug functions in debug.c
- */
-void put_byte (uint8_t b);
-void put_byte_with_no_nl (uint8_t b);
-void put_short (uint16_t x);
-void put_word (uint32_t x);
-void put_int (uint32_t x);
-void put_string (const char *s);
-void put_binary (const char *s, int len);
-
-#define DEBUG_INFO(msg)	    put_string (msg)
-#define DEBUG_WORD(w)	    put_word (w)
-#define DEBUG_SHORT(h)	    put_short (h)
-#define DEBUG_BYTE(b)       put_byte (b)
-#define DEBUG_BINARY(s,len) put_binary ((const char *)s,len)
-#else
-#define DEBUG_INFO(msg)
-#define DEBUG_WORD(w)
-#define DEBUG_SHORT(h)
-#define DEBUG_BYTE(b)
-#define DEBUG_BINARY(s,len)
-#endif
 
 extern int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len);
 extern void low_flash_available();
@@ -174,7 +60,6 @@ enum  {
     BLINK_ALWAYS_OFF  = 0
 };
 extern void led_set_blink(uint32_t mode);
-
 
 #define SW_BYTES_REMAINING_00()             set_res_sw (0x61, 0x00)
 #define SW_WARNING_STATE_UNCHANGED()        set_res_sw (0x62, 0x00)

@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
+ * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 #include "mbedtls/sha256.h"
 #include "mbedtls/aes.h"
 #include "crypto_utils.h"
-#include "ccid2040.h"
+#include "hsm.h"
 
 void double_hash_pin(const uint8_t *pin, size_t len, uint8_t output[32]) {
     uint8_t o1[32];

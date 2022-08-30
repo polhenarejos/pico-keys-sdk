@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
+ * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -26,7 +26,7 @@
 #include "pico/mutex.h"
 #include "pico/sem.h"
 #include "pico/multicore.h"
-#include "ccid2040.h"
+#include "hsm.h"
 #include <string.h>
 
 #define TOTAL_FLASH_PAGES 4
@@ -82,7 +82,7 @@ void do_flash()
             }
             flash_available = false;
             if (ready_pages != 0) {
-                DEBUG_INFO("ERROR: DO FLASH DOES NOT HAVE ZERO PAGES");
+                printf("ERROR: DO FLASH DOES NOT HAVE ZERO PAGES\n");
             }
         }
         mutex_exit(&mtx_flash);
@@ -146,13 +146,13 @@ int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
-        DEBUG_INFO("ERROR: ALL FLASH PAGES CACHED\r\n");
+        printf("ERROR: ALL FLASH PAGES CACHED\r\n");
         return CCID_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr)))
     {
         mutex_exit(&mtx_flash);
-        DEBUG_INFO("ERROR: FLASH CANNOT FIND A PAGE (rare error)\r\n");
+        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\r\n");
         return CCID_ERR_MEMORY_FATAL;
     }
     memcpy(&p->page[addr&(FLASH_SECTOR_SIZE-1)], data, len);
@@ -217,11 +217,11 @@ int flash_erase_page (uintptr_t addr, size_t page_size) {
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
-        DEBUG_INFO("ERROR: ALL FLASH PAGES CACHED\r\n");
+        printf("ERROR: ALL FLASH PAGES CACHED\r\n");
         return CCID_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
-        DEBUG_INFO("ERROR: FLASH CANNOT FIND A PAGE (rare error)\r\n");
+        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\r\n");
         mutex_exit(&mtx_flash);
         return CCID_ERR_MEMORY_FATAL;
     }

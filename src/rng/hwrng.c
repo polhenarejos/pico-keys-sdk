@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
+ * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,15 +15,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-//Part of the code is taken from GnuK (GPLv3)
-
-
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include "pico/stdlib.h"
 
-#include "neug.h"
+#include "hwrng.h"
 #include "hardware/structs/rosc.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"

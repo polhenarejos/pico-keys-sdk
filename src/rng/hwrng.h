@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
+ * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,13 +15,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __VERSION_H_
-#define __VERSION_H_
+#ifndef _NEUG_H_
+#define _NEUG_H_
 
-#define CCID_VERSION 0x0202
+#define NEUG_PRE_LOOP 32
 
-#define CCID_VERSION_MAJOR ((CCID_VERSION >> 8) & 0xff)
-#define CCID_VERSION_MINOR (CCID_VERSION & 0xff)
+void neug_init(uint32_t *buf, uint8_t size);
+uint32_t neug_get();
+void neug_flush(void);
+void neug_wait_full(void);
+void neug_fini(void);
 
 #endif
-

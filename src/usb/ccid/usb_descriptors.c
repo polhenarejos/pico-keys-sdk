@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
+ * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,7 +18,7 @@
 #include "tusb.h"
 #include "usb_descriptors.h"
 #include "pico/unique_id.h"
-#include "ccid_version.h"
+#include "hsm_version.h"
 
 #ifndef USB_VID
 #define USB_VID   0xFEFF
@@ -76,7 +76,7 @@ tusb_desc_device_t const desc_device =
 
     .idVendor           = (USB_VID),
     .idProduct          = (USB_PID),
-    .bcdDevice          = CCID_VERSION,
+    .bcdDevice          = HSM_SDK_VERSION,
 
     .iManufacturer      = 1,
     .iProduct           = 2,

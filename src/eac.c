@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico CCID distribution (https://github.com/polhenarejos/pico-ccid).
+ * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 #include "random.h"
 #include "mbedtls/cmac.h"
 #include "asn1.h"
+#include "apdu.h"
 
 static uint8_t nonce[8];
 static uint8_t sm_kmac[16];

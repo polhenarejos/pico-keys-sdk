@@ -30,7 +30,7 @@ typedef struct app {
 
 extern int register_app(app_t * (*)());
 
-#ifdef DEBUG_APDU
+#if defined(DEBUG_APDU) && DEBUG_APDU == 1
 #define DEBUG_PAYLOAD(_p,_s) { \
     printf("Payload %s (%d bytes):\r\n", #_p,_s);\
     for (int _i = 0; _i < _s; _i += 16) {\

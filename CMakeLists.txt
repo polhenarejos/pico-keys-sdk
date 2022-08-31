@@ -26,75 +26,15 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
-add_executable(pico_hsm_sdk)
+add_executable(pico_hsm_sdk_exe)
 
-if (NOT DEFINED USB_VID)
-    set(USB_VID 0xFEFF)
-endif()
-add_definitions(-DUSB_VID=${USB_VID})
-if (NOT DEFINED USB_PID)
-    set(USB_PID 0xFCFD)
-endif()
-add_definitions(-DUSB_PID=${USB_PID})
-if (NOT DEFINED DEBUG_APDU)
-    set(DEBUG_APDU 0)
-endif()
-if (NOT DEFINED HSM_DRIVER)
-    set(HSM_DRIVER "ccid")
-endif()
-add_definitions(-DDEBUG_APDU=${DEBUG_APDU})
-configure_file(${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include/mbedtls COPYONLY)
+include(pico_hsm_sdk.cmake)
 
-message(STATUS "HSM driver: ${HSM_DRIVER}")
-
-
-target_sources(pico_hsm_sdk PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/src/main.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/fs/flash.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/fs/low_flash.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/rng/random.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/rng/hwrng.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/eac.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/crypto_utils.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/asn1.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/apdu.c
-        )
-
-if (${HSM_DRIVER} STREQUAL "ccid")
-target_sources(pico_hsm_sdk PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/usb_descriptors.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
-        )
-
-target_include_directories(pico_hsm_sdk PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid
-        )
-elseif (${HSM_DRIVER} STREQUAL "hid")
-target_sources(pico_hsm_sdk PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/usb_descriptors.c
-        )
-target_include_directories(pico_hsm_sdk PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid
-        )
-endif()
-
-target_include_directories(pico_hsm_sdk PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/src
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb
-        ${CMAKE_CURRENT_LIST_DIR}/src/fs
-        ${CMAKE_CURRENT_LIST_DIR}/src/rng
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library
-        )
-
-target_compile_options(pico_hsm_sdk PUBLIC
+target_compile_options(pico_hsm_sdk_exe PUBLIC
     -Wall
     -Werror
 )
 
-pico_add_extra_outputs(pico_hsm_sdk)
+pico_add_extra_outputs(pico_hsm_sdk_exe)
 
-target_link_libraries(pico_hsm_sdk PRIVATE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)
+target_link_libraries(pico_hsm_sdk_exe PRIVATE pico_hsm_sdk pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)

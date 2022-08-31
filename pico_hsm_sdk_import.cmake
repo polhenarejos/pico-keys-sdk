@@ -54,6 +54,7 @@ if (NOT TARGET pico_hsm_sdk)
             ${CMAKE_CURRENT_LIST_DIR}/src/apdu.c
 
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
+            ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1write.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/bignum.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c

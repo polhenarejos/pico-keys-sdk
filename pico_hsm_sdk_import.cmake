@@ -76,6 +76,7 @@ if (NOT TARGET pico_hsm_sdk)
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha1.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha256.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha512.c
+            ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
             )
 
     if (${HSM_DRIVER} STREQUAL "ccid")

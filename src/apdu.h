@@ -20,6 +20,7 @@
 
 #include <stdlib.h>
 #include "pico/stdlib.h"
+#include <stdio.h>
 
 typedef struct app {
     const uint8_t *aid;

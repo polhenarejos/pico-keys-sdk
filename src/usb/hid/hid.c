@@ -187,7 +187,7 @@ int driver_process_usb_packet(uint16_t read) {
             hid_write(64);
         }
         else if ((u2f_req->init.cmd == U2FHID_MSG && msg_packet.len == 0) || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0)) {
-            if (msg_packet.current_len == msg_packet.len)
+            if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
                 apdu_sent = apdu_process(msg_packet.data, msg_packet.len);
             else
                 apdu_sent = apdu_process(u2f_req->init.data, MSG_LEN(u2f_req));

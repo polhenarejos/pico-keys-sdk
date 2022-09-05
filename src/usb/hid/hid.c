@@ -212,6 +212,7 @@ void driver_exec_timeout() {
 uint8_t *driver_prepare_response() {
     u2f_resp = (U2FHID_FRAME *)usb_get_tx();
     apdu.rdata = u2f_resp->init.data;
+    memset(usb_get_tx(), 0, 4096);
     return u2f_resp->init.data;
 }
 

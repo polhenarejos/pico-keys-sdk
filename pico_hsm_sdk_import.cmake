@@ -77,6 +77,10 @@ if (NOT TARGET pico_hsm_sdk)
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha256.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha512.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
+            ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
+            ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk.c
+            ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
+            ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
             )
 
     if (${HSM_DRIVER} STREQUAL "ccid")

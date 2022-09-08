@@ -21,6 +21,7 @@
 #include "hsm_version.h"
 #include "apdu.h"
 #include "usb.h"
+#include "bsp/board.h"
 
 #define U2F_MAX_PACKET_SIZE (64 - 7 + 128 * (64 - 5))
 
@@ -138,6 +139,7 @@ int u2f_error(uint8_t error) {
 uint8_t last_cmd = 0;
 uint8_t last_seq = 0;
 U2FHID_FRAME last_req;
+uint32_t lock = 0;
 
 int driver_process_usb_packet(uint16_t read) {
     int apdu_sent = 0;
@@ -147,6 +149,8 @@ int driver_process_usb_packet(uint16_t read) {
         memset(u2f_resp, 0, sizeof(U2FHID_FRAME));
         if (u2f_req->cid == 0x0 || (u2f_req->cid == CID_BROADCAST && u2f_req->init.cmd != U2FHID_INIT))
             return u2f_error(ERR_SYNC_FAIL);
+        if (board_millis() < lock && u2f_req->cid != last_req.cid)
+            return u2f_error(ERR_CHANNEL_BUSY);
         if (FRAME_TYPE(u2f_req) == TYPE_INIT)
         {
             if (MSG_LEN(u2f_req) > U2F_MAX_PACKET_SIZE)
@@ -212,6 +216,18 @@ int driver_process_usb_packet(uint16_t read) {
         else if (u2f_req->init.cmd == U2FHID_PING) {
             u2f_resp = (U2FHID_FRAME *)usb_get_tx();
             memcpy(u2f_resp, u2f_req, sizeof(U2FHID_FRAME));
+            hid_write(64);
+        }
+        else if (u2f_req->init.cmd == U2FHID_LOCK) {
+            if (MSG_LEN(u2f_req) != 1)
+                return u2f_error(ERR_INVALID_LEN);
+            if (u2f_req->init.data[0] > 10)
+                return u2f_error(ERR_INVALID_PAR);
+            lock = board_millis() + u2f_req->init.data[0] * 1000;
+            u2f_resp = (U2FHID_FRAME *)usb_get_tx();
+            memset(u2f_resp, 0, 64);
+            u2f_resp->cid = u2f_req->cid;
+            u2f_resp->init.cmd = u2f_req->init.cmd;
             hid_write(64);
         }
         else if ((u2f_req->init.cmd == U2FHID_MSG && msg_packet.len == 0) || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0)) {

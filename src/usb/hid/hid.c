@@ -33,7 +33,7 @@ typedef struct msg_packet {
     uint8_t data[U2F_MAX_PACKET_SIZE];
 } __packed msg_packet_t;
 
-msg_packet_t msg_packet;
+msg_packet_t msg_packet = { 0 };
 
 void tud_mount_cb()
 {
@@ -44,7 +44,7 @@ bool driver_mounted() {
     return mounted;
 }
 
-U2FHID_FRAME *u2f_req, *u2f_resp;
+U2FHID_FRAME *u2f_req = NULL, *u2f_resp = NULL;
 
 int driver_init() {
     tud_init(BOARD_TUD_RHPORT);
@@ -127,6 +127,7 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
 
 int u2f_error(uint8_t error) {
     u2f_resp = (U2FHID_FRAME *)usb_get_tx();
+    memset(u2f_resp, 0, sizeof(U2FHID_FRAME));
     u2f_resp->cid = u2f_req->cid;
     u2f_resp->init.cmd = U2FHID_ERROR;
     u2f_resp->init.bcntl = 1;
@@ -138,7 +139,7 @@ int u2f_error(uint8_t error) {
 
 uint8_t last_cmd = 0;
 uint8_t last_seq = 0;
-U2FHID_FRAME last_req;
+U2FHID_FRAME last_req = { 0 };
 uint32_t lock = 0;
 
 int driver_process_usb_packet(uint16_t read) {
@@ -235,7 +236,8 @@ int driver_process_usb_packet(uint16_t read) {
                 apdu_sent = apdu_process(msg_packet.data, msg_packet.len);
             else
                 apdu_sent = apdu_process(u2f_req->init.data, MSG_LEN(u2f_req));
-             DEBUG_PAYLOAD(apdu.data, (int)apdu.nc);
+            DEBUG_PAYLOAD(apdu.data, (int)apdu.nc);
+            msg_packet.len = msg_packet.current_len = 0; //Reset the transaction
         }
         else {
             if (msg_packet.len == 0)

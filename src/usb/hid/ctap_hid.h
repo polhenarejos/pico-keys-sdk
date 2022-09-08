@@ -93,6 +93,15 @@ typedef struct {
 #define CTAPHID_VENDOR_FIRST (TYPE_INIT | 0x40)  // First vendor defined command
 #define CTAPHID_VENDOR_LAST  (TYPE_INIT | 0x7F)  // Last vendor defined command
 
+// CTAP CBOR commands
+
+#define CTAP_MAKE_CREDENTIAL     0x01
+#define CTAP_GET_ASSERTION       0x02
+#define CTAP_GET_INFO            0x04
+#define CTAP_CLIENT_PIN          0x06
+#define CTAP_RESET               0x07
+#define CTAP_GET_NEXT_ASSERTION  0x08
+
 // CTAP_KEEPALIVE command defines
 
 #define KEEPALIVE_STATUS_PROCESSING     0x1

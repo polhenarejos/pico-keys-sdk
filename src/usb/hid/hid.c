@@ -142,6 +142,18 @@ uint8_t last_seq = 0;
 CTAPHID_FRAME last_req = { 0 };
 uint32_t lock = 0;
 
+int cbor_make_credential(const uint8_t *data, size_t len) {
+    return 0;
+}
+
+int cbor_process(const uint8_t *data, size_t len) {
+    if (len == 0)
+        return -ERR_INVALID_LEN;
+    if (data[0] == CTAP_MAKE_CREDENTIAL)
+        return cbor_make_credential(data + 1, len - 1);
+    return 0;
+}
+
 int driver_process_usb_packet(uint16_t read) {
     int apdu_sent = 0;
     if (read >= 5)
@@ -238,6 +250,15 @@ int driver_process_usb_packet(uint16_t read) {
                 apdu_sent = apdu_process(ctap_req->init.data, MSG_LEN(ctap_req));
             DEBUG_PAYLOAD(apdu.data, (int)apdu.nc);
             msg_packet.len = msg_packet.current_len = 0; //Reset the transaction
+        }
+        else if ((ctap_req->init.cmd == CTAPHID_CBOR && msg_packet.len == 0) || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0)) {
+            if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
+                apdu_sent = cbor_process(msg_packet.data, msg_packet.len);
+            else
+                apdu_sent = cbor_process(ctap_req->init.data, MSG_LEN(ctap_req));
+            msg_packet.len = msg_packet.current_len = 0; //Reset the transaction
+            if (apdu_sent < 0)
+                return ctap_error(-apdu_sent);
         }
         else {
             if (msg_packet.len == 0)

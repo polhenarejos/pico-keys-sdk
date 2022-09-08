@@ -209,6 +209,11 @@ int driver_process_usb_packet(uint16_t read) {
             sleep_ms(1000); //For blinking the device during 1 seg
             hid_write(64);
         }
+        else if (u2f_req->init.cmd == U2FHID_PING) {
+            u2f_resp = (U2FHID_FRAME *)usb_get_tx();
+            memcpy(u2f_resp, u2f_req, sizeof(U2FHID_FRAME));
+            hid_write(64);
+        }
         else if ((u2f_req->init.cmd == U2FHID_MSG && msg_packet.len == 0) || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0)) {
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
                 apdu_sent = apdu_process(msg_packet.data, msg_packet.len);

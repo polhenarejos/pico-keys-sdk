@@ -18,7 +18,7 @@
 #ifndef __VERSION_H_
 #define __VERSION_H_
 
-#define HSM_SDK_VERSION 0x0300
+#define HSM_SDK_VERSION 0x0302
 
 #define HSM_SDK_VERSION_MAJOR ((HSM_SDK_VERSION >> 8) & 0xff)
 #define HSM_SDK_VERSION_MINOR (HSM_SDK_VERSION & 0xff)

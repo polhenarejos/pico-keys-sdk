@@ -84,16 +84,25 @@ typedef struct {
 #define CTAPHID_LOCK         (TYPE_INIT | 0x04)  // Send lock channel command
 #define CTAPHID_INIT         (TYPE_INIT | 0x06)  // Channel initialization
 #define CTAPHID_WINK         (TYPE_INIT | 0x08)  // Send device identification wink
-#define CTAPHID_SYNC         (TYPE_INIT | 0x3c)  // Protocol resync command
-#define CTAPHID_ERROR        (TYPE_INIT | 0x3f)  // Error response
+#define CTAPHID_CBOR         (TYPE_INIT | 0x10)  // CBOR
+#define CTAPHID_CANCEL       (TYPE_INIT | 0x11)  // Cancel any request
+#define CTAPHID_KEEPALIVE    (TYPE_INIT | 0x3B)  // Keepalive command
+#define CTAPHID_SYNC         (TYPE_INIT | 0x3C)  // Protocol resync command
+#define CTAPHID_ERROR        (TYPE_INIT | 0x3F)  // Error response
 
 #define CTAPHID_VENDOR_FIRST (TYPE_INIT | 0x40)  // First vendor defined command
-#define CTAPHID_VENDOR_LAST  (TYPE_INIT | 0x7f)  // Last vendor defined command
+#define CTAPHID_VENDOR_LAST  (TYPE_INIT | 0x7F)  // Last vendor defined command
+
+// CTAP_KEEPALIVE command defines
+
+#define KEEPALIVE_STATUS_PROCESSING     0x1
+#define KEEPALIVE_STATUS_UPNEEDED       0x2
 
 // CTAPHID_INIT command defines
 
 #define INIT_NONCE_SIZE         8       // Size of channel initialization challenge
 #define CAPFLAG_WINK            0x01    // Device supports WINK command
+#define CAPFLAG_CBOR            0x04    // Device supports CBOR command
 
 typedef struct {
   uint8_t nonce[INIT_NONCE_SIZE];       // Client application nonce
@@ -129,7 +138,7 @@ typedef struct {
 #define ERR_MSG_TIMEOUT         0x05    // Message has timed out
 #define ERR_CHANNEL_BUSY        0x06    // Channel busy
 #define ERR_LOCK_REQUIRED       0x0a    // Command requires channel lock
-#define ERR_SYNC_FAIL           0x0b    // SYNC command failed
+#define ERR_INVALID_CHANNEL     0x0b    // CID not valid
 #define ERR_OTHER               0x7f    // Other unspecified error
 
 #ifdef __cplusplus

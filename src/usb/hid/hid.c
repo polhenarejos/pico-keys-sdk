@@ -149,7 +149,7 @@ int driver_process_usb_packet(uint16_t read) {
         DEBUG_PAYLOAD(usb_get_rx(),64);
         memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
         if (ctap_req->cid == 0x0 || (ctap_req->cid == CID_BROADCAST && ctap_req->init.cmd != CTAPHID_INIT))
-            return ctap_error(ERR_SYNC_FAIL);
+            return ctap_error(ERR_INVALID_CHANNEL);
         if (board_millis() < lock && ctap_req->cid != last_req.cid)
             return ctap_error(ERR_CHANNEL_BUSY);
         if (FRAME_TYPE(ctap_req) == TYPE_INIT)

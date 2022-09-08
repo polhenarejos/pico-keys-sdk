@@ -24,7 +24,7 @@
  */
 
 #include "tusb.h"
-#include "u2f_hid.h"
+#include "ctap_hid.h"
 #include "pico/unique_id.h"
 #include "hsm_version.h"
 
@@ -71,9 +71,9 @@ uint8_t const * tud_descriptor_device_cb(void)
 // HID Report Descriptor
 //--------------------------------------------------------------------+
 
-#define TUD_HID_REPORT_DESC_U2F(report_size, ...) \
+#define TUD_HID_REPORT_DESC_CTAP(report_size, ...) \
     HID_USAGE_PAGE_N ( FIDO_USAGE_PAGE, 2   ),\
-    HID_USAGE        ( FIDO_USAGE_U2FHID    ),\
+    HID_USAGE        ( FIDO_USAGE_CTAPHID   ),\
     HID_COLLECTION   ( HID_COLLECTION_APPLICATION ),\
       /* Report ID if any */\
       __VA_ARGS__ \
@@ -95,7 +95,7 @@ uint8_t const * tud_descriptor_device_cb(void)
 
 uint8_t const desc_hid_report[] =
 {
-  TUD_HID_REPORT_DESC_U2F(CFG_TUD_HID_EP_BUFSIZE)
+  TUD_HID_REPORT_DESC_CTAP(CFG_TUD_HID_EP_BUFSIZE)
 };
 
 // Invoked when received GET HID REPORT DESCRIPTOR
@@ -148,7 +148,7 @@ char const* string_desc_arr [] =
 {
   (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
   "Pol Henarejos",                     // 1: Manufacturer
-  "Pico HSM",              // 2: Product
+  "Pico HSM HID",              // 2: Product
   "123456",                      // 3: Serials, should use chip ID
 };
 

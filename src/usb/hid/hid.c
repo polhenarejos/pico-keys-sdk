@@ -16,21 +16,21 @@
  */
 
 #include "tusb.h"
-#include "u2f_hid.h"
+#include "ctap_hid.h"
 #include "hsm.h"
 #include "hsm_version.h"
 #include "apdu.h"
 #include "usb.h"
 #include "bsp/board.h"
 
-#define U2F_MAX_PACKET_SIZE (64 - 7 + 128 * (64 - 5))
+#define CTAP_MAX_PACKET_SIZE (64 - 7 + 128 * (64 - 5))
 
 static bool mounted = false;
 
 typedef struct msg_packet {
     uint16_t len;
     uint16_t current_len;
-    uint8_t data[U2F_MAX_PACKET_SIZE];
+    uint8_t data[CTAP_MAX_PACKET_SIZE];
 } __packed msg_packet_t;
 
 msg_packet_t msg_packet = { 0 };
@@ -44,15 +44,15 @@ bool driver_mounted() {
     return mounted;
 }
 
-U2FHID_FRAME *u2f_req = NULL, *u2f_resp = NULL;
+CTAPHID_FRAME *ctap_req = NULL, *ctap_resp = NULL;
 
 int driver_init() {
     tud_init(BOARD_TUD_RHPORT);
-    u2f_req = (U2FHID_FRAME *)usb_get_rx();
-    apdu.header = u2f_req->init.data;
+    ctap_req = (CTAPHID_FRAME *)usb_get_rx();
+    apdu.header = ctap_req->init.data;
 
-    u2f_resp = (U2FHID_FRAME *)usb_get_tx();
-    apdu.rdata = u2f_resp->init.data;
+    ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+    apdu.rdata = ctap_resp->init.data;
 
     return 0;
 }
@@ -96,11 +96,11 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, /*uint1
     uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4]+1;
     if (send_buffer_size > 0)
     {
-        u2f_resp->cid = u2f_req->cid;
-        u2f_resp->cont.seq = seq;
-        hid_write_offset(64, (uint8_t *)u2f_resp - (usb_get_tx()));
+        ctap_resp->cid = ctap_req->cid;
+        ctap_resp->cont.seq = seq;
+        hid_write_offset(64, (uint8_t *)ctap_resp - (usb_get_tx()));
         send_buffer_size -= MIN(64 - 5, send_buffer_size);
-        u2f_resp = (U2FHID_FRAME *)((uint8_t *)u2f_resp + 64 - 5);
+        ctap_resp = (CTAPHID_FRAME *)((uint8_t *)ctap_resp + 64 - 5);
     }
 }
 
@@ -125,13 +125,13 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
   usb_rx(buffer, bufsize);
 }
 
-int u2f_error(uint8_t error) {
-    u2f_resp = (U2FHID_FRAME *)usb_get_tx();
-    memset(u2f_resp, 0, sizeof(U2FHID_FRAME));
-    u2f_resp->cid = u2f_req->cid;
-    u2f_resp->init.cmd = U2FHID_ERROR;
-    u2f_resp->init.bcntl = 1;
-    u2f_resp->init.data[0] = error;
+int ctap_error(uint8_t error) {
+    ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+    memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
+    ctap_resp->cid = ctap_req->cid;
+    ctap_resp->init.cmd = CTAPHID_ERROR;
+    ctap_resp->init.bcntl = 1;
+    ctap_resp->init.data[0] = error;
     hid_write(64);
     usb_clear_rx();
     return 0;
@@ -139,7 +139,7 @@ int u2f_error(uint8_t error) {
 
 uint8_t last_cmd = 0;
 uint8_t last_seq = 0;
-U2FHID_FRAME last_req = { 0 };
+CTAPHID_FRAME last_req = { 0 };
 uint32_t lock = 0;
 
 int driver_process_usb_packet(uint16_t read) {
@@ -147,101 +147,101 @@ int driver_process_usb_packet(uint16_t read) {
     if (read >= 5)
     {
         DEBUG_PAYLOAD(usb_get_rx(),64);
-        memset(u2f_resp, 0, sizeof(U2FHID_FRAME));
-        if (u2f_req->cid == 0x0 || (u2f_req->cid == CID_BROADCAST && u2f_req->init.cmd != U2FHID_INIT))
-            return u2f_error(ERR_SYNC_FAIL);
-        if (board_millis() < lock && u2f_req->cid != last_req.cid)
-            return u2f_error(ERR_CHANNEL_BUSY);
-        if (FRAME_TYPE(u2f_req) == TYPE_INIT)
+        memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
+        if (ctap_req->cid == 0x0 || (ctap_req->cid == CID_BROADCAST && ctap_req->init.cmd != CTAPHID_INIT))
+            return ctap_error(ERR_SYNC_FAIL);
+        if (board_millis() < lock && ctap_req->cid != last_req.cid)
+            return ctap_error(ERR_CHANNEL_BUSY);
+        if (FRAME_TYPE(ctap_req) == TYPE_INIT)
         {
-            if (MSG_LEN(u2f_req) > U2F_MAX_PACKET_SIZE)
-                return u2f_error(ERR_INVALID_LEN);
-            if (msg_packet.len > 0 && last_req.cid != u2f_req->cid) //We are in a transaction
-                return u2f_error(ERR_CHANNEL_BUSY);
-            printf("command %x\n", FRAME_CMD(u2f_req));
-            printf("len %d\n", MSG_LEN(u2f_req));
+            if (MSG_LEN(ctap_req) > CTAP_MAX_PACKET_SIZE)
+                return ctap_error(ERR_INVALID_LEN);
+            if (msg_packet.len > 0 && last_req.cid != ctap_req->cid) //We are in a transaction
+                return ctap_error(ERR_CHANNEL_BUSY);
+            printf("command %x\n", FRAME_CMD(ctap_req));
+            printf("len %d\n", MSG_LEN(ctap_req));
             msg_packet.len = msg_packet.current_len = 0;
-            if (MSG_LEN(u2f_req) > 64 - 7)
+            if (MSG_LEN(ctap_req) > 64 - 7)
             {
-                msg_packet.len = MSG_LEN(u2f_req);
-                memcpy(msg_packet.data + msg_packet.current_len, u2f_req->init.data, 64-7);
+                msg_packet.len = MSG_LEN(ctap_req);
+                memcpy(msg_packet.data + msg_packet.current_len, ctap_req->init.data, 64-7);
                 msg_packet.current_len += 64 - 7;
             }
-            memcpy(&last_req, u2f_req, sizeof(U2FHID_FRAME));
-            last_cmd = u2f_req->init.cmd;
+            memcpy(&last_req, ctap_req, sizeof(CTAPHID_FRAME));
+            last_cmd = ctap_req->init.cmd;
             last_seq = 0;
         }
         else {
             if (msg_packet.len == 0) //Received a cont with a prior init pkt
                 return 0;
-            if (last_seq != u2f_req->cont.seq)
-                return u2f_error(ERR_INVALID_SEQ);
-            if (last_req.cid == u2f_req->cid) {
-                memcpy(msg_packet.data + msg_packet.current_len, u2f_req->cont.data, MIN(64 - 5, msg_packet.len - msg_packet.current_len));
+            if (last_seq != ctap_req->cont.seq)
+                return ctap_error(ERR_INVALID_SEQ);
+            if (last_req.cid == ctap_req->cid) {
+                memcpy(msg_packet.data + msg_packet.current_len, ctap_req->cont.data, MIN(64 - 5, msg_packet.len - msg_packet.current_len));
                 msg_packet.current_len += MIN(64 - 5, msg_packet.len - msg_packet.current_len);
-                memcpy(&last_req, u2f_req, sizeof(U2FHID_FRAME));
+                memcpy(&last_req, ctap_req, sizeof(CTAPHID_FRAME));
             }
             //else // Received a cont from another channel. Silently discard
             last_seq++;
         }
 
-        if (u2f_req->init.cmd == U2FHID_INIT) {
-            u2f_resp = (U2FHID_FRAME *)usb_get_tx();
-            U2FHID_INIT_REQ *req = (U2FHID_INIT_REQ *)u2f_req->init.data;
-            U2FHID_INIT_RESP *resp = (U2FHID_INIT_RESP *)u2f_resp->init.data;
+        if (ctap_req->init.cmd == CTAPHID_INIT) {
+            ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            CTAPHID_INIT_REQ *req = (CTAPHID_INIT_REQ *)ctap_req->init.data;
+            CTAPHID_INIT_RESP *resp = (CTAPHID_INIT_RESP *)ctap_resp->init.data;
             memcpy(resp->nonce, req->nonce, sizeof(resp->nonce));
             resp->cid = 0x01000000;
-            resp->versionInterface = U2FHID_IF_VERSION;
+            resp->versionInterface = CTAPHID_IF_VERSION;
             resp->versionMajor = HSM_SDK_VERSION_MAJOR;
             resp->versionMinor = HSM_SDK_VERSION_MINOR;
             resp->capFlags = CAPFLAG_WINK;
 
-            u2f_resp->cid = CID_BROADCAST;
-            u2f_resp->init.cmd = U2FHID_INIT;
-            u2f_resp->init.bcntl = 17;
-            u2f_resp->init.bcnth = 0;
+            ctap_resp->cid = CID_BROADCAST;
+            ctap_resp->init.cmd = CTAPHID_INIT;
+            ctap_resp->init.bcntl = 17;
+            ctap_resp->init.bcnth = 0;
             hid_write(64);
             current_app = apps[0].select_aid(&apps[0]);
             card_start();
-            DEBUG_PAYLOAD((uint8_t *)u2f_resp, u2f_resp->init.bcntl+7);
+            DEBUG_PAYLOAD((uint8_t *)ctap_resp, ctap_resp->init.bcntl+7);
         }
-        else if (u2f_req->init.cmd == U2FHID_WINK) {
-            if (MSG_LEN(u2f_req) != 0) {
-                return u2f_error(ERR_INVALID_LEN);
+        else if (ctap_req->init.cmd == CTAPHID_WINK) {
+            if (MSG_LEN(ctap_req) != 0) {
+                return ctap_error(ERR_INVALID_LEN);
             }
-            u2f_resp = (U2FHID_FRAME *)usb_get_tx();
-            memcpy(u2f_resp, u2f_req, sizeof(U2FHID_FRAME));
+            ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            memcpy(ctap_resp, ctap_req, sizeof(CTAPHID_FRAME));
             sleep_ms(1000); //For blinking the device during 1 seg
             hid_write(64);
         }
-        else if (u2f_req->init.cmd == U2FHID_PING || u2f_req->init.cmd == U2FHID_SYNC) {
-            u2f_resp = (U2FHID_FRAME *)usb_get_tx();
-            memcpy(u2f_resp, u2f_req, sizeof(U2FHID_FRAME));
+        else if (ctap_req->init.cmd == CTAPHID_PING || ctap_req->init.cmd == CTAPHID_SYNC) {
+            ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            memcpy(ctap_resp, ctap_req, sizeof(CTAPHID_FRAME));
             hid_write(64);
         }
-        else if (u2f_req->init.cmd == U2FHID_LOCK) {
-            if (MSG_LEN(u2f_req) != 1)
-                return u2f_error(ERR_INVALID_LEN);
-            if (u2f_req->init.data[0] > 10)
-                return u2f_error(ERR_INVALID_PAR);
-            lock = board_millis() + u2f_req->init.data[0] * 1000;
-            u2f_resp = (U2FHID_FRAME *)usb_get_tx();
-            memset(u2f_resp, 0, 64);
-            u2f_resp->cid = u2f_req->cid;
-            u2f_resp->init.cmd = u2f_req->init.cmd;
+        else if (ctap_req->init.cmd == CTAPHID_LOCK) {
+            if (MSG_LEN(ctap_req) != 1)
+                return ctap_error(ERR_INVALID_LEN);
+            if (ctap_req->init.data[0] > 10)
+                return ctap_error(ERR_INVALID_PAR);
+            lock = board_millis() + ctap_req->init.data[0] * 1000;
+            ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            memset(ctap_resp, 0, 64);
+            ctap_resp->cid = ctap_req->cid;
+            ctap_resp->init.cmd = ctap_req->init.cmd;
             hid_write(64);
         }
-        else if ((u2f_req->init.cmd == U2FHID_MSG && msg_packet.len == 0) || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0)) {
+        else if ((ctap_req->init.cmd == CTAPHID_MSG && msg_packet.len == 0) || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0)) {
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
                 apdu_sent = apdu_process(msg_packet.data, msg_packet.len);
             else
-                apdu_sent = apdu_process(u2f_req->init.data, MSG_LEN(u2f_req));
+                apdu_sent = apdu_process(ctap_req->init.data, MSG_LEN(ctap_req));
             DEBUG_PAYLOAD(apdu.data, (int)apdu.nc);
             msg_packet.len = msg_packet.current_len = 0; //Reset the transaction
         }
         else {
             if (msg_packet.len == 0)
-                return u2f_error(ERR_INVALID_CMD);
+                return ctap_error(ERR_INVALID_CMD);
         }
         // echo back anything we received from host
         //tud_hid_report(0, buffer, bufsize);
@@ -256,10 +256,10 @@ void driver_exec_timeout() {
 }
 
 uint8_t *driver_prepare_response() {
-    u2f_resp = (U2FHID_FRAME *)usb_get_tx();
-    apdu.rdata = u2f_resp->init.data;
+    ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+    apdu.rdata = ctap_resp->init.data;
     memset(usb_get_tx(), 0, 4096);
-    return u2f_resp->init.data;
+    return ctap_resp->init.data;
 }
 
 void driver_exec_finished(size_t size_next) {
@@ -268,13 +268,13 @@ void driver_exec_finished(size_t size_next) {
 
 void driver_exec_finished_cont(size_t size_next, size_t offset) {
     offset -= 7;
-    u2f_resp = (U2FHID_FRAME *)(usb_get_tx() + offset);
-    u2f_resp->cid = u2f_req->cid;
-    u2f_resp->init.cmd = last_cmd;
-    u2f_resp->init.bcnth = size_next >> 8;
-    u2f_resp->init.bcntl = size_next & 0xff;
+    ctap_resp = (CTAPHID_FRAME *)(usb_get_tx() + offset);
+    ctap_resp->cid = ctap_req->cid;
+    ctap_resp->init.cmd = last_cmd;
+    ctap_resp->init.bcnth = size_next >> 8;
+    ctap_resp->init.bcntl = size_next & 0xff;
     hid_write_offset(64, offset);
-    u2f_resp = (U2FHID_FRAME *)((uint8_t *)u2f_resp + 64 - 5);
+    ctap_resp = (CTAPHID_FRAME *)((uint8_t *)ctap_resp + 64 - 5);
 
     send_buffer_size = size_next;
     send_buffer_size -= MIN(64-7, send_buffer_size);

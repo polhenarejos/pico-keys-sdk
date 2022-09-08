@@ -1,9 +1,22 @@
-// Common U2F HID transport header - Review Draft
-// 2014-10-08
-// Editor: Jakob Ehrensvard, Yubico, jakob@yubico.com
+/*
+ * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * Copyright (c) 2022 Pol Henarejos.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 
-#ifndef __U2FHID_H_INCLUDED__
-#define __U2FHID_H_INCLUDED__
+#ifndef _CTAP_HID_H_
+#define _CTAP_HID_H_
 
 #ifdef _MSC_VER  // Windows
 typedef unsigned char     uint8_t;
@@ -45,7 +58,7 @@ typedef struct {
       uint8_t data[HID_RPT_SIZE - 5];  // Data payload
     } cont;
   };
-}__packed U2FHID_FRAME;
+}__packed CTAPHID_FRAME;
 
 #define FRAME_TYPE(f) ((f)->type & TYPE_MASK)
 #define FRAME_CMD(f)  ((f)->init.cmd & ~TYPE_MASK)
@@ -55,36 +68,36 @@ typedef struct {
 // HID usage- and usage-page definitions
 
 #define FIDO_USAGE_PAGE         0xf1d0  // FIDO alliance HID usage page
-#define FIDO_USAGE_U2FHID       0x01    // U2FHID usage for top-level collection
+#define FIDO_USAGE_CTAPHID       0x01    // CTAPHID usage for top-level collection
 #define FIDO_USAGE_DATA_IN      0x20    // Raw IN data report
 #define FIDO_USAGE_DATA_OUT     0x21    // Raw OUT data report
 
 // General constants
 
-#define U2FHID_IF_VERSION       2       // Current interface implementation version
-#define U2FHID_TRANS_TIMEOUT    3000    // Default message timeout in ms
+#define CTAPHID_IF_VERSION       2       // Current interface implementation version
+#define CTAPHID_TRANS_TIMEOUT    3000    // Default message timeout in ms
 
-// U2FHID native commands
+// CTAPHID native commands
 
-#define U2FHID_PING         (TYPE_INIT | 0x01)  // Echo data through local processor only
-#define U2FHID_MSG          (TYPE_INIT | 0x03)  // Send U2F message frame
-#define U2FHID_LOCK         (TYPE_INIT | 0x04)  // Send lock channel command
-#define U2FHID_INIT         (TYPE_INIT | 0x06)  // Channel initialization
-#define U2FHID_WINK         (TYPE_INIT | 0x08)  // Send device identification wink
-#define U2FHID_SYNC         (TYPE_INIT | 0x3c)  // Protocol resync command
-#define U2FHID_ERROR        (TYPE_INIT | 0x3f)  // Error response
+#define CTAPHID_PING         (TYPE_INIT | 0x01)  // Echo data through local processor only
+#define CTAPHID_MSG          (TYPE_INIT | 0x03)  // Send CTAP message frame
+#define CTAPHID_LOCK         (TYPE_INIT | 0x04)  // Send lock channel command
+#define CTAPHID_INIT         (TYPE_INIT | 0x06)  // Channel initialization
+#define CTAPHID_WINK         (TYPE_INIT | 0x08)  // Send device identification wink
+#define CTAPHID_SYNC         (TYPE_INIT | 0x3c)  // Protocol resync command
+#define CTAPHID_ERROR        (TYPE_INIT | 0x3f)  // Error response
 
-#define U2FHID_VENDOR_FIRST (TYPE_INIT | 0x40)  // First vendor defined command
-#define U2FHID_VENDOR_LAST  (TYPE_INIT | 0x7f)  // Last vendor defined command
+#define CTAPHID_VENDOR_FIRST (TYPE_INIT | 0x40)  // First vendor defined command
+#define CTAPHID_VENDOR_LAST  (TYPE_INIT | 0x7f)  // Last vendor defined command
 
-// U2FHID_INIT command defines
+// CTAPHID_INIT command defines
 
 #define INIT_NONCE_SIZE         8       // Size of channel initialization challenge
 #define CAPFLAG_WINK            0x01    // Device supports WINK command
 
 typedef struct {
   uint8_t nonce[INIT_NONCE_SIZE];       // Client application nonce
-}__packed U2FHID_INIT_REQ;
+}__packed CTAPHID_INIT_REQ;
 
 typedef struct {
   uint8_t nonce[INIT_NONCE_SIZE];       // Client application nonce
@@ -94,17 +107,17 @@ typedef struct {
   uint8_t versionMinor;                 // Minor version number
   uint8_t versionBuild;                 // Build version number
   uint8_t capFlags;                     // Capabilities flags
-}__packed U2FHID_INIT_RESP;
+}__packed CTAPHID_INIT_RESP;
 
-// U2FHID_SYNC command defines
-
-typedef struct {
-  uint8_t nonce;                        // Client application nonce
-} U2FHID_SYNC_REQ;
+// CTAPHID_SYNC command defines
 
 typedef struct {
   uint8_t nonce;                        // Client application nonce
-} U2FHID_SYNC_RESP;
+} CTAPHID_SYNC_REQ;
+
+typedef struct {
+  uint8_t nonce;                        // Client application nonce
+} CTAPHID_SYNC_RESP;
 
 // Low-level error codes. Return as negatives.
 
@@ -123,5 +136,4 @@ typedef struct {
 }
 #endif
 
-#endif  // __U2FHID_H_INCLUDED__
-
+#endif  // _CTAP_HID_H_

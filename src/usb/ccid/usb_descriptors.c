@@ -183,7 +183,7 @@ char const* string_desc_arr [] =
 {
     (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
     "Pol Henarejos",                     // 1: Manufacturer
-    "Pico HSM",                       // 2: Product
+    "Pico HSM CCID",                       // 2: Product
     "11223344",                      // 3: Serials, should use chip ID
     "Pico HSM Config",               // 4: Vendor Interface
     "Pico HSM Interface"

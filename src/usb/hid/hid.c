@@ -213,7 +213,7 @@ int driver_process_usb_packet(uint16_t read) {
             sleep_ms(1000); //For blinking the device during 1 seg
             hid_write(64);
         }
-        else if (u2f_req->init.cmd == U2FHID_PING) {
+        else if (u2f_req->init.cmd == U2FHID_PING || u2f_req->init.cmd == U2FHID_SYNC) {
             u2f_resp = (U2FHID_FRAME *)usb_get_tx();
             memcpy(u2f_resp, u2f_req, sizeof(U2FHID_FRAME));
             hid_write(64);

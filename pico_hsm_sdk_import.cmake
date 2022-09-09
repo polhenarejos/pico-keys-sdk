@@ -96,9 +96,11 @@ if (NOT TARGET pico_hsm_sdk)
         target_sources(pico_hsm_sdk INTERFACE
                 ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
                 ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/usb_descriptors.c
+                ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
                 )
         target_include_directories(pico_hsm_sdk INTERFACE
                 ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid
+                ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
                 )
     endif()
 

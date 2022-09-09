@@ -22,6 +22,7 @@
 #include "apdu.h"
 #include "usb.h"
 #include "bsp/board.h"
+#include "cbor.h"
 
 #define CTAP_MAX_PACKET_SIZE (64 - 7 + 128 * (64 - 5))
 
@@ -142,16 +143,82 @@ uint8_t last_seq = 0;
 CTAPHID_FRAME last_req = { 0 };
 uint32_t lock = 0;
 
+const uint8_t aaguid[16] = {0x89, 0xFB, 0x94, 0xB7, 0x06, 0xC9, 0x36, 0x73, 0x9B, 0x7E, 0x30, 0x52, 0x6D, 0x96, 0x81, 0x45}; // First 16 bytes of SHA256("Pico FIDO2")
+
 int cbor_make_credential(const uint8_t *data, size_t len) {
+    return 0;
+}
+
+#define CHECK_CBOR(f)           \
+    do                          \
+    {                           \
+        CborError err = f;      \
+        if (err != CborNoError) \
+        {                       \
+            printf("Cannot encode CBOR: %s\n", #f); \
+            return err; \
+        } \
+    } while (0)
+
+int cbor_get_info() {
+    CborEncoder encoder, mapEncoder, arrayEncoder;
+    cbor_encoder_init(&encoder, ctap_resp->init.data + 1, CTAP_MAX_PACKET_SIZE, 0);
+    CHECK_CBOR(cbor_encoder_create_map(&encoder, &mapEncoder, 7));
+
+    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x01));
+    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 2));
+    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "U2F_V2"));
+    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "FIDO_2_0"));
+    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+
+    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x02));
+    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
+    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "hmac-secret"));
+    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+
+    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x03));
+    CHECK_CBOR(cbor_encode_byte_string(&mapEncoder, aaguid, sizeof(aaguid)));
+
+    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x04));
+    CHECK_CBOR(cbor_encoder_create_map(&mapEncoder, &arrayEncoder, 3));
+    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "rk"));
+    CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, true));
+    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "up"));
+    CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, true));
+    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "uv"));
+    CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, true));
+    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+
+    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x06));
+    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
+    CHECK_CBOR(cbor_encode_simple_value(&arrayEncoder, 1)); // PIN protocols
+    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+
+    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x07));
+    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
+    CHECK_CBOR(cbor_encode_simple_value(&arrayEncoder, 10)); // MAX_CRED_COUNT_IN_LIST
+    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+
+    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x08));
+    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
+    CHECK_CBOR(cbor_encode_uint(&arrayEncoder, 1024)); // CRED_ID_MAX_LENGTH
+    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+
+    CHECK_CBOR(cbor_encoder_close_container(&encoder, &mapEncoder));
+    size_t rs = cbor_encoder_get_buffer_size(&encoder, ctap_resp->init.data + 1);
+    driver_exec_finished(rs + 1);
     return 0;
 }
 
 int cbor_process(const uint8_t *data, size_t len) {
     if (len == 0)
         return -ERR_INVALID_LEN;
+    driver_prepare_response();
     if (data[0] == CTAP_MAKE_CREDENTIAL)
         return cbor_make_credential(data + 1, len - 1);
-    return 0;
+    else if (data[0] == CTAP_GET_INFO)
+        return cbor_get_info();
+    return -ERR_INVALID_PAR;
 }
 
 int driver_process_usb_packet(uint16_t read) {
@@ -206,7 +273,7 @@ int driver_process_usb_packet(uint16_t read) {
             resp->versionInterface = CTAPHID_IF_VERSION;
             resp->versionMajor = HSM_SDK_VERSION_MAJOR;
             resp->versionMinor = HSM_SDK_VERSION_MINOR;
-            resp->capFlags = CAPFLAG_WINK;
+            resp->capFlags = CAPFLAG_WINK | CAPFLAG_CBOR;
 
             ctap_resp->cid = CID_BROADCAST;
             ctap_resp->init.cmd = CTAPHID_INIT;

@@ -165,44 +165,38 @@ int cbor_get_info() {
     cbor_encoder_init(&encoder, ctap_resp->init.data + 1, CTAP_MAX_PACKET_SIZE, 0);
     CHECK_CBOR(cbor_encoder_create_map(&encoder, &mapEncoder, 7));
 
-    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x01));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x01));
     CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 2));
     CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "U2F_V2"));
     CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "FIDO_2_0"));
     CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
 
-    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x02));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x02));
     CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
     CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "hmac-secret"));
     CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
 
-    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x03));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x03));
     CHECK_CBOR(cbor_encode_byte_string(&mapEncoder, aaguid, sizeof(aaguid)));
 
-    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x04));
-    CHECK_CBOR(cbor_encoder_create_map(&mapEncoder, &arrayEncoder, 3));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x04));
+    CHECK_CBOR(cbor_encoder_create_map(&mapEncoder, &arrayEncoder, 2));
     CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "rk"));
     CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, true));
-    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "up"));
-    CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, true));
-    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "uv"));
-    CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, true));
+    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "clientPin"));
+    CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, false));
     CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
 
-    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x06));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x06));
     CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
-    CHECK_CBOR(cbor_encode_simple_value(&arrayEncoder, 1)); // PIN protocols
+    CHECK_CBOR(cbor_encode_uint(&arrayEncoder, 1)); // PIN protocols
     CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
 
-    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x07));
-    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
-    CHECK_CBOR(cbor_encode_simple_value(&arrayEncoder, 10)); // MAX_CRED_COUNT_IN_LIST
-    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x07));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 10)); // MAX_CRED_COUNT_IN_LIST
 
-    CHECK_CBOR(cbor_encode_simple_value(&mapEncoder, 0x08));
-    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
-    CHECK_CBOR(cbor_encode_uint(&arrayEncoder, 1024)); // CRED_ID_MAX_LENGTH
-    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x08));
+    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 1024)); // CRED_ID_MAX_LENGTH
 
     CHECK_CBOR(cbor_encoder_close_container(&encoder, &mapEncoder));
     size_t rs = cbor_encoder_get_buffer_size(&encoder, ctap_resp->init.data + 1);
@@ -210,14 +204,21 @@ int cbor_get_info() {
     return 0;
 }
 
+int cbor_reset() {
+    driver_exec_finished(1);
+    return 0;
+}
+
 int cbor_process(const uint8_t *data, size_t len) {
     if (len == 0)
         return -ERR_INVALID_LEN;
     driver_prepare_response();
-    if (data[0] == CTAP_MAKE_CREDENTIAL)
-        return cbor_make_credential(data + 1, len - 1);
-    else if (data[0] == CTAP_GET_INFO)
+    //if (data[0] == CTAP_MAKE_CREDENTIAL)
+    //    return cbor_make_credential(data + 1, len - 1);
+    if (data[0] == CTAP_GET_INFO)
         return cbor_get_info();
+    else if (data[0] == CTAP_RESET)
+        return cbor_reset();
     return -ERR_INVALID_PAR;
 }
 
@@ -310,7 +311,7 @@ int driver_process_usb_packet(uint16_t read) {
             ctap_resp->init.cmd = ctap_req->init.cmd;
             hid_write(64);
         }
-        else if ((ctap_req->init.cmd == CTAPHID_MSG && msg_packet.len == 0) || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0)) {
+        else if (last_cmd == CTAPHID_MSG && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
                 apdu_sent = apdu_process(msg_packet.data, msg_packet.len);
             else
@@ -318,7 +319,7 @@ int driver_process_usb_packet(uint16_t read) {
             DEBUG_PAYLOAD(apdu.data, (int)apdu.nc);
             msg_packet.len = msg_packet.current_len = 0; //Reset the transaction
         }
-        else if ((ctap_req->init.cmd == CTAPHID_CBOR && msg_packet.len == 0) || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0)) {
+        else if (last_cmd == CTAPHID_CBOR && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
                 apdu_sent = cbor_process(msg_packet.data, msg_packet.len);
             else

@@ -145,60 +145,280 @@ uint32_t lock = 0;
 
 const uint8_t aaguid[16] = {0x89, 0xFB, 0x94, 0xB7, 0x06, 0xC9, 0x36, 0x73, 0x9B, 0x7E, 0x30, 0x52, 0x6D, 0x96, 0x81, 0x45}; // First 16 bytes of SHA256("Pico FIDO2")
 
-int cbor_make_credential(const uint8_t *data, size_t len) {
-    return 0;
-}
-
-#define CHECK_CBOR(f)           \
+#define CBOR_CHECK(f)           \
     do                          \
     {                           \
-        CborError err = f;      \
-        if (err != CborNoError) \
+        error = f;      \
+        if (error != CborNoError) \
         {                       \
-            printf("Cannot encode CBOR: %s\n", #f); \
-            return err; \
+            printf("Cannot encode CBOR [%d]: %s\n", __LINE__, #f); \
+            goto err; \
         } \
     } while (0)
 
+#define CBOR_FREE(x) \
+    do               \
+    {                \
+        if (x)       \
+        {            \
+            free(x); \
+            x = NULL;\
+        }            \
+    } while(0)
+
+#define CBOR_ERROR(e) \
+    do                \
+    {                 \
+        error = e;    \
+        printf("Cbor ERROR [%d]: %d\n", __LINE__, e); \
+        goto err;     \
+    } while(0)
+
+#define CBOR_ASSERT(c)                      \
+    do                                      \
+    {                                       \
+        if (!c)                             \
+        {                                   \
+            error = CborErrorImproperValue; \
+            printf("Cbor ASSERT [%d]: %s\n", __LINE__, #c); \
+            goto err;                       \
+        }                                   \
+    } while(0)
+
+typedef struct CborByteString {
+    uint8_t *val;
+    size_t val_len;
+} CborByteString;
+
+typedef struct CborCharString {
+    char *val;
+    size_t val_len;
+} CborCharString;
+
+#define CBOR_FREE_BYTE_STRING(v) \
+    do                           \
+    {                            \
+        CBOR_FREE((v).val);      \
+        (v).val_len = 0;         \
+    } while(0)
+
+typedef struct PublicKeyCredentialEntity
+{
+    CborCharString name;
+} PublicKeyCredentialEntity;
+
+typedef struct PublicKeyCredentialRpEntity
+{
+    PublicKeyCredentialEntity parent;
+    CborCharString id;
+} PublicKeyCredentialRpEntity;
+
+typedef struct PublicKeyCredentialUserEntity
+{
+    PublicKeyCredentialEntity parent;
+    CborByteString id;
+    CborCharString displayName;
+} PublicKeyCredentialUserEntity;
+
+typedef struct PublicKeyCredentialParameters {
+    CborCharString type;
+    int64_t alg;
+} PublicKeyCredentialParameters;
+
+int
+cbor_make_credential(const uint8_t *data, size_t len)
+{
+    CborParser parser;
+    CborValue map, field;
+    CborError error = CborNoError;
+    CborByteString clientDataHash = {0}, pinUvAuthParam = {0};
+    PublicKeyCredentialRpEntity rp = {0};
+    PublicKeyCredentialUserEntity user = {0};
+    PublicKeyCredentialParameters pubKeyCredParams[16] = {0};
+    size_t pubKeyCredParams_len = 0;
+    CBOR_CHECK(cbor_parser_init(data, len, 0, &parser, &map));
+    CBOR_ASSERT(cbor_value_is_map(&map) == true);
+
+    CBOR_CHECK(cbor_value_enter_container(&map, &field));
+    while (cbor_value_at_end(&map) == false) {
+        CBOR_ASSERT(cbor_value_is_unsigned_integer(&field) == true);
+        uint64_t val_u = 0;
+        CBOR_CHECK(cbor_value_get_uint64(&field, &val_u));
+        printf("VAL %llx\n", val_u);
+        CBOR_CHECK(cbor_value_advance_fixed(&field));
+        if (val_u == 0x01) { // clientDataHash
+            CBOR_ASSERT(cbor_value_is_byte_string(&field) == true);
+            CBOR_CHECK(cbor_value_dup_byte_string(&field, &clientDataHash.val, &clientDataHash.val_len, &field));
+        }
+        else if (val_u == 0x02) { // rp
+            CBOR_ASSERT(cbor_value_is_map(&field) == true);
+            CborValue map_val;
+            CBOR_CHECK(cbor_value_enter_container(&field, &map_val));
+            while (cbor_value_at_end(&map_val) == false) {
+                CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
+                char *field_text = NULL;
+                size_t field_text_len = 0;
+                CBOR_CHECK(cbor_value_dup_text_string(&map_val, &field_text, &field_text_len, &map_val));
+                CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
+                if (strcmp(field_text, "id") == 0) {
+                    free(field_text);
+                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &rp.id.val, &rp.id.val_len, &map_val));
+                }
+                else if (strcmp(field_text, "name") == 0) {
+                    free(field_text);
+                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &rp.parent.name.val, &rp.parent.name.val_len, &map_val));
+                }
+                else {
+                    free(field_text);
+                }
+            }
+            CBOR_CHECK(cbor_value_leave_container(&field, &map_val));
+        }
+        else if (val_u == 0x03) { // user
+            CBOR_ASSERT(cbor_value_is_map(&field) == true);
+            CborValue map_val;
+            CBOR_CHECK(cbor_value_enter_container(&field, &map_val));
+            while (cbor_value_at_end(&map_val) == false) {
+                CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
+                char *field_text = NULL;
+                size_t field_text_len = 0;
+                CBOR_CHECK(cbor_value_dup_text_string(&map_val, &field_text, &field_text_len, &map_val));
+                if (strcmp(field_text, "id") == 0) {
+                    free(field_text);
+                    CBOR_ASSERT(cbor_value_is_byte_string(&map_val) == true);
+                    CBOR_CHECK(cbor_value_dup_byte_string(&map_val, &user.id.val, &user.id.val_len, &map_val));
+                }
+                else if (strcmp(field_text, "name") == 0) {
+                    free(field_text);
+                    CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
+                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &user.parent.name.val, &user.parent.name.val_len, &map_val));
+                }
+                else if (strcmp(field_text, "displayName") == 0) {
+                    free(field_text);
+                    CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
+                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &user.displayName.val, &user.displayName.val_len, &map_val));
+                }
+                else {
+                    free(field_text);
+                }
+            }
+            CBOR_CHECK(cbor_value_leave_container(&field, &map_val));
+        }
+        else if (val_u == 0x04) { // pubKeyCredParams
+            CBOR_ASSERT(cbor_value_is_array(&field) == true);
+            CborValue arr_val;
+            CBOR_CHECK(cbor_value_enter_container(&field, &arr_val));
+            while (cbor_value_at_end(&arr_val) == false) {
+                CBOR_ASSERT(cbor_value_is_map(&arr_val) == true);
+                CborValue map_val;
+                PublicKeyCredentialParameters *pk = &pubKeyCredParams[pubKeyCredParams_len];
+                CBOR_CHECK(cbor_value_enter_container(&arr_val, &map_val));
+                while (cbor_value_at_end(&map_val) == false) {
+                    CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
+                    char *field_text = NULL;
+                    size_t field_text_len = 0;
+                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &field_text, &field_text_len, &map_val));
+                    if (strcmp(field_text, "type") == 0) {
+                        free(field_text);
+                        CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
+                        CBOR_CHECK(cbor_value_dup_text_string(&map_val, &pk->type.val, &pk->type.val_len, &map_val));
+                    }
+                    else if (strcmp(field_text, "alg") == 0) {
+                        free(field_text);
+                        CBOR_ASSERT(cbor_value_is_integer(&map_val) == true);
+                        CBOR_CHECK(cbor_value_get_int64(&map_val, &pk->alg));
+                        printf("ALG %lld\n", pk->alg);
+                        CBOR_CHECK(cbor_value_advance_fixed(&map_val));
+                    }
+                    else {
+                        free(field_text);
+                    }
+                }
+                CBOR_CHECK(cbor_value_leave_container(&arr_val, &map_val));
+                pubKeyCredParams_len++;
+            }
+            CBOR_CHECK(cbor_value_leave_container(&field, &arr_val));
+        }
+        else if (val_u == 0x05) { // excludeList
+
+        }
+        else if (val_u == 0x06) { // extensions
+
+        }
+        else if (val_u == 0x07) { // options
+
+        }
+        else if (val_u == 0x08) { // pinUvAuthParam
+
+        }
+        else if (val_u == 0x09) { // pinUvAuthProtocol
+
+        }
+        else if (val_u == 0x0A) { // enterpriseAttestation
+
+        }
+    }
+    CBOR_CHECK(cbor_value_leave_container(&map, &field));
+    err:
+    CBOR_FREE_BYTE_STRING(clientDataHash);
+    CBOR_FREE_BYTE_STRING(pinUvAuthParam);
+    CBOR_FREE_BYTE_STRING(rp.id);
+    CBOR_FREE_BYTE_STRING(rp.parent.name);
+    CBOR_FREE_BYTE_STRING(user.id);
+    CBOR_FREE_BYTE_STRING(user.displayName);
+    CBOR_FREE_BYTE_STRING(user.parent.name);
+    for (int n = 0; n < pubKeyCredParams_len; n++) {
+        CBOR_FREE_BYTE_STRING(pubKeyCredParams[n].type);
+    }
+    if (error != CborNoError)
+        return -ERR_INVALID_PAR;
+    driver_exec_finished(1);
+    return 0;
+    }
+
 int cbor_get_info() {
     CborEncoder encoder, mapEncoder, arrayEncoder;
+    CborError error = CborNoError;
     cbor_encoder_init(&encoder, ctap_resp->init.data + 1, CTAP_MAX_PACKET_SIZE, 0);
-    CHECK_CBOR(cbor_encoder_create_map(&encoder, &mapEncoder, 7));
+    CBOR_CHECK(cbor_encoder_create_map(&encoder, &mapEncoder, 7));
 
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x01));
-    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 2));
-    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "U2F_V2"));
-    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "FIDO_2_0"));
-    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 0x01));
+    CBOR_CHECK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 2));
+    CBOR_CHECK(cbor_encode_text_stringz(&arrayEncoder, "U2F_V2"));
+    CBOR_CHECK(cbor_encode_text_stringz(&arrayEncoder, "FIDO_2_0"));
+    CBOR_CHECK(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
 
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x02));
-    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
-    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "hmac-secret"));
-    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 0x02));
+    CBOR_CHECK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
+    CBOR_CHECK(cbor_encode_text_stringz(&arrayEncoder, "hmac-secret"));
+    CBOR_CHECK(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
 
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x03));
-    CHECK_CBOR(cbor_encode_byte_string(&mapEncoder, aaguid, sizeof(aaguid)));
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 0x03));
+    CBOR_CHECK(cbor_encode_byte_string(&mapEncoder, aaguid, sizeof(aaguid)));
 
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x04));
-    CHECK_CBOR(cbor_encoder_create_map(&mapEncoder, &arrayEncoder, 2));
-    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "rk"));
-    CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, true));
-    CHECK_CBOR(cbor_encode_text_stringz(&arrayEncoder, "clientPin"));
-    CHECK_CBOR(cbor_encode_boolean(&arrayEncoder, false));
-    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 0x04));
+    CBOR_CHECK(cbor_encoder_create_map(&mapEncoder, &arrayEncoder, 2));
+    CBOR_CHECK(cbor_encode_text_stringz(&arrayEncoder, "rk"));
+    CBOR_CHECK(cbor_encode_boolean(&arrayEncoder, true));
+    CBOR_CHECK(cbor_encode_text_stringz(&arrayEncoder, "clientPin"));
+    CBOR_CHECK(cbor_encode_boolean(&arrayEncoder, false));
+    CBOR_CHECK(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
 
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x06));
-    CHECK_CBOR(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
-    CHECK_CBOR(cbor_encode_uint(&arrayEncoder, 1)); // PIN protocols
-    CHECK_CBOR(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 0x06));
+    CBOR_CHECK(cbor_encoder_create_array(&mapEncoder, &arrayEncoder, 1));
+    CBOR_CHECK(cbor_encode_uint(&arrayEncoder, 1)); // PIN protocols
+    CBOR_CHECK(cbor_encoder_close_container(&mapEncoder, &arrayEncoder));
 
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x07));
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 10)); // MAX_CRED_COUNT_IN_LIST
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 0x07));
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 10)); // MAX_CRED_COUNT_IN_LIST
 
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 0x08));
-    CHECK_CBOR(cbor_encode_uint(&mapEncoder, 1024)); // CRED_ID_MAX_LENGTH
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 0x08));
+    CBOR_CHECK(cbor_encode_uint(&mapEncoder, 1024)); // CRED_ID_MAX_LENGTH
 
-    CHECK_CBOR(cbor_encoder_close_container(&encoder, &mapEncoder));
+    CBOR_CHECK(cbor_encoder_close_container(&encoder, &mapEncoder));
+    err:
+    if (error != CborNoError)
+        return -ERR_INVALID_PAR;
     size_t rs = cbor_encoder_get_buffer_size(&encoder, ctap_resp->init.data + 1);
     driver_exec_finished(rs + 1);
     return 0;
@@ -213,8 +433,8 @@ int cbor_process(const uint8_t *data, size_t len) {
     if (len == 0)
         return -ERR_INVALID_LEN;
     driver_prepare_response();
-    //if (data[0] == CTAP_MAKE_CREDENTIAL)
-    //    return cbor_make_credential(data + 1, len - 1);
+    if (data[0] == CTAP_MAKE_CREDENTIAL)
+        return cbor_make_credential(data + 1, len - 1);
     if (data[0] == CTAP_GET_INFO)
         return cbor_get_info();
     else if (data[0] == CTAP_RESET)

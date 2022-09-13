@@ -225,141 +225,189 @@ typedef struct PublicKeyCredentialParameters {
     int64_t alg;
 } PublicKeyCredentialParameters;
 
+typedef struct PublicKeyCredentialDescriptor {
+    CborCharString type;
+    CborByteString id;
+    CborCharString transports[8];
+    size_t transports_len;
+} PublicKeyCredentialDescriptor;
+
+typedef struct CredOptions {
+    bool rk;
+    bool up;
+    bool uv;
+} CredOptions;
+
+#define CBOR_PARSE_MAP_START(_p,_n)                   \
+    CBOR_ASSERT(cbor_value_is_map(&(_p)) == true); \
+    CborValue _f##_n; \
+    CBOR_CHECK(cbor_value_enter_container(&(_p), &(_f##_n))); \
+    while (cbor_value_at_end(&(_f##_n)) == false)
+
+#define CBOR_PARSE_ARRAY_START(_p,_n)                   \
+    CBOR_ASSERT(cbor_value_is_array(&(_p)) == true); \
+    CborValue _f##_n; \
+    CBOR_CHECK(cbor_value_enter_container(&(_p), &(_f##_n))); \
+    while (cbor_value_at_end(&(_f##_n)) == false)
+
+#define CBOR_FIELD_GET_UINT(v, _n) \
+    do { \
+        CBOR_ASSERT(cbor_value_is_unsigned_integer(&(_f##_n)) == true); \
+        CBOR_CHECK(cbor_value_get_uint64(&(_f##_n), &(v))); \
+        CBOR_CHECK(cbor_value_advance_fixed(&(_f##_n))); \
+    } while(0)
+
+#define CBOR_FIELD_GET_INT(v, _n) \
+    do { \
+        CBOR_ASSERT(cbor_value_is_integer(&(_f##_n)) == true); \
+        CBOR_CHECK(cbor_value_get_int64(&(_f##_n), &(v))); \
+        CBOR_CHECK(cbor_value_advance_fixed(&(_f##_n))); \
+    } while(0)
+
+#define CBOR_FIELD_GET_BYTES(v, _n) \
+    do { \
+        CBOR_ASSERT(cbor_value_is_byte_string(&(_f##_n)) == true); \
+        CBOR_CHECK(cbor_value_dup_byte_string(&(_f##_n), &(v).val, &(v).val_len, &(_f##_n))); \
+    } while (0)
+
+#define CBOR_FIELD_GET_TEXT(v, _n) \
+    do { \
+        CBOR_ASSERT(cbor_value_is_text_string(&(_f##_n)) == true); \
+        CBOR_CHECK(cbor_value_dup_text_string(&(_f##_n), &(v).val, &(v).val_len, &(_f##_n))); \
+    } while (0)
+
+#define CBOR_FIELD_GET_BOOL(v, _n) \
+    do { \
+        CBOR_ASSERT(cbor_value_is_boolean(&(_f##_n)) == true); \
+        CBOR_CHECK(cbor_value_get_boolean(&(_f##_n), &(v))); \
+        CBOR_CHECK(cbor_value_advance_fixed(&(_f##_n))); \
+    } while(0)
+
+#define CBOR_FIELD_GET_KEY_TEXT(_n) \
+    CBOR_ASSERT(cbor_value_is_text_string(&(_f##_n)) == true); \
+    char _fd##_n[64]; \
+    size_t _fdl##_n = sizeof(_fd##_n); \
+    CBOR_CHECK(cbor_value_copy_text_string(&(_f##_n), _fd##_n, &_fdl##_n, &(_f##_n)))
+
+#define CBOR_FIELD_KEY_TEXT_VAL_TEXT(_n, _t, _v) \
+    if (strcmp(_fd##_n, _t) == 0) { \
+        CBOR_ASSERT(cbor_value_is_text_string(&_f##_n) == true); \
+        CBOR_CHECK(cbor_value_dup_text_string(&(_f##_n), &(_v).val, &(_v).val_len, &(_f##_n))); \
+    }
+
+#define CBOR_FIELD_KEY_TEXT_VAL_BYTES(_n, _t, _v) \
+    if (strcmp(_fd##_n, _t) == 0) { \
+        CBOR_ASSERT(cbor_value_is_byte_string(&_f##_n) == true); \
+        CBOR_CHECK(cbor_value_dup_byte_string(&(_f##_n), &(_v).val, &(_v).val_len, &(_f##_n))); \
+    }
+
+#define CBOR_FIELD_KEY_TEXT_VAL_INT(_n, _t, _v) \
+    if (strcmp(_fd##_n, _t) == 0) { \
+        CBOR_FIELD_GET_INT(_v, _n);\
+    }
+
+#define CBOR_FIELD_KEY_TEXT_VAL_BOOL(_n, _t, _v) \
+    if (strcmp(_fd##_n, _t) == 0) { \
+        CBOR_FIELD_GET_BOOL(_v, _n);\
+    }
+
+#define CBOR_PARSE_MAP_END(_p,_n)  \
+    CBOR_CHECK(cbor_value_leave_container(&(_p), &(_f##_n)))
+
+#define CBOR_PARSE_ARRAY_END(_p,_n)  CBOR_PARSE_MAP_END(_p, _n)
+
+#define CBOR_ADVANCE(_n) CBOR_CHECK(cbor_value_advance(&_f##_n));
+
 int
-cbor_make_credential(const uint8_t *data, size_t len)
-{
+cbor_make_credential(const uint8_t *data, size_t len) {
     CborParser parser;
-    CborValue map, field;
+    CborValue map;
     CborError error = CborNoError;
     CborByteString clientDataHash = {0}, pinUvAuthParam = {0};
     PublicKeyCredentialRpEntity rp = {0};
     PublicKeyCredentialUserEntity user = {0};
     PublicKeyCredentialParameters pubKeyCredParams[16] = {0};
     size_t pubKeyCredParams_len = 0;
-    CBOR_CHECK(cbor_parser_init(data, len, 0, &parser, &map));
-    CBOR_ASSERT(cbor_value_is_map(&map) == true);
+    PublicKeyCredentialDescriptor excludeList = {0};
+    CredOptions options = {0};
+    uint64_t pinUvAuthProtocol = 0, enterpriseAttestation = 0;
 
-    CBOR_CHECK(cbor_value_enter_container(&map, &field));
-    while (cbor_value_at_end(&map) == false) {
-        CBOR_ASSERT(cbor_value_is_unsigned_integer(&field) == true);
+    CBOR_CHECK(cbor_parser_init(data, len, 0, &parser, &map));
+    CBOR_PARSE_MAP_START(map, 1) {
         uint64_t val_u = 0;
-        CBOR_CHECK(cbor_value_get_uint64(&field, &val_u));
-        printf("VAL %llx\n", val_u);
-        CBOR_CHECK(cbor_value_advance_fixed(&field));
+        CBOR_FIELD_GET_UINT(val_u, 1);
         if (val_u == 0x01) { // clientDataHash
-            CBOR_ASSERT(cbor_value_is_byte_string(&field) == true);
-            CBOR_CHECK(cbor_value_dup_byte_string(&field, &clientDataHash.val, &clientDataHash.val_len, &field));
+            CBOR_FIELD_GET_BYTES(clientDataHash, 1);
         }
         else if (val_u == 0x02) { // rp
-            CBOR_ASSERT(cbor_value_is_map(&field) == true);
-            CborValue map_val;
-            CBOR_CHECK(cbor_value_enter_container(&field, &map_val));
-            while (cbor_value_at_end(&map_val) == false) {
-                CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
-                char *field_text = NULL;
-                size_t field_text_len = 0;
-                CBOR_CHECK(cbor_value_dup_text_string(&map_val, &field_text, &field_text_len, &map_val));
-                CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
-                if (strcmp(field_text, "id") == 0) {
-                    free(field_text);
-                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &rp.id.val, &rp.id.val_len, &map_val));
-                }
-                else if (strcmp(field_text, "name") == 0) {
-                    free(field_text);
-                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &rp.parent.name.val, &rp.parent.name.val_len, &map_val));
-                }
-                else {
-                    free(field_text);
-                }
+            CBOR_PARSE_MAP_START(_f1, 2) {
+                CBOR_FIELD_GET_KEY_TEXT(2);
+                CBOR_FIELD_KEY_TEXT_VAL_TEXT(2, "id", rp.id);
+                CBOR_FIELD_KEY_TEXT_VAL_TEXT(2, "name", rp.parent.name);
             }
-            CBOR_CHECK(cbor_value_leave_container(&field, &map_val));
+            CBOR_PARSE_MAP_END(_f1, 2);
         }
         else if (val_u == 0x03) { // user
-            CBOR_ASSERT(cbor_value_is_map(&field) == true);
-            CborValue map_val;
-            CBOR_CHECK(cbor_value_enter_container(&field, &map_val));
-            while (cbor_value_at_end(&map_val) == false) {
-                CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
-                char *field_text = NULL;
-                size_t field_text_len = 0;
-                CBOR_CHECK(cbor_value_dup_text_string(&map_val, &field_text, &field_text_len, &map_val));
-                if (strcmp(field_text, "id") == 0) {
-                    free(field_text);
-                    CBOR_ASSERT(cbor_value_is_byte_string(&map_val) == true);
-                    CBOR_CHECK(cbor_value_dup_byte_string(&map_val, &user.id.val, &user.id.val_len, &map_val));
-                }
-                else if (strcmp(field_text, "name") == 0) {
-                    free(field_text);
-                    CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
-                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &user.parent.name.val, &user.parent.name.val_len, &map_val));
-                }
-                else if (strcmp(field_text, "displayName") == 0) {
-                    free(field_text);
-                    CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
-                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &user.displayName.val, &user.displayName.val_len, &map_val));
-                }
-                else {
-                    free(field_text);
-                }
+            CBOR_PARSE_MAP_START(_f1, 2) {
+                CBOR_FIELD_GET_KEY_TEXT(2);
+                CBOR_FIELD_KEY_TEXT_VAL_BYTES(2, "id", user.id);
+                CBOR_FIELD_KEY_TEXT_VAL_TEXT(2, "name", user.parent.name);
+                CBOR_FIELD_KEY_TEXT_VAL_TEXT(2, "displayName", user.displayName);
             }
-            CBOR_CHECK(cbor_value_leave_container(&field, &map_val));
+            CBOR_PARSE_MAP_END(_f1, 2);
         }
         else if (val_u == 0x04) { // pubKeyCredParams
-            CBOR_ASSERT(cbor_value_is_array(&field) == true);
-            CborValue arr_val;
-            CBOR_CHECK(cbor_value_enter_container(&field, &arr_val));
-            while (cbor_value_at_end(&arr_val) == false) {
-                CBOR_ASSERT(cbor_value_is_map(&arr_val) == true);
-                CborValue map_val;
+            CBOR_PARSE_ARRAY_START(_f1, 2) {
                 PublicKeyCredentialParameters *pk = &pubKeyCredParams[pubKeyCredParams_len];
-                CBOR_CHECK(cbor_value_enter_container(&arr_val, &map_val));
-                while (cbor_value_at_end(&map_val) == false) {
-                    CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
-                    char *field_text = NULL;
-                    size_t field_text_len = 0;
-                    CBOR_CHECK(cbor_value_dup_text_string(&map_val, &field_text, &field_text_len, &map_val));
-                    if (strcmp(field_text, "type") == 0) {
-                        free(field_text);
-                        CBOR_ASSERT(cbor_value_is_text_string(&map_val) == true);
-                        CBOR_CHECK(cbor_value_dup_text_string(&map_val, &pk->type.val, &pk->type.val_len, &map_val));
-                    }
-                    else if (strcmp(field_text, "alg") == 0) {
-                        free(field_text);
-                        CBOR_ASSERT(cbor_value_is_integer(&map_val) == true);
-                        CBOR_CHECK(cbor_value_get_int64(&map_val, &pk->alg));
-                        printf("ALG %lld\n", pk->alg);
-                        CBOR_CHECK(cbor_value_advance_fixed(&map_val));
-                    }
-                    else {
-                        free(field_text);
-                    }
+                CBOR_PARSE_MAP_START(_f2, 3) {
+                    CBOR_FIELD_GET_KEY_TEXT(3);
+                    CBOR_FIELD_KEY_TEXT_VAL_TEXT(3, "type", pk->type);
+                    CBOR_FIELD_KEY_TEXT_VAL_INT(3, "alg", pk->alg);
                 }
-                CBOR_CHECK(cbor_value_leave_container(&arr_val, &map_val));
+                CBOR_PARSE_MAP_END(_f2, 3);
                 pubKeyCredParams_len++;
             }
-            CBOR_CHECK(cbor_value_leave_container(&field, &arr_val));
+            CBOR_PARSE_ARRAY_END(_f1, 2);
         }
         else if (val_u == 0x05) { // excludeList
-
+            CBOR_PARSE_MAP_START(_f1, 2) {
+                CBOR_FIELD_GET_KEY_TEXT(2);
+                CBOR_FIELD_KEY_TEXT_VAL_BYTES(2, "id", excludeList.id);
+                CBOR_FIELD_KEY_TEXT_VAL_TEXT(2, "type", excludeList.type);
+                if (strcmp(_fd2, "transports") == 0) {
+                    CBOR_PARSE_ARRAY_START(_f2, 3) {
+                        CBOR_FIELD_GET_TEXT(excludeList.transports[excludeList.transports_len], 3);
+                        excludeList.transports_len++;
+                    }
+                    CBOR_PARSE_ARRAY_END(_f2, 3);
+                }
+            }
+            CBOR_PARSE_MAP_END(_f1, 2);
         }
         else if (val_u == 0x06) { // extensions
-
+            CBOR_ADVANCE(1);
         }
         else if (val_u == 0x07) { // options
-
+            CBOR_PARSE_MAP_START(_f1, 2) {
+                CBOR_FIELD_GET_KEY_TEXT(2);
+                CBOR_FIELD_KEY_TEXT_VAL_BOOL(2, "rk", options.rk);
+                CBOR_FIELD_KEY_TEXT_VAL_BOOL(2, "up", options.up);
+                CBOR_FIELD_KEY_TEXT_VAL_BOOL(2, "uv", options.uv);
+            }
+            CBOR_PARSE_MAP_END(_f1, 2);
         }
         else if (val_u == 0x08) { // pinUvAuthParam
-
+            CBOR_FIELD_GET_BYTES(pinUvAuthParam, 1);
         }
         else if (val_u == 0x09) { // pinUvAuthProtocol
-
+            CBOR_FIELD_GET_UINT(pinUvAuthProtocol, 1);
         }
         else if (val_u == 0x0A) { // enterpriseAttestation
-
+            CBOR_FIELD_GET_UINT(enterpriseAttestation, 1);
         }
     }
-    CBOR_CHECK(cbor_value_leave_container(&map, &field));
-    err:
+    CBOR_PARSE_MAP_END(map, 1);
+err:
     CBOR_FREE_BYTE_STRING(clientDataHash);
     CBOR_FREE_BYTE_STRING(pinUvAuthParam);
     CBOR_FREE_BYTE_STRING(rp.id);
@@ -369,6 +417,12 @@ cbor_make_credential(const uint8_t *data, size_t len)
     CBOR_FREE_BYTE_STRING(user.parent.name);
     for (int n = 0; n < pubKeyCredParams_len; n++) {
         CBOR_FREE_BYTE_STRING(pubKeyCredParams[n].type);
+    }
+
+    CBOR_FREE_BYTE_STRING(excludeList.type);
+    CBOR_FREE_BYTE_STRING(excludeList.id);
+    for (int n = 0; n < excludeList.transports_len; n++) {
+        CBOR_FREE_BYTE_STRING(excludeList.transports[n]);
     }
     if (error != CborNoError)
         return -ERR_INVALID_PAR;

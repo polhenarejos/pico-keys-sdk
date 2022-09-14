@@ -15,6 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common.h"
+#include "mbedtls/chachapoly.h"
 #include "tusb.h"
 #include "ctap_hid.h"
 #include "hsm.h"
@@ -23,6 +25,7 @@
 #include "usb.h"
 #include "bsp/board.h"
 #include "cbor.h"
+#include "random.h"
 
 #define CTAP_MAX_PACKET_SIZE (64 - 7 + 128 * (64 - 5))
 
@@ -318,8 +321,90 @@ typedef struct CredOptions {
 
 #define CBOR_ADVANCE(_n) CBOR_CHECK(cbor_value_advance(&_f##_n));
 
-int
-cbor_make_credential(const uint8_t *data, size_t len) {
+typedef struct Credential {
+    CborCharString rp_id;
+    CborCharString rp_name;
+    CborByteString rp_id_hash;
+    CborCharString user_id;
+    CborCharString user_name;
+    CborCharString display_name;
+    uint32_t creation_time;
+    bool hmac_secret;
+    bool use_sign_count;
+    int algorithm;
+    int curve;
+    CborByteString id;
+} Credential;
+
+int credential_free(Credential *cred) {
+    CBOR_FREE_BYTE_STRING(cred->rp_id);
+    CBOR_FREE_BYTE_STRING(cred->rp_name);
+    CBOR_FREE_BYTE_STRING(cred->rp_id_hash);
+    CBOR_FREE_BYTE_STRING(cred->user_id);
+    CBOR_FREE_BYTE_STRING(cred->user_name);
+    CBOR_FREE_BYTE_STRING(cred->display_name);
+    CBOR_FREE_BYTE_STRING(cred->id);
+    return 0;
+}
+
+#define CBOR_APPEND_KEY_UINT_VAL_TEXT(p, k, v) \
+    do { \
+        if ((v).val && (v).val_len > 0) { \
+            CBOR_CHECK(cbor_encode_uint(&(p), (k))); \
+            CBOR_CHECK(cbor_encode_text_stringz(&(p), (v).val)); \
+        } } while(0)
+
+#define CBOR_APPEND_KEY_UINT_VAL_UINT(p, k, v) \
+    do { \
+            CBOR_CHECK(cbor_encode_uint(&(p), (k))); \
+            CBOR_CHECK(cbor_encode_uint(&(p), (v))); \
+    } while(0)
+
+#define CBOR_APPEND_KEY_UINT_VAL_BOOL(p, k, v) \
+    do { \
+            CBOR_CHECK(cbor_encode_uint(&(p), (k))); \
+            CBOR_CHECK(cbor_encode_boolean(&(p), (v))); \
+     } while(0)
+
+int credential_gen(Credential *cred) {
+    uint8_t key[32], iv[12], cbor_data[256], cipher[256], tag[16];
+    mbedtls_chachapoly_context chatx;
+    memset(key, 0, sizeof(key));
+    memcpy(iv, random_bytes_get(12), 12);
+    mbedtls_chachapoly_init(&chatx);
+    CborEncoder encoder, mapEncoder;
+    CborError error = CborNoError;
+    cbor_encoder_init(&encoder, cbor_data, sizeof(cbor_data), 0);
+    CBOR_CHECK(cbor_encoder_create_map(&encoder, &mapEncoder, CborIndefiniteLength));
+
+    CBOR_APPEND_KEY_UINT_VAL_TEXT(mapEncoder, 0x01, cred->rp_id);
+    CBOR_APPEND_KEY_UINT_VAL_TEXT(mapEncoder, 0x02, cred->rp_name);
+    CBOR_APPEND_KEY_UINT_VAL_TEXT(mapEncoder, 0x03, cred->user_id);
+    CBOR_APPEND_KEY_UINT_VAL_TEXT(mapEncoder, 0x04, cred->user_name);
+    CBOR_APPEND_KEY_UINT_VAL_TEXT(mapEncoder, 0x05, cred->display_name);
+    CBOR_APPEND_KEY_UINT_VAL_UINT(mapEncoder, 0x06, cred->creation_time);
+    CBOR_APPEND_KEY_UINT_VAL_BOOL(mapEncoder, 0x07, cred->hmac_secret);
+    CBOR_APPEND_KEY_UINT_VAL_BOOL(mapEncoder, 0x08, cred->use_sign_count);
+
+    CBOR_CHECK(cbor_encoder_close_container(&encoder, &mapEncoder));
+    err:
+    if (error != CborNoError)
+        return -ERR_INVALID_PAR;
+    size_t rs = cbor_encoder_get_buffer_size(&encoder, cbor_data);
+    int ret = mbedtls_chachapoly_encrypt_and_tag(&chatx, rs, iv, cred->rp_id_hash.val, cred->rp_id_hash.val_len, cbor_data, cipher, tag);
+    mbedtls_chachapoly_free(&chatx);
+    if (ret != 0)
+        return -ERR_OTHER;
+    cred->id.val_len = 4 + 12 + rs + 16;
+    cred->id.val = (uint8_t *)calloc(1, cred->id.val_len);
+    memcpy(cred->id.val, "\xf1\xd0\x02\x00", 4);
+    memcpy(cred->id.val + 4, iv, 12);
+    memcpy(cred->id.val + 4 + 12, cipher, rs);
+    memcpy(cred->id.val + 4 + 12 + rs, tag, 16);
+    return 0;
+}
+
+int cbor_make_credential(const uint8_t *data, size_t len) {
     CborParser parser;
     CborValue map;
     CborError error = CborNoError;
@@ -407,6 +492,9 @@ cbor_make_credential(const uint8_t *data, size_t len) {
         }
     }
     CBOR_PARSE_MAP_END(map, 1);
+
+
+
 err:
     CBOR_FREE_BYTE_STRING(clientDataHash);
     CBOR_FREE_BYTE_STRING(pinUvAuthParam);

@@ -176,6 +176,17 @@ void neug_wait_full(void) { //should be called only on core1
     }
 }
 
+void neug_wait_full_ext(bool blocking) {
+    struct rng_rb *rb = &the_ring_buffer;
+
+    while (!rb->full) {
+        if (blocking == true)
+            sleep_ms(1);
+        else
+            neug_task();
+    }
+}
+
 void neug_fini(void) {
     neug_get();
 }

@@ -79,13 +79,13 @@ void random_get_salt(uint8_t *p) {
 /*
  * Random byte iterator
  */
-int random_gen(void *arg, unsigned char *out, size_t out_len) {
+int random_gen_ext(void *arg, unsigned char *out, size_t out_len, bool blocking) {
     uint8_t *index_p = (uint8_t *)arg;
     uint8_t index = index_p ? *index_p : 0;
     size_t n;
 
     while (out_len) {
-        neug_wait_full();
+        neug_wait_full_ext(blocking);
 
         n = RANDOM_BYTES_LENGTH - index;
         if (n > out_len)
@@ -106,4 +106,12 @@ int random_gen(void *arg, unsigned char *out, size_t out_len) {
         *index_p = index;
 
     return 0;
+}
+
+int random_gen(void *arg, unsigned char *out, size_t out_len) {
+    return random_gen_ext(arg, out, out_len, true);
+}
+
+int random_gen_core0(void *arg, unsigned char *out, size_t out_len) {
+    return random_gen_ext(arg, out, out_len, false);
 }

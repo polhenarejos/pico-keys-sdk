@@ -74,6 +74,8 @@ typedef struct file
     const uint8_t acl[7];
 } __attribute__((packed)) file_t;
 
+extern bool file_has_data(file_t *);
+
 extern file_t *currentEF;
 extern file_t *currentDF;
 extern const file_t *selected_applet;

@@ -139,16 +139,18 @@ typedef struct {
 
 // Low-level error codes. Return as negatives.
 
-#define ERR_NONE                0x00    // No error
-#define ERR_INVALID_CMD         0x01    // Invalid command
-#define ERR_INVALID_PAR         0x02    // Invalid parameter
-#define ERR_INVALID_LEN         0x03    // Invalid message length
-#define ERR_INVALID_SEQ         0x04    // Invalid message sequencing
-#define ERR_MSG_TIMEOUT         0x05    // Message has timed out
-#define ERR_CHANNEL_BUSY        0x06    // Channel busy
-#define ERR_LOCK_REQUIRED       0x0a    // Command requires channel lock
-#define ERR_INVALID_CHANNEL     0x0b    // CID not valid
-#define ERR_OTHER               0x7f    // Other unspecified error
+#define CTAP_MAX_PACKET_SIZE (64 - 7 + 128 * (64 - 5))
+
+#define CTAP1_ERR_NONE                0x00    // No error
+#define CTAP1_ERR_INVALID_CMD         0x01    // Invalid command
+#define CTAP1_ERR_INVALID_PARAMETER   0x02    // Invalid parameter
+#define CTAP1_ERR_INVALID_LEN         0x03    // Invalid message length
+#define CTAP1_ERR_INVALID_SEQ         0x04    // Invalid message sequencing
+#define CTAP1_ERR_MSG_TIMEOUT         0x05    // Message has timed out
+#define CTAP1_ERR_CHANNEL_BUSY        0x06    // Channel busy
+#define CTAP1_ERR_LOCK_REQUIRED       0x0a    // Command requires channel lock
+#define CTAP1_ERR_INVALID_CHANNEL     0x0b    // CID not valid
+#define CTAP1_ERR_OTHER               0x7f    // Other unspecified error
 
 #ifdef __cplusplus
 }

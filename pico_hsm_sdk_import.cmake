@@ -101,6 +101,8 @@ if (NOT TARGET pico_hsm_sdk)
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chachapoly.c
+                ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chacha20.c
+                ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
                 )
         target_include_directories(pico_hsm_sdk INTERFACE
                 ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid

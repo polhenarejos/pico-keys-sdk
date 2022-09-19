@@ -120,7 +120,6 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
   (void) itf;
   (void) report_id;
   (void) report_type;
-  printf("set report\n");
   usb_rx(buffer, bufsize);
 }
 
@@ -253,7 +252,7 @@ int driver_process_usb_packet(uint16_t read) {
         }
         // echo back anything we received from host
         //tud_hid_report(0, buffer, bufsize);
-        printf("END\n");
+        //printf("END\n");
         usb_clear_rx();
     }
     return apdu_sent;

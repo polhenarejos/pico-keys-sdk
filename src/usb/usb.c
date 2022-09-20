@@ -38,6 +38,11 @@
 static uint8_t rx_buffer[4096], tx_buffer[4096];
 static uint16_t w_offset = 0, r_offset = 0;
 static uint16_t w_len = 0, tx_r_offset = 0;
+static uint32_t timeout_counter = 0;
+
+void usb_set_timeout_counter(uint32_t v) {
+    timeout_counter = v;
+}
 
 uint32_t usb_write_offset(uint16_t len, uint16_t offset) {
     uint8_t pkt_max = 64;
@@ -147,7 +152,6 @@ static void card_init_core1(void) {
 
 size_t finished_data_size = 0;
 
-void apdu_thread();
 void card_start(void (*func)(void)) {
     multicore_reset_core1();
     card_init_core1();
@@ -175,8 +179,9 @@ void usb_task() {
             if (m == EV_EXEC_FINISHED) {
                 driver_exec_finished(finished_data_size);
                 led_set_blink(BLINK_MOUNTED);
+                timeout_stop();
             }
-        	else if (m == EV_PRESS_BUTTON) {
+            else if (m == EV_PRESS_BUTTON) {
         	    uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
         	    queue_try_add(&usb_to_card_q, &flag);
         	}
@@ -232,7 +237,7 @@ void usb_task() {
         }
         else {
             if (timeout > 0) {
-                if (timeout + 1500 < board_millis()) {
+                if (timeout + timeout_counter < board_millis()) {
                     driver_exec_timeout();
                     timeout = board_millis();
                 }

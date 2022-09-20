@@ -57,4 +57,6 @@ extern uint8_t *usb_get_tx();
 extern uint32_t usb_write_offset(uint16_t len, uint16_t offset);
 extern void usb_clear_rx();
 extern size_t finished_data_size;
+extern void usb_set_timeout_counter(uint32_t v);
+
 #endif

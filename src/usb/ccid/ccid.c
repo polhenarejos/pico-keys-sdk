@@ -124,6 +124,8 @@ int driver_init() {
     ccid_response = (struct ccid_header *)usb_get_tx();
     apdu.rdata = &ccid_response->apdu;
 
+    usb_set_timeout_counter(1500);
+
     return CCID_OK;
 }
 

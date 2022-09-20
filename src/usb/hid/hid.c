@@ -53,6 +53,8 @@ int driver_init() {
     ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
     apdu.rdata = ctap_resp->init.data;
 
+    usb_set_timeout_counter(200);
+
     return 0;
 }
 void driver_task() {
@@ -272,7 +274,15 @@ int driver_process_usb_packet(uint16_t read) {
 }
 
 void driver_exec_timeout() {
-
+    ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+    memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
+    ctap_resp->cid = ctap_req->cid;
+    ctap_resp->init.cmd = CTAPHID_KEEPALIVE;
+    ctap_resp->init.bcntl = 1;
+    uint8_t bck = ctap_resp->init.data[0];
+    ctap_resp->init.data[0] = is_req_button_pending() ? 2 : 1;
+    hid_write(64);
+    ctap_resp->init.data[0] = bck;
 }
 
 uint8_t *driver_prepare_response() {

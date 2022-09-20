@@ -61,6 +61,8 @@ enum  {
 };
 extern void led_set_blink(uint32_t mode);
 
+extern bool is_req_button_pending();
+
 #define SW_BYTES_REMAINING_00()             set_res_sw (0x61, 0x00)
 #define SW_WARNING_STATE_UNCHANGED()        set_res_sw (0x62, 0x00)
 #define SW_WARNING_CORRUPTED()              set_res_sw (0x62, 0x81)

@@ -67,11 +67,17 @@ void led_set_blink(uint32_t mode) {
 
 void execute_tasks();
 
+static bool req_button_pending = false;
+
+bool is_req_button_pending() {
+    return req_button_pending;
+}
+
 bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
     led_set_blink((1000 << 16) | 100);
-
+    req_button_pending = true;
     while (board_button_read() == false) {
         execute_tasks();
         //sleep_ms(10);
@@ -91,6 +97,7 @@ bool wait_button() {
         }
     }
     led_set_blink(BLINK_PROCESSING);
+    req_button_pending = false;
     return timeout;
 }
 

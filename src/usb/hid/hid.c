@@ -140,6 +140,10 @@ uint8_t last_seq = 0;
 CTAPHID_FRAME last_req = { 0 };
 uint32_t lock = 0;
 
+uint8_t thread_type = 0; //1 is APDU, 2 is CBOR
+extern void cbor_thread();
+extern void init_fido();
+
 int driver_process_usb_packet(uint16_t read) {
     int apdu_sent = 0;
     if (read >= 5)
@@ -199,9 +203,8 @@ int driver_process_usb_packet(uint16_t read) {
             ctap_resp->init.bcntl = 17;
             ctap_resp->init.bcnth = 0;
             hid_write(64);
-            current_app = apps[0].select_aid(&apps[0]);
-            card_start();
-            DEBUG_PAYLOAD((uint8_t *)ctap_resp, ctap_resp->init.bcntl+7);
+            DEBUG_PAYLOAD((uint8_t *)ctap_resp, ctap_resp->init.bcntl + 7);
+            init_fido();
         }
         else if (ctap_req->init.cmd == CTAPHID_WINK) {
             if (MSG_LEN(ctap_req) != 0) {
@@ -230,6 +233,12 @@ int driver_process_usb_packet(uint16_t read) {
             hid_write(64);
         }
         else if (last_cmd == CTAPHID_MSG && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
+
+            current_app = apps[0].select_aid(&apps[0]);
+            if (thread_type != 1)
+                card_start(apdu_thread);
+            thread_type = 1;
+
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
                 apdu_sent = apdu_process(msg_packet.data, msg_packet.len);
             else
@@ -238,6 +247,10 @@ int driver_process_usb_packet(uint16_t read) {
             msg_packet.len = msg_packet.current_len = 0; //Reset the transaction
         }
         else if (last_cmd == CTAPHID_CBOR && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
+
+            if (thread_type != 2)
+                card_start(cbor_thread);
+            thread_type = 2;
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
                 apdu_sent = cbor_process(msg_packet.data, msg_packet.len);
             else
@@ -270,7 +283,10 @@ uint8_t *driver_prepare_response() {
 }
 
 void driver_exec_finished(size_t size_next) {
-    driver_exec_finished_cont(size_next, 7);
+    if (apdu.sw != 0)
+        ctap_error(apdu.sw & 0xff);
+    else
+        driver_exec_finished_cont(size_next, 7);
 }
 
 void driver_exec_finished_cont(size_t size_next, size_t offset) {

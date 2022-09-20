@@ -140,46 +140,18 @@ static int usb_event_handle() {
     return 0;
 }
 
+extern void low_flash_init();
 static void card_init_core1(void) {
-    //gpg_data_scan (flash_do_start, flash_do_end);
-    low_flash_init_core1();
+    low_flash_init();
 }
 
-void card_thread() {
-    card_init_core1();
+size_t finished_data_size = 0;
 
-    while (1) {
-        uint32_t m;
-        queue_remove_blocking(&usb_to_card_q, &m);
-
-        if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE)
-	    {
-	        set_res_sw (0x6f, 0x00);
-	        goto done;
-	    }
-        else if (m == EV_EXIT) {
-            if (current_app && current_app->unload) {
-                current_app->unload();
-            }
-	        break;
-	    }
-
-        process_apdu();
-
-        done:;
-        uint32_t flag = EV_EXEC_FINISHED;
-        queue_add_blocking(&card_to_usb_q, &flag);
-    }
-    //printf("EXIT !!!!!!\r\n");
-    if (current_app && current_app->unload)
-        current_app->unload();
-}
-
-void card_thread();
-void card_start()
-{
+void apdu_thread();
+void card_start(void (*func)(void)) {
     multicore_reset_core1();
-    multicore_launch_core1(card_thread);
+    card_init_core1();
+    multicore_launch_core1(func);
     led_set_blink(BLINK_MOUNTED);
 }
 
@@ -201,9 +173,7 @@ void usb_task() {
         //    printf("\r\n ------ M = %lu\r\n",m);
         if (has_m) {
             if (m == EV_EXEC_FINISHED) {
-                apdu_finish();
-                size_t size_next = apdu_next();
-                driver_exec_finished(size_next);
+                driver_exec_finished(finished_data_size);
                 led_set_blink(BLINK_MOUNTED);
             }
         	else if (m == EV_PRESS_BUTTON) {

@@ -125,6 +125,38 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
     return make_uint16_t(sw1, sw2);
 }
 
+void apdu_thread() {
+
+    while (1) {
+        uint32_t m;
+        queue_remove_blocking(&usb_to_card_q, &m);
+
+        if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE)
+	    {
+	        set_res_sw (0x6f, 0x00);
+	        goto done;
+	    }
+        else if (m == EV_EXIT) {
+            if (current_app && current_app->unload) {
+                current_app->unload();
+            }
+	        break;
+	    }
+
+        process_apdu();
+
+        done:;
+
+        apdu_finish();
+        finished_data_size = apdu_next();
+        uint32_t flag = EV_EXEC_FINISHED;
+        queue_add_blocking(&card_to_usb_q, &flag);
+    }
+    //printf("EXIT !!!!!!\r\n");
+    if (current_app && current_app->unload)
+        current_app->unload();
+}
+
 void apdu_finish() {
     apdu.rdata[apdu.rlen] = apdu.sw >> 8;
     apdu.rdata[apdu.rlen+1] = apdu.sw & 0xff;

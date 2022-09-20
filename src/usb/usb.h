@@ -46,7 +46,7 @@ extern void driver_exec_timeout();
 extern bool driver_mounted();
 extern uint8_t *driver_prepare_response();
 
-extern void card_start();
+extern void card_start(void (*func)(void));
 extern void card_exit();
 extern void usb_init();
 extern uint8_t *usb_prepare_response();
@@ -56,4 +56,5 @@ extern uint8_t *usb_get_rx();
 extern uint8_t *usb_get_tx();
 extern uint32_t usb_write_offset(uint16_t len, uint16_t offset);
 extern void usb_clear_rx();
+extern size_t finished_data_size;
 #endif

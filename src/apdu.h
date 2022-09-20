@@ -81,5 +81,6 @@ extern int process_apdu();
 extern size_t apdu_process(const uint8_t *buffer, size_t buffer_size);
 extern void apdu_finish();
 extern size_t apdu_next();
+extern void apdu_thread();
 
 #endif

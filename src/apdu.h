@@ -48,8 +48,19 @@ extern int register_app(app_t * (*)());
             printf("\r\n");\
         } printf("\r\n"); \
     }
+#define DEBUG_DATA(_p, _s)                          \
+    {                                               \
+        printf("Data %s (%d bytes):\r\n", #_p, _s); \
+        for (int _i = 0; _i < _s; _i++)             \
+        {                                           \
+            printf("%02X", _p[_i]);                 \
+        }                                           \
+        printf("\n");                               \
+}
+
 #else
 #define DEBUG_PAYLOAD(_p,_s)
+#define DEBUG_DATA(_p,_s)
 #endif
 
 extern uint8_t num_apps;

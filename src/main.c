@@ -73,6 +73,8 @@ bool is_req_button_pending() {
     return req_button_pending;
 }
 
+uint32_t button_timeout = 15000;
+
 bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
@@ -81,7 +83,7 @@ bool wait_button() {
     while (board_button_read() == false) {
         execute_tasks();
         //sleep_ms(10);
-        if (start_button + 15000 < board_millis()) { /* timeout */
+        if (start_button + button_timeout < board_millis()) { /* timeout */
             timeout = true;
             break;
         }

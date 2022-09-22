@@ -35,7 +35,7 @@
 #include <stdlib.h>
 
 // Device specific functions
-static uint8_t rx_buffer[4096], tx_buffer[4096];
+static uint8_t rx_buffer[4096], tx_buffer[4096+64];
 static uint16_t w_offset = 0, r_offset = 0;
 static uint16_t w_len = 0, tx_r_offset = 0;
 static uint32_t timeout_counter = 0;

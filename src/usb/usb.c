@@ -134,6 +134,8 @@ void usb_init() {
     driver_init();
 }
 
+extern int driver_process_usb_nopacket();
+
 static int usb_event_handle() {
     uint16_t rx_read = usb_read_available();
     if (driver_process_usb_packet(rx_read) > 0) {
@@ -141,6 +143,8 @@ static int usb_event_handle() {
         queue_add_blocking(&usb_to_card_q, &flag);
         timeout_start();
     }
+    else
+        driver_process_usb_nopacket();
 
     return 0;
 }

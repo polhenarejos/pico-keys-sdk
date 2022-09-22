@@ -145,22 +145,33 @@ uint32_t lock = 0;
 uint8_t thread_type = 0; //1 is APDU, 2 is CBOR
 extern void cbor_thread();
 extern void init_fido();
+uint32_t last_cmd_time = 0, last_packet_time = 0;
+
+int driver_process_usb_nopacket() {
+    if (last_packet_time+500 < board_millis()) {
+        ctap_error(CTAP1_ERR_MSG_TIMEOUT);
+        last_packet_time = 0;
+        msg_packet.len = msg_packet.current_len = 0;
+    }
+    return 0;
+}
 
 int driver_process_usb_packet(uint16_t read) {
     int apdu_sent = 0;
     if (read >= 5)
     {
+        last_packet_time = board_millis();
         DEBUG_PAYLOAD(usb_get_rx(),64);
         memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
         if (ctap_req->cid == 0x0 || (ctap_req->cid == CID_BROADCAST && ctap_req->init.cmd != CTAPHID_INIT))
             return ctap_error(CTAP1_ERR_INVALID_CHANNEL);
-        if (board_millis() < lock && ctap_req->cid != last_req.cid)
+        if (board_millis() < lock && ctap_req->cid != last_req.cid && last_cmd_time+1000 > board_millis())
             return ctap_error(CTAP1_ERR_CHANNEL_BUSY);
         if (FRAME_TYPE(ctap_req) == TYPE_INIT)
         {
             if (MSG_LEN(ctap_req) > CTAP_MAX_PACKET_SIZE)
                 return ctap_error(CTAP1_ERR_INVALID_LEN);
-            if (msg_packet.len > 0 && last_req.cid != ctap_req->cid) //We are in a transaction
+            if (msg_packet.len > 0 && last_req.cid != ctap_req->cid && last_cmd_time+1000 > board_millis()) //We are in a transaction
                 return ctap_error(CTAP1_ERR_CHANNEL_BUSY);
             printf("command %x\n", FRAME_CMD(ctap_req));
             printf("len %d\n", MSG_LEN(ctap_req));
@@ -174,6 +185,7 @@ int driver_process_usb_packet(uint16_t read) {
             memcpy(&last_req, ctap_req, sizeof(CTAPHID_FRAME));
             last_cmd = ctap_req->init.cmd;
             last_seq = 0;
+            last_cmd_time = board_millis();
         }
         else {
             if (msg_packet.len == 0) //Received a cont with a prior init pkt
@@ -190,7 +202,9 @@ int driver_process_usb_packet(uint16_t read) {
         }
 
         if (ctap_req->init.cmd == CTAPHID_INIT) {
+            init_fido();
             ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            memset(ctap_resp, 0, 64);
             CTAPHID_INIT_REQ *req = (CTAPHID_INIT_REQ *)ctap_req->init.data;
             CTAPHID_INIT_RESP *resp = (CTAPHID_INIT_RESP *)ctap_resp->init.data;
             memcpy(resp->nonce, req->nonce, sizeof(resp->nonce));
@@ -204,9 +218,8 @@ int driver_process_usb_packet(uint16_t read) {
             ctap_resp->init.cmd = CTAPHID_INIT;
             ctap_resp->init.bcntl = 17;
             ctap_resp->init.bcnth = 0;
-            hid_write(64);
-            DEBUG_PAYLOAD((uint8_t *)ctap_resp, ctap_resp->init.bcntl + 7);
-            init_fido();
+            driver_exec_finished(17);
+            printf("OK\n");
         }
         else if (ctap_req->init.cmd == CTAPHID_WINK) {
             if (MSG_LEN(ctap_req) != 0) {
@@ -217,10 +230,17 @@ int driver_process_usb_packet(uint16_t read) {
             sleep_ms(1000); //For blinking the device during 1 seg
             hid_write(64);
         }
-        else if (ctap_req->init.cmd == CTAPHID_PING || ctap_req->init.cmd == CTAPHID_SYNC) {
+        else if ((last_cmd == CTAPHID_PING || last_cmd == CTAPHID_SYNC) && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
             ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
-            memcpy(ctap_resp, ctap_req, sizeof(CTAPHID_FRAME));
-            hid_write(64);
+            if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
+                memcpy(ctap_resp->init.data, msg_packet.data, msg_packet.len);
+                driver_exec_finished(msg_packet.len);
+            }
+            else {
+                memcpy(ctap_resp->init.data, ctap_req->init.data, MSG_LEN(ctap_req));
+                driver_exec_finished(MSG_LEN(ctap_req));
+            }
+            msg_packet.len = msg_packet.current_len = 0;
         }
         else if (ctap_req->init.cmd == CTAPHID_LOCK) {
             if (MSG_LEN(ctap_req) != 1)
@@ -297,6 +317,7 @@ void driver_exec_finished(size_t size_next) {
         ctap_error(apdu.sw & 0xff);
     else
         driver_exec_finished_cont(size_next, 7);
+    apdu.sw = 0;
 }
 
 void driver_exec_finished_cont(size_t size_next, size_t offset) {

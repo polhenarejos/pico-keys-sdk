@@ -309,15 +309,13 @@ int driver_process_usb_packet(uint16_t read) {
 }
 
 void send_keepalive() {
-    ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+    ctap_resp = (CTAPHID_FRAME *)(usb_get_tx()+4096);
     memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
     ctap_resp->cid = ctap_req->cid;
     ctap_resp->init.cmd = CTAPHID_KEEPALIVE;
     ctap_resp->init.bcntl = 1;
-    uint8_t bck = ctap_resp->init.data[0];
     ctap_resp->init.data[0] = is_req_button_pending() ? 2 : 1;
-    hid_write(64);
-    ctap_resp->init.data[0] = bck;
+    hid_write_offset(64,4096);
 }
 
 void driver_exec_timeout() {
@@ -332,7 +330,7 @@ uint8_t *driver_prepare_response() {
 }
 
 void driver_exec_finished(size_t size_next) {
-    if (apdu.sw != 0)
+    if (thread_type == 2 && apdu.sw != 0)
         ctap_error(apdu.sw & 0xff);
     else
         driver_exec_finished_cont(size_next, 7);

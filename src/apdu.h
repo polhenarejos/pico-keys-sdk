@@ -53,7 +53,7 @@ extern int register_app(app_t * (*)());
         printf("Data %s (%d bytes):\r\n", #_p, _s); \
         for (int _i = 0; _i < _s; _i++)             \
         {                                           \
-            printf("%02X", _p[_i]);                 \
+            printf("%02X", (_p)[_i]);                 \
         }                                           \
         printf("\n");                               \
 }

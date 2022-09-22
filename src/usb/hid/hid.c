@@ -25,6 +25,7 @@
 
 static bool mounted = false;
 extern int cbor_process(const uint8_t *, size_t);
+extern void init_fido(bool);
 
 typedef struct msg_packet {
     uint16_t len;
@@ -146,7 +147,6 @@ uint32_t lock = 0;
 
 uint8_t thread_type = 0; //1 is APDU, 2 is CBOR
 extern void cbor_thread();
-extern void init_fido();
 
 int driver_process_usb_nopacket() {
     if (last_packet_time > 0 && last_packet_time+500 < board_millis()) {
@@ -209,7 +209,7 @@ int driver_process_usb_packet(uint16_t read) {
         }
 
         if (ctap_req->init.cmd == CTAPHID_INIT) {
-            init_fido();
+            init_fido(false);
             ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
             memset(ctap_resp, 0, 64);
             CTAPHID_INIT_REQ *req = (CTAPHID_INIT_REQ *)ctap_req->init.data;

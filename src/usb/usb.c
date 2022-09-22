@@ -150,15 +150,14 @@ static int usb_event_handle() {
 }
 
 extern void low_flash_init();
-static void card_init_core1(void) {
-    low_flash_init();
+void card_init_core1() {
+    low_flash_init_core1();
 }
 
 size_t finished_data_size = 0;
 
 void card_start(void (*func)(void)) {
     multicore_reset_core1();
-    card_init_core1();
     multicore_launch_core1(func);
     led_set_blink(BLINK_MOUNTED);
 }

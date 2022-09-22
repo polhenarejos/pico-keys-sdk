@@ -127,6 +127,7 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
 
 void apdu_thread() {
 
+    card_init_core1();
     while (1) {
         uint32_t m;
         queue_remove_blocking(&usb_to_card_q, &m);

@@ -96,8 +96,7 @@ uint16_t send_buffer_size = 0;
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, /*uint16_t*/ uint8_t len) {
     uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4]+1;
-    if (send_buffer_size > 0)
-    {
+    if (send_buffer_size > 0) {
         ctap_resp->cid = ctap_req->cid;
         ctap_resp->cont.seq = seq;
         hid_write_offset(64, (uint8_t *)ctap_resp - (usb_get_tx()));
@@ -309,13 +308,14 @@ int driver_process_usb_packet(uint16_t read) {
 }
 
 void send_keepalive() {
-    ctap_resp = (CTAPHID_FRAME *)(usb_get_tx()+4096);
-    memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
-    ctap_resp->cid = ctap_req->cid;
-    ctap_resp->init.cmd = CTAPHID_KEEPALIVE;
-    ctap_resp->init.bcntl = 1;
-    ctap_resp->init.data[0] = is_req_button_pending() ? 2 : 1;
-    hid_write_offset(64,4096);
+    CTAPHID_FRAME *resp = (CTAPHID_FRAME *)(usb_get_tx() + 4096);
+    //memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
+    resp->cid = ctap_req->cid;
+    resp->init.cmd = CTAPHID_KEEPALIVE;
+    resp->init.bcntl = 1;
+    resp->init.data[0] = is_req_button_pending() ? 2 : 1;
+    send_buffer_size = 0;
+    hid_write_offset(64, 4096);
 }
 
 void driver_exec_timeout() {

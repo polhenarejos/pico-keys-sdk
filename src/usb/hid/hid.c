@@ -146,6 +146,7 @@ uint32_t lock = 0;
 
 uint8_t thread_type = 0; //1 is APDU, 2 is CBOR
 extern void cbor_thread();
+extern bool cancel_button;
 
 int driver_process_usb_nopacket() {
     if (last_packet_time > 0 && last_packet_time+500 < board_millis()) {
@@ -294,6 +295,12 @@ int driver_process_usb_packet(uint16_t read) {
             last_packet_time = 0;
             if (apdu_sent < 0)
                 return ctap_error(-apdu_sent);
+        }
+        else if (ctap_req->init.cmd == CTAPHID_CANCEL) {
+            ctap_error(0x2D);
+            msg_packet.len = msg_packet.current_len = 0;
+            last_packet_time = 0;
+            cancel_button = true;
         }
         else {
             if (msg_packet.len == 0)

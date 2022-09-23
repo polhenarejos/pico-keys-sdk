@@ -74,13 +74,15 @@ bool is_req_button_pending() {
 }
 
 uint32_t button_timeout = 15000;
+bool cancel_button = false;
 
 bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
+    cancel_button = false;
     led_set_blink((1000 << 16) | 100);
     req_button_pending = true;
-    while (board_button_read() == false) {
+    while (board_button_read() == false && cancel_button == false) {
         execute_tasks();
         //sleep_ms(10);
         if (start_button + button_timeout < board_millis()) { /* timeout */
@@ -89,7 +91,7 @@ bool wait_button() {
         }
     }
     if (!timeout) {
-        while (board_button_read() == true) {
+        while (board_button_read() == true && cancel_button == false) {
             execute_tasks();
             //sleep_ms(10);
             if (start_button + 15000 < board_millis()) { /* timeout */
@@ -100,7 +102,7 @@ bool wait_button() {
     }
     led_set_blink(BLINK_PROCESSING);
     req_button_pending = false;
-    return timeout;
+    return timeout || cancel_button;
 }
 
 struct apdu apdu;

@@ -149,6 +149,10 @@ size_t driver_read(uint8_t *buffer, size_t buffer_size) {
     return tud_vendor_read(buffer, buffer_size);
 }
 
+int driver_process_usb_nopacket() {
+    return 0;
+}
+
 int driver_process_usb_packet(uint16_t rx_read) {
     if (rx_read >= 10)
     {

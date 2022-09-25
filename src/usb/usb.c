@@ -71,7 +71,7 @@ size_t usb_rx(const uint8_t *buffer, size_t len) {
 
 uint32_t usb_write_flush() {
     int w = 0;
-    if (w_len > 0 && tud_vendor_write_available() > 0) {
+    if (w_len > 0) {
         w = driver_write(tx_buffer+tx_r_offset, MIN(w_len, 64));
         tx_r_offset += w;
         w_len -= w;

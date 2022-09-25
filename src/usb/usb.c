@@ -46,14 +46,15 @@ void usb_set_timeout_counter(uint32_t v) {
 
 uint32_t usb_write_offset(uint16_t len, uint16_t offset) {
     uint8_t pkt_max = 64;
+    int w = 0;
     if (len > sizeof(tx_buffer))
         len = sizeof(tx_buffer);
     w_len = len;
     tx_r_offset = offset;
-    driver_write(tx_buffer+offset, MIN(len, pkt_max));
-    w_len -= MIN(len, pkt_max);
-    tx_r_offset += MIN(len, pkt_max);
-    return MIN(w_len, pkt_max);
+    w = driver_write(tx_buffer+offset, MIN(len, pkt_max));
+    w_len -= w;
+    tx_r_offset += w;
+    return w;
 }
 
 size_t usb_rx(const uint8_t *buffer, size_t len) {
@@ -69,12 +70,13 @@ size_t usb_rx(const uint8_t *buffer, size_t len) {
 }
 
 uint32_t usb_write_flush() {
-    if (w_len > 0) {
-        driver_write(tx_buffer+tx_r_offset, MIN(w_len, 64));
-        tx_r_offset += MIN(w_len, 64);
-        w_len -= MIN(w_len, 64);
+    int w = 0;
+    if (w_len > 0 && tud_vendor_write_available() > 0) {
+        w = driver_write(tx_buffer+tx_r_offset, MIN(w_len, 64));
+        tx_r_offset += w;
+        w_len -= w;
     }
-    return w_len;
+    return w;
 }
 
 uint32_t usb_write(uint16_t len) {

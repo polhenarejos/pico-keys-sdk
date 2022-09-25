@@ -332,6 +332,7 @@ void driver_exec_timeout() {
 uint8_t *driver_prepare_response() {
     ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
     apdu.rdata = ctap_resp->init.data;
+    send_buffer_size = 0;
     memset(usb_get_tx(), 0, 4096);
     return ctap_resp->init.data;
 }

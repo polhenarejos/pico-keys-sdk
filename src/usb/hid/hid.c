@@ -326,7 +326,8 @@ void send_keepalive() {
 }
 
 void driver_exec_timeout() {
-    send_keepalive();
+    if (thread_type == 2)
+        send_keepalive();
 }
 
 uint8_t *driver_prepare_response() {
@@ -338,10 +339,12 @@ uint8_t *driver_prepare_response() {
 }
 
 void driver_exec_finished(size_t size_next) {
-    if (thread_type == 2 && apdu.sw != 0)
-        ctap_error(apdu.sw & 0xff);
-    else
-        driver_exec_finished_cont(size_next, 7);
+    if (size_next > 0) {
+        if (thread_type == 2 && apdu.sw != 0)
+            ctap_error(apdu.sw & 0xff);
+        else
+            driver_exec_finished_cont(size_next, 7);
+    }
     apdu.sw = 0;
 }
 

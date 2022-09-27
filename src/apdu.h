@@ -48,15 +48,17 @@ extern int register_app(app_t * (*)());
             printf("\r\n");\
         } printf("\r\n"); \
     }
-#define DEBUG_DATA(_p, _s)                          \
-    {                                               \
-        printf("Data %s (%d bytes):\r\n", #_p, _s); \
-        for (int _i = 0; _i < _s; _i++)             \
-        {                                           \
-            printf("%02X", (_p)[_i]);                 \
-        }                                           \
-        printf("\n");                               \
-}
+#define DEBUG_DATA(_p, _s)                               \
+    {                                                    \
+        printf("Data %s (%d bytes):\r\n", #_p, _s);      \
+        char *tmp = (char *)calloc(1, 2 * _s + 1); \
+        for (int _i = 0; _i < _s; _i++)                  \
+        {                                                \
+            sprintf(&tmp[2 * _i], "%02X", (_p)[_i]);       \
+        }                                                \
+        printf("%s\n", tmp);                             \
+        free(tmp);                                       \
+    }
 
 #else
 #define DEBUG_PAYLOAD(_p,_s)

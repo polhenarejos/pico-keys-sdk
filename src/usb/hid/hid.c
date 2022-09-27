@@ -95,7 +95,7 @@ void hid_write(uint16_t size) {
 uint16_t send_buffer_size = 0;
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, /*uint16_t*/ uint8_t len) {
-    uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4]+1;
+    uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4] + 1;
     if (send_buffer_size > 0) {
         ctap_resp->cid = ctap_req->cid;
         ctap_resp->cont.seq = seq;
@@ -106,8 +106,8 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, /*uint1
 }
 
 int driver_write(const uint8_t *buffer, size_t buffer_size) {
-    int ret = tud_hid_report(0, buffer, buffer_size);
-    return ret;
+    tud_hid_report(0, buffer, buffer_size);
+    return MIN(64, buffer_size);
 }
 
 size_t driver_read(uint8_t *buffer, size_t buffer_size) {

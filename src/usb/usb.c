@@ -54,7 +54,7 @@ uint32_t usb_write_offset(uint16_t len, uint16_t offset) {
     w = driver_write(tx_buffer+offset, MIN(len, pkt_max));
     w_len -= w;
     tx_r_offset += w;
-    return w;
+    return MIN(w_len, pkt_max);
 }
 
 size_t usb_rx(const uint8_t *buffer, size_t len) {
@@ -182,9 +182,9 @@ void usb_task() {
         //    printf("\r\n ------ M = %lu\r\n",m);
         if (has_m) {
             if (m == EV_EXEC_FINISHED) {
+                timeout_stop();
                 driver_exec_finished(finished_data_size);
                 led_set_blink(BLINK_MOUNTED);
-                timeout_stop();
             }
             else if (m == EV_PRESS_BUTTON) {
         	    uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;

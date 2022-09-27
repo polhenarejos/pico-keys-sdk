@@ -169,18 +169,20 @@ void apdu_finish() {
 }
 
 size_t apdu_next() {
-    if (apdu.rlen <= apdu.ne)
-        return apdu.rlen + 2;
-    else {
-        rdata_gr = apdu.rdata+apdu.ne;
-        rdata_bk = *(uint16_t *)rdata_gr;
-        rdata_gr[0] = 0x61;
-        if (apdu.rlen - apdu.ne >= 256)
-            rdata_gr[1] = 0;
-        else
-            rdata_gr[1] = apdu.rlen - apdu.ne;
-        apdu.rlen -= apdu.ne;
+    if (apdu.sw != 0) {
+        if (apdu.rlen <= apdu.ne)
+            return apdu.rlen + 2;
+        else {
+            rdata_gr = apdu.rdata+apdu.ne;
+            rdata_bk = *(uint16_t *)rdata_gr;
+            rdata_gr[0] = 0x61;
+            if (apdu.rlen - apdu.ne >= 256)
+                rdata_gr[1] = 0;
+            else
+                rdata_gr[1] = apdu.rlen - apdu.ne;
+            apdu.rlen -= apdu.ne;
+        }
+        return apdu.ne + 2;
     }
-    return apdu.ne + 2;
+    return 0;
 }
-

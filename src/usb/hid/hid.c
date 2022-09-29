@@ -248,7 +248,11 @@ int driver_process_usb_packet(uint16_t read) {
             }
             else {
                 memcpy(ctap_resp->init.data, ctap_req->init.data, MSG_LEN(ctap_req));
-                driver_exec_finished(MSG_LEN(ctap_req));
+                ctap_resp->cid = ctap_req->cid;
+                ctap_resp->init.cmd = last_cmd;
+                ctap_resp->init.bcnth = MSG_LEN(ctap_req) >> 8;
+                ctap_resp->init.bcntl = MSG_LEN(ctap_req) & 0xff;
+                hid_write(64);
             }
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;

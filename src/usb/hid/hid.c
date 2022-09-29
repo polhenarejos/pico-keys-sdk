@@ -82,31 +82,38 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
   return 0;
 }
 
-void hid_write_offset(uint16_t size, uint16_t offset) {
+uint32_t hid_write_offset(uint16_t size, uint16_t offset) {
     if (*usb_get_tx() != 0x81)
         DEBUG_PAYLOAD(usb_get_tx()+offset, size);
-    usb_write_offset(size, offset);
+    return usb_write_offset(size, offset);
 }
 
-void hid_write(uint16_t size) {
-    hid_write_offset(size, 0);
+uint32_t hid_write(uint16_t size) {
+    return hid_write_offset(size, 0);
 }
 
 uint16_t send_buffer_size = 0;
+bool last_write_result = false;
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, /*uint16_t*/ uint8_t len) {
     uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4] + 1;
     if (send_buffer_size > 0) {
-        ctap_resp->cid = ctap_req->cid;
-        ctap_resp->cont.seq = seq;
-        hid_write_offset(64, (uint8_t *)ctap_resp - (usb_get_tx()));
-        send_buffer_size -= MIN(64 - 5, send_buffer_size);
-        ctap_resp = (CTAPHID_FRAME *)((uint8_t *)ctap_resp + 64 - 5);
+        if (last_write_result == true) {
+            ctap_resp->cid = ctap_req->cid;
+            ctap_resp->cont.seq = seq;
+        }
+        if (hid_write_offset(64, (uint8_t *)ctap_resp - (usb_get_tx())) > 0) {
+            send_buffer_size -= MIN(64 - 5, send_buffer_size);
+            ctap_resp = (CTAPHID_FRAME *)((uint8_t *)ctap_resp + 64 - 5);
+        }
     }
 }
 
 int driver_write(const uint8_t *buffer, size_t buffer_size) {
-    tud_hid_report(0, buffer, buffer_size);
+    last_write_result = tud_hid_report(0, buffer, buffer_size);
+    printf("result %d\n", last_write_result);
+    if (last_write_result == false)
+        return 0;
     return MIN(64, buffer_size);
 }
 
@@ -359,9 +366,10 @@ void driver_exec_finished_cont(size_t size_next, size_t offset) {
     ctap_resp->init.cmd = last_cmd;
     ctap_resp->init.bcnth = size_next >> 8;
     ctap_resp->init.bcntl = size_next & 0xff;
-    hid_write_offset(64, offset);
-    ctap_resp = (CTAPHID_FRAME *)((uint8_t *)ctap_resp + 64 - 5);
-
     send_buffer_size = size_next;
-    send_buffer_size -= MIN(64-7, send_buffer_size);
+    if (hid_write_offset(64, offset) > 0) {
+        ctap_resp = (CTAPHID_FRAME *)((uint8_t *)ctap_resp + 64 - 5);
+
+        send_buffer_size -= MIN(64-7, send_buffer_size);
+    }
 }

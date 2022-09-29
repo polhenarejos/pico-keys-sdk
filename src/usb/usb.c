@@ -54,7 +54,7 @@ uint32_t usb_write_offset(uint16_t len, uint16_t offset) {
     w = driver_write(tx_buffer+offset, MIN(len, pkt_max));
     w_len -= w;
     tx_r_offset += w;
-    return MIN(w_len, pkt_max);
+    return w;
 }
 
 size_t usb_rx(const uint8_t *buffer, size_t len) {

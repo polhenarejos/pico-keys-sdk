@@ -430,3 +430,13 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
 bool file_has_data(file_t *f) {
     return (f != NULL && f->data != NULL && file_get_size(f) > 0);
 }
+
+int delete_file(file_t *ef) {
+    meta_delete(ef->fid);
+    if (flash_clear_file(ef) != CCID_OK)
+        return CCID_EXEC_ERROR;
+    if (delete_dynamic_file(ef) != CCID_OK)
+        return CCID_EXEC_ERROR;
+    low_flash_available();
+    return CCID_OK;
+}

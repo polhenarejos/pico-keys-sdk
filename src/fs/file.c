@@ -395,10 +395,17 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 uint8_t *tpos = p-asn1_len_tag(tag, tag_len);
                 memmove(tpos, p, fdata+ef_size-p);
                 tpos += fdata+ef_size-p;
-                uintptr_t meta_offset = tpos-fdata;
+                volatile uintptr_t meta_offset = tpos-fdata;
                 ef_size += len - (tag_len-2);
-                if (len > tag_len-2)
-                    fdata = (uint8_t *)realloc(fdata, ef_size);
+                if (len > tag_len-2) {
+                    uint8_t *fdata_new = (uint8_t *)realloc(fdata, ef_size);
+                    if (fdata_new != NULL)
+                        fdata = fdata_new;
+                    else {
+                        free(fdata);
+                        return CCID_ERR_MEMORY_FATAL;
+                    }
+                }
                 uint8_t *f = fdata+meta_offset;
                 *f++ = fid & 0xff;
                 f += format_tlv_len(len+2, f);

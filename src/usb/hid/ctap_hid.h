@@ -91,6 +91,7 @@ typedef struct {
 #define CTAPHID_ERROR        (TYPE_INIT | 0x3F)  // Error response
 
 #define CTAPHID_VENDOR_FIRST (TYPE_INIT | 0x40)  // First vendor defined command
+#define CTAPHID_VD_PROTECT   (TYPE_INIT | 0x41)  //
 #define CTAPHID_VENDOR_LAST  (TYPE_INIT | 0x7F)  // Last vendor defined command
 
 // CTAP_KEEPALIVE command defines

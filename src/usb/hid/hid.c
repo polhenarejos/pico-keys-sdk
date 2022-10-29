@@ -24,7 +24,7 @@
 #include "bsp/board.h"
 
 static bool mounted = false;
-extern int cbor_process(const uint8_t *, size_t);
+extern int cbor_process(uint8_t, const uint8_t *, size_t);
 extern void init_fido(bool);
 
 typedef struct msg_packet {
@@ -293,15 +293,15 @@ int driver_process_usb_packet(uint16_t read) {
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
         }
-        else if (last_cmd == CTAPHID_CBOR && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
+        else if ((last_cmd == CTAPHID_CBOR || (last_cmd >= CTAPHID_VENDOR_FIRST && last_cmd <= CTAPHID_VENDOR_LAST)) && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
 
             if (thread_type != 2)
                 card_start(cbor_thread);
             thread_type = 2;
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
-                apdu_sent = cbor_process(msg_packet.data, msg_packet.len);
+                apdu_sent = cbor_process(last_cmd, msg_packet.data, msg_packet.len);
             else
-                apdu_sent = cbor_process(ctap_req->init.data, MSG_LEN(ctap_req));
+                apdu_sent = cbor_process(last_cmd, ctap_req->init.data, MSG_LEN(ctap_req));
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
             if (apdu_sent < 0)

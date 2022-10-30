@@ -106,8 +106,10 @@ int sm_unwrap() {
             }
         }
     }
-    if (!body)
-        return CCID_WRONG_DATA;
+    if (!body) {
+        apdu.nc = 0;
+        return CCID_OK;
+    }
     if (is87 && *body++ != 0x1) {
         return CCID_WRONG_PADDING;
     }

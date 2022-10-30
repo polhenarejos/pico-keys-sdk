@@ -90,6 +90,10 @@ size_t apdu_process(const uint8_t *buffer, size_t buffer_size) {
         *(uint16_t *)rdata_gr = rdata_bk;
         if (apdu.rlen <= apdu.ne) {
             driver_exec_finished_cont(apdu.rlen+2, rdata_gr-usb_get_tx());
+            //Prepare next RAPDU
+            apdu.sw = 0;
+            apdu.rlen = 0;
+            usb_prepare_response();
         }
         else {
             rdata_gr += apdu.ne;
@@ -102,10 +106,6 @@ size_t apdu_process(const uint8_t *buffer, size_t buffer_size) {
             driver_exec_finished_cont(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx());
             apdu.rlen -= apdu.ne;
         }
-        //Prepare next RAPDU
-        apdu.sw = 0;
-        apdu.rlen = 0;
-        usb_prepare_response();
         return 0;
     }
     else {

@@ -76,6 +76,7 @@ if (NOT TARGET pico_hsm_sdk)
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md5.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/oid.c
+            ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkcs5.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/platform_util.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/rsa.c

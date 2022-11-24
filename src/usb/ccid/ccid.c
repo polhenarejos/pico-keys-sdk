@@ -154,8 +154,7 @@ int driver_process_usb_nopacket() {
 }
 
 int driver_process_usb_packet(uint16_t rx_read) {
-    if (rx_read >= 10)
-    {
+    if (rx_read >= 10) {
         //printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
         if (ccid_header->dwLength <= rx_read-10) {
             size_t apdu_sent = 0;
@@ -185,6 +184,8 @@ int driver_process_usb_packet(uint16_t rx_read) {
                 ccid_write(size_atr);
             }
             else if (ccid_header->bMessageType == 0x63) {
+                if (ccid_status == 0)
+                    card_exit(0);
                 ccid_status = 1;
                 ccid_response->bMessageType = CCID_SLOT_STATUS_RET;
                 ccid_response->dwLength = 0;
@@ -192,7 +193,6 @@ int driver_process_usb_packet(uint16_t rx_read) {
                 ccid_response->bSeq = ccid_header->bSeq;
                 ccid_response->abRFU0 = ccid_status;
                 ccid_response->abRFU1 = 0;
-                card_exit();
                 ccid_write(0);
             }
             else if (ccid_header->bMessageType == 0x6F) {

@@ -126,23 +126,18 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
 }
 
 void apdu_thread() {
-
     card_init_core1();
     while (1) {
-        uint32_t m;
+        uint32_t m = 0;
         queue_remove_blocking(&usb_to_card_q, &m);
 
-        if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE)
-	    {
+        if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE){
 	        set_res_sw (0x6f, 0x00);
 	        goto done;
 	    }
         else if (m == EV_EXIT) {
-            if (current_app && current_app->unload) {
-                current_app->unload();
-            }
-	        break;
-	    }
+            break;
+        }
 
         process_apdu();
 
@@ -154,8 +149,9 @@ void apdu_thread() {
         queue_add_blocking(&card_to_usb_q, &flag);
     }
     //printf("EXIT !!!!!!\r\n");
-    if (current_app && current_app->unload)
+    if (current_app && current_app->unload) {
         current_app->unload();
+    }
 }
 
 void apdu_finish() {

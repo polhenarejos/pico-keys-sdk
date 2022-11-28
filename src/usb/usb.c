@@ -159,6 +159,15 @@ void card_init_core1() {
 size_t finished_data_size = 0;
 
 void card_start(void (*func)(void)) {
+    uint32_t m = 0;
+    while (queue_is_empty(&usb_to_card_q) == false) {
+        if (queue_try_remove(&usb_to_card_q, &m) == false)
+            break;
+    }
+    while (queue_is_empty(&card_to_usb_q) == false) {
+        if (queue_try_remove(&card_to_usb_q, &m) == false)
+            break;
+    }
     multicore_reset_core1();
     multicore_launch_core1(func);
     led_set_blink(BLINK_MOUNTED);

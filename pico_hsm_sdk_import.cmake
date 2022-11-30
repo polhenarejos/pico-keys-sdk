@@ -107,6 +107,7 @@ if (NOT TARGET pico_hsm_sdk)
                 ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
+                ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_csr.c
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk.c
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
                 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c

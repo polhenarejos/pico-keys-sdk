@@ -40,10 +40,4 @@ enum ccid_state {
 
 extern const uint8_t *ccid_atr;
 
-extern uint8_t *usb_get_rx();
-extern uint8_t *usb_get_tx();
-extern uint32_t usb_write_offset(uint16_t len, uint16_t offset);
-extern uint16_t usb_read_available();
-extern void usb_clear_rx();
-extern uint32_t usb_write_flush();
 #endif //_CCID_H_

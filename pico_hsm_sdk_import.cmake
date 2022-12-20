@@ -26,9 +26,7 @@ add_definitions(-DUSB_PID=${USB_PID})
 if (NOT DEFINED DEBUG_APDU)
     set(DEBUG_APDU 0)
 endif()
-if (NOT DEFINED HSM_DRIVER)
-    set(HSM_DRIVER "ccid")
-endif()
+
 option(ENABLE_DELAYED_BOOT "Enable/disable delayed boot" OFF)
 if(ENABLE_DELAYED_BOOT)
     add_definitions(-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64)
@@ -36,10 +34,18 @@ if(ENABLE_DELAYED_BOOT)
 else()
     message("Disabling delayed boot")
 endif(ENABLE_DELAYED_BOOT)
+if(USB_ITF_HID)
+    add_definitions(-DUSB_ITF_HID=1)
+    message("Enabling USB HID interface")
+endif(USB_ITF_HID)
+if(USB_ITF_CCID)
+    add_definitions(-DUSB_ITF_CCID=1)
+    message("Enabling USB CCID interface")
+endif(USB_ITF_CCID)
 add_definitions(-DDEBUG_APDU=${DEBUG_APDU})
+
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include/mbedtls COPYONLY)
 
-message(STATUS "HSM driver: ${HSM_DRIVER}")
 message(STATUS "USB VID/PID: ${USB_VID}:${USB_PID}")
 
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include/mbedtls COPYONLY)
@@ -50,6 +56,7 @@ if (NOT TARGET pico_hsm_sdk)
     target_sources(pico_hsm_sdk INTERFACE
             ${CMAKE_CURRENT_LIST_DIR}/src/main.c
             ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
+            ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
             ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
             ${CMAKE_CURRENT_LIST_DIR}/src/fs/flash.c
             ${CMAKE_CURRENT_LIST_DIR}/src/fs/low_flash.c
@@ -89,19 +96,17 @@ if (NOT TARGET pico_hsm_sdk)
             ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
             )
 
-    if (${HSM_DRIVER} STREQUAL "ccid")
+    if (${USB_ITF_CCID})
         target_sources(pico_hsm_sdk INTERFACE
-                ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/usb_descriptors.c
                 ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
                 )
-
         target_include_directories(pico_hsm_sdk INTERFACE
                 ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid
                 )
-    elseif (${HSM_DRIVER} STREQUAL "hid")
+    endif()
+    if (${USB_ITF_HID})
         target_sources(pico_hsm_sdk INTERFACE
                 ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
-                ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/usb_descriptors.c
                 ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
                 ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser.c
                 ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c

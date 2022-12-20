@@ -42,7 +42,7 @@ int process_apdu() {
     return set_res_sw(0x6D, 0x00);
 }
 
-size_t apdu_process(const uint8_t *buffer, size_t buffer_size) {
+size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
     apdu.header = (uint8_t *)buffer;
     apdu.nc = apdu.ne = 0;
     if (buffer_size == 4) {
@@ -89,11 +89,18 @@ size_t apdu_process(const uint8_t *buffer, size_t buffer_size) {
         timeout_stop();
         *(uint16_t *)rdata_gr = rdata_bk;
         if (apdu.rlen <= apdu.ne) {
-            driver_exec_finished_cont(apdu.rlen+2, rdata_gr-usb_get_tx());
+#ifdef USB_ITF_HID
+            if (itf == ITF_HID)
+                driver_exec_finished_cont_hid(apdu.rlen+2, rdata_gr-usb_get_tx(itf));
+#endif
+#ifdef USB_ITF_CCID
+            if (itf == ITF_CCID)
+                driver_exec_finished_cont_ccid(apdu.rlen+2, rdata_gr-usb_get_tx(itf));
+#endif
             //Prepare next RAPDU
             apdu.sw = 0;
             apdu.rlen = 0;
-            usb_prepare_response();
+            usb_prepare_response(itf);
         }
         else {
             rdata_gr += apdu.ne;
@@ -103,7 +110,18 @@ size_t apdu_process(const uint8_t *buffer, size_t buffer_size) {
                 rdata_gr[1] = 0;
             else
                 rdata_gr[1] = apdu.rlen - apdu.ne;
-            driver_exec_finished_cont(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx());
+            if (card_locked_itf == ITF_TOTAL)
+                printf("CRITICAL ERROR: CARD LOCKED WITHOUT ITF\n");
+            else {
+#ifdef USB_ITF_HID
+                if (itf == ITF_HID)
+                    driver_exec_finished_cont_hid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(card_locked_itf));
+#endif
+#ifdef USB_ITF_CCID
+                if (itf == ITF_CCID)
+                    driver_exec_finished_cont_ccid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(card_locked_itf));
+#endif
+            }
             apdu.rlen -= apdu.ne;
         }
         return 0;
@@ -111,7 +129,7 @@ size_t apdu_process(const uint8_t *buffer, size_t buffer_size) {
     else {
         apdu.sw = 0;
         apdu.rlen = 0;
-        apdu.rdata = usb_prepare_response();
+        apdu.rdata = usb_prepare_response(itf);
         rdata_gr = apdu.rdata;
         return 1;
     }

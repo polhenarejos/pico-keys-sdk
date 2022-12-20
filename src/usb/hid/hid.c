@@ -40,27 +40,25 @@ void tud_mount_cb()
     mounted = true;
 }
 
-bool driver_mounted() {
+bool driver_mounted_hid() {
     return mounted;
 }
 
 CTAPHID_FRAME *ctap_req = NULL, *ctap_resp = NULL;
 
-int driver_init() {
+int driver_init_hid() {
     tud_init(BOARD_TUD_RHPORT);
-    ctap_req = (CTAPHID_FRAME *)usb_get_rx();
+    ctap_req = (CTAPHID_FRAME *)usb_get_rx(ITF_HID);
     apdu.header = ctap_req->init.data;
 
-    ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+    ctap_resp = (CTAPHID_FRAME *)usb_get_tx(ITF_HID);
     apdu.rdata = ctap_resp->init.data;
 
-    usb_set_timeout_counter(200);
+    usb_set_timeout_counter(ITF_HID, 200);
 
     return 0;
 }
-void driver_task() {
-    tud_task(); // tinyusb device task
-}
+
 //--------------------------------------------------------------------+
 // USB HID
 //--------------------------------------------------------------------+
@@ -83,9 +81,9 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
 }
 
 uint32_t hid_write_offset(uint16_t size, uint16_t offset) {
-    if (*usb_get_tx() != 0x81)
-        DEBUG_PAYLOAD(usb_get_tx()+offset, size);
-    return usb_write_offset(size, offset);
+    if (*usb_get_tx(ITF_HID) != 0x81)
+        DEBUG_PAYLOAD(usb_get_tx(ITF_HID)+offset, size);
+    return usb_write_offset(ITF_HID, size, offset);
 }
 
 uint32_t hid_write(uint16_t size) {
@@ -102,14 +100,14 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, /*uint1
             ctap_resp->cid = ctap_req->cid;
             ctap_resp->cont.seq = seq;
         }
-        if (hid_write_offset(64, (uint8_t *)ctap_resp - (usb_get_tx())) > 0) {
+        if (hid_write_offset(64, (uint8_t *)ctap_resp - (usb_get_tx(ITF_HID))) > 0) {
             send_buffer_size -= MIN(64 - 5, send_buffer_size);
             ctap_resp = (CTAPHID_FRAME *)((uint8_t *)ctap_resp + 64 - 5);
         }
     }
 }
 
-int driver_write(const uint8_t *buffer, size_t buffer_size) {
+int driver_write_hid(const uint8_t *buffer, size_t buffer_size) {
     last_write_result = tud_hid_report(0, buffer, buffer_size);
     printf("result %d\n", last_write_result);
     if (last_write_result == false)
@@ -117,31 +115,31 @@ int driver_write(const uint8_t *buffer, size_t buffer_size) {
     return MIN(64, buffer_size);
 }
 
-size_t driver_read(uint8_t *buffer, size_t buffer_size) {
+size_t driver_read_hid(uint8_t *buffer, size_t buffer_size) {
     return 0;
 }
 
 // Invoked when received SET_REPORT control request or
 // received data on OUT endpoint ( Report ID = 0, Type = 0 )
-void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize)
-{
-  // This example doesn't use multiple report and report ID
-  (void) itf;
-  (void) report_id;
-  (void) report_type;
-  usb_rx(buffer, bufsize);
+void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize) {
+    // This example doesn't use multiple report and report ID
+    (void) itf;
+    (void) report_id;
+    (void) report_type;
+
+    usb_rx(ITF_HID, buffer, bufsize);
 }
 
 uint32_t last_cmd_time = 0, last_packet_time = 0;
 int ctap_error(uint8_t error) {
-    ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+    ctap_resp = (CTAPHID_FRAME *)usb_get_tx(ITF_HID);
     memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
     ctap_resp->cid = ctap_req->cid;
     ctap_resp->init.cmd = CTAPHID_ERROR;
     ctap_resp->init.bcntl = 1;
     ctap_resp->init.data[0] = error;
     hid_write(64);
-    usb_clear_rx();
+    usb_clear_rx(ITF_HID);
     last_packet_time = 0;
     return 0;
 }
@@ -155,7 +153,7 @@ uint8_t thread_type = 0; //1 is APDU, 2 is CBOR
 extern void cbor_thread();
 extern bool cancel_button;
 
-int driver_process_usb_nopacket() {
+int driver_process_usb_nopacket_hid() {
     if (last_packet_time > 0 && last_packet_time+500 < board_millis()) {
         ctap_error(CTAP1_ERR_MSG_TIMEOUT);
         last_packet_time = 0;
@@ -164,12 +162,12 @@ int driver_process_usb_nopacket() {
     return 0;
 }
 
-int driver_process_usb_packet(uint16_t read) {
+int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
-    if (read >= 5)
-    {
+    if (read >= 5) {
+        driver_init_hid();
         last_packet_time = board_millis();
-        DEBUG_PAYLOAD(usb_get_rx(),64);
+        DEBUG_PAYLOAD(usb_get_rx(ITF_HID),64);
         memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
         if (ctap_req->cid == 0x0 || (ctap_req->cid == CID_BROADCAST && ctap_req->init.cmd != CTAPHID_INIT))
             return ctap_error(CTAP1_ERR_INVALID_CHANNEL);
@@ -217,7 +215,7 @@ int driver_process_usb_packet(uint16_t read) {
 
         if (ctap_req->init.cmd == CTAPHID_INIT) {
             init_fido(false);
-            ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            ctap_resp = (CTAPHID_FRAME *)usb_get_tx(ITF_HID);
             memset(ctap_resp, 0, 64);
             CTAPHID_INIT_REQ *req = (CTAPHID_INIT_REQ *)ctap_req->init.data;
             CTAPHID_INIT_RESP *resp = (CTAPHID_INIT_RESP *)ctap_resp->init.data;
@@ -232,7 +230,7 @@ int driver_process_usb_packet(uint16_t read) {
             ctap_resp->init.cmd = CTAPHID_INIT;
             ctap_resp->init.bcntl = 17;
             ctap_resp->init.bcnth = 0;
-            driver_exec_finished(17);
+            driver_exec_finished_hid(17);
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
         }
@@ -240,7 +238,7 @@ int driver_process_usb_packet(uint16_t read) {
             if (MSG_LEN(ctap_req) != 0) {
                 return ctap_error(CTAP1_ERR_INVALID_LEN);
             }
-            ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            ctap_resp = (CTAPHID_FRAME *)usb_get_tx(ITF_HID);
             memcpy(ctap_resp, ctap_req, sizeof(CTAPHID_FRAME));
             sleep_ms(1000); //For blinking the device during 1 seg
             hid_write(64);
@@ -248,10 +246,10 @@ int driver_process_usb_packet(uint16_t read) {
             last_packet_time = 0;
         }
         else if ((last_cmd == CTAPHID_PING || last_cmd == CTAPHID_SYNC) && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
-            ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            ctap_resp = (CTAPHID_FRAME *)usb_get_tx(ITF_HID);
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
                 memcpy(ctap_resp->init.data, msg_packet.data, msg_packet.len);
-                driver_exec_finished(msg_packet.len);
+                driver_exec_finished_hid(msg_packet.len);
             }
             else {
                 memcpy(ctap_resp->init.data, ctap_req->init.data, MSG_LEN(ctap_req));
@@ -270,7 +268,7 @@ int driver_process_usb_packet(uint16_t read) {
             if (ctap_req->init.data[0] > 10)
                 return ctap_error(CTAP1_ERR_INVALID_PARAMETER);
             lock = board_millis() + ctap_req->init.data[0] * 1000;
-            ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+            ctap_resp = (CTAPHID_FRAME *)usb_get_tx(ITF_HID);
             memset(ctap_resp, 0, 64);
             ctap_resp->cid = ctap_req->cid;
             ctap_resp->init.cmd = ctap_req->init.cmd;
@@ -286,9 +284,9 @@ int driver_process_usb_packet(uint16_t read) {
             thread_type = 1;
 
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)
-                apdu_sent = apdu_process(msg_packet.data, msg_packet.len);
+                apdu_sent = apdu_process(ITF_HID, msg_packet.data, msg_packet.len);
             else
-                apdu_sent = apdu_process(ctap_req->init.data, MSG_LEN(ctap_req));
+                apdu_sent = apdu_process(ITF_HID, ctap_req->init.data, MSG_LEN(ctap_req));
             DEBUG_PAYLOAD(apdu.data, (int)apdu.nc);
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
@@ -320,13 +318,13 @@ int driver_process_usb_packet(uint16_t read) {
         // echo back anything we received from host
         //tud_hid_report(0, buffer, bufsize);
         //printf("END\n");
-        usb_clear_rx();
+        usb_clear_rx(ITF_HID);
     }
     return apdu_sent;
 }
 
 void send_keepalive() {
-    CTAPHID_FRAME *resp = (CTAPHID_FRAME *)(usb_get_tx() + 4096);
+    CTAPHID_FRAME *resp = (CTAPHID_FRAME *)(usb_get_tx(ITF_HID) + 4096);
     //memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
     resp->cid = ctap_req->cid;
     resp->init.cmd = CTAPHID_KEEPALIVE;
@@ -336,32 +334,32 @@ void send_keepalive() {
     hid_write_offset(64, 4096);
 }
 
-void driver_exec_timeout() {
+void driver_exec_timeout_hid() {
     if (thread_type == 2)
         send_keepalive();
 }
 
-uint8_t *driver_prepare_response() {
-    ctap_resp = (CTAPHID_FRAME *)usb_get_tx();
+uint8_t *driver_prepare_response_hid() {
+    ctap_resp = (CTAPHID_FRAME *)usb_get_tx(ITF_HID);
     apdu.rdata = ctap_resp->init.data;
     send_buffer_size = 0;
-    memset(usb_get_tx(), 0, 4096);
+    memset(usb_get_tx(ITF_HID), 0, 4096);
     return ctap_resp->init.data;
 }
 
-void driver_exec_finished(size_t size_next) {
+void driver_exec_finished_hid(size_t size_next) {
     if (size_next > 0) {
         if (thread_type == 2 && apdu.sw != 0)
             ctap_error(apdu.sw & 0xff);
         else
-            driver_exec_finished_cont(size_next, 7);
+            driver_exec_finished_cont_hid(size_next, 7);
     }
     apdu.sw = 0;
 }
 
-void driver_exec_finished_cont(size_t size_next, size_t offset) {
+void driver_exec_finished_cont_hid(size_t size_next, size_t offset) {
     offset -= 7;
-    ctap_resp = (CTAPHID_FRAME *)(usb_get_tx() + offset);
+    ctap_resp = (CTAPHID_FRAME *)(usb_get_tx(ITF_HID) + offset);
     ctap_resp->cid = ctap_req->cid;
     ctap_resp->init.cmd = last_cmd;
     ctap_resp->init.bcnth = size_next >> 8;

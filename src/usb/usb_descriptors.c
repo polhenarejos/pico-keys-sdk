@@ -19,6 +19,7 @@
 #include "usb_descriptors.h"
 #include "pico/unique_id.h"
 #include "hsm_version.h"
+#include "usb.h"
 
 #ifndef USB_VID
 #define USB_VID   0xFEFF
@@ -33,32 +34,6 @@
 
 #define	MAX_USB_POWER		1
 
-static const struct ccid_class_descriptor desc_ccid = {
-    .bLength                = sizeof(struct ccid_class_descriptor),
-    .bDescriptorType        = 0x21,
-    .bcdCCID                = (0x0110),
-    .bMaxSlotIndex          = 0,
-    .bVoltageSupport        = 0x01,  // 5.0V
-    .dwProtocols            = (
-                              0x01|  // T=0
-                              0x02), // T=1
-    .dwDefaultClock         = (0xDFC),
-    .dwMaximumClock         = (0xDFC),
-    .bNumClockSupport       = 0,
-    .dwDataRate             = (0x2580),
-    .dwMaxDataRate          = (0x2580),
-    .bNumDataRatesSupported = 0,
-    .dwMaxIFSD              = (0xFE), // IFSD is handled by the real reader driver
-    .dwSynchProtocols       = (0),
-    .dwMechanical           = (0),
-    .dwFeatures             = 0x40840, //USB-ICC, short & extended APDU
-    .dwMaxCCIDMessageLength = 65544+10,
-    .bClassGetResponse      = 0xFF,
-    .bclassEnvelope         = 0xFF,
-    .wLcdLayout             = 0x0,
-    .bPINSupport            = 0x0,
-    .bMaxCCIDBusySlots      = 0x01,
-};
 
 //--------------------------------------------------------------------+
 // Device Descriptors
@@ -90,18 +65,6 @@ uint8_t const * tud_descriptor_device_cb(void)
     return (uint8_t const *) &desc_device;
 }
 
-tusb_desc_interface_t const desc_interface =
-{
-    .bLength            = sizeof(tusb_desc_interface_t),
-    .bDescriptorType    = TUSB_DESC_INTERFACE,
-    .bInterfaceNumber   = 0,
-    .bAlternateSetting  = 0,
-    .bNumEndpoints      = 2,
-    .bInterfaceClass    = TUSB_CLASS_SMART_CARD,
-    .bInterfaceSubClass = 0,
-    .bInterfaceProtocol = 0,
-    .iInterface         = 5,
-};
 
 //--------------------------------------------------------------------+
 // Configuration Descriptor
@@ -111,12 +74,53 @@ tusb_desc_configuration_t const desc_config  =
 {
     .bLength             = sizeof(tusb_desc_configuration_t),
   	.bDescriptorType     = TUSB_DESC_CONFIGURATION,
-    .wTotalLength        = (sizeof(tusb_desc_configuration_t) + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)),
-  	.bNumInterfaces      = 1,
+    .wTotalLength        = (sizeof(tusb_desc_configuration_t) + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)) + TUD_HID_INOUT_DESC_LEN,
+  	.bNumInterfaces      = ITF_TOTAL,
   	.bConfigurationValue = 1,
   	.iConfiguration      = 4,
   	.bmAttributes        = USB_CONFIG_ATT_ONE | TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP,
   	.bMaxPower           = TUSB_DESC_CONFIG_POWER_MA(MAX_USB_POWER+1),
+};
+
+#ifdef USB_ITF_CCID
+static const struct ccid_class_descriptor desc_ccid = {
+    .bLength                = sizeof(struct ccid_class_descriptor),
+    .bDescriptorType        = 0x21,
+    .bcdCCID                = (0x0110),
+    .bMaxSlotIndex          = 0,
+    .bVoltageSupport        = 0x01,  // 5.0V
+    .dwProtocols            = (
+                              0x01|  // T=0
+                              0x02), // T=1
+    .dwDefaultClock         = (0xDFC),
+    .dwMaximumClock         = (0xDFC),
+    .bNumClockSupport       = 0,
+    .dwDataRate             = (0x2580),
+    .dwMaxDataRate          = (0x2580),
+    .bNumDataRatesSupported = 0,
+    .dwMaxIFSD              = (0xFE), // IFSD is handled by the real reader driver
+    .dwSynchProtocols       = (0),
+    .dwMechanical           = (0),
+    .dwFeatures             = 0x40840, //USB-ICC, short & extended APDU
+    .dwMaxCCIDMessageLength = 65544+10,
+    .bClassGetResponse      = 0xFF,
+    .bclassEnvelope         = 0xFF,
+    .wLcdLayout             = 0x0,
+    .bPINSupport            = 0x0,
+    .bMaxCCIDBusySlots      = 0x01,
+};
+
+tusb_desc_interface_t const desc_interface =
+{
+    .bLength            = sizeof(tusb_desc_interface_t),
+    .bDescriptorType    = TUSB_DESC_INTERFACE,
+    .bInterfaceNumber   = ITF_CCID,
+    .bAlternateSetting  = 0,
+    .bNumEndpoints      = 2,
+    .bInterfaceClass    = TUSB_CLASS_SMART_CARD,
+    .bInterfaceSubClass = 0,
+    .bInterfaceProtocol = 0,
+    .iInterface         = ITF_CCID+5,
 };
 
 tusb_desc_endpoint_t const desc_ep1 =
@@ -138,8 +142,65 @@ tusb_desc_endpoint_t const desc_ep2 =
 	.wMaxPacketSize.size = (64),
 	.bInterval           = 0
 };
+#endif
 
-static uint8_t desc_config_extended[sizeof(tusb_desc_configuration_t) + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)];
+static uint8_t desc_config_extended[sizeof(tusb_desc_configuration_t)
+#ifdef USB_ITF_CCID
++ sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)
+#endif
+#ifdef USB_ITF_HID
++ TUD_HID_INOUT_DESC_LEN
+#endif
+];
+
+#ifdef USB_ITF_HID
+#define HID_USAGE_PAGE_FIDO            0xF1D0
+enum
+{
+  HID_USAGE_FIDO_U2FHID   = 0x01, // U2FHID usage for top-level collection
+  HID_USAGE_FIDO_DATA_IN  = 0x20, // Raw IN data report
+  HID_USAGE_FIDO_DATA_OUT = 0x21  // Raw OUT data report
+};
+
+#define TUD_HID_REPORT_DESC_FIDO_U2F(report_size, ...) \
+  HID_USAGE_PAGE_N ( HID_USAGE_PAGE_FIDO, 2                    ) ,\
+  HID_USAGE      ( HID_USAGE_FIDO_U2FHID                       ) ,\
+  HID_COLLECTION ( HID_COLLECTION_APPLICATION                  ) ,\
+    /* Report ID if any */ \
+    __VA_ARGS__ \
+    /* Usage Data In */ \
+    HID_USAGE         ( HID_USAGE_FIDO_DATA_IN                 ) ,\
+    HID_LOGICAL_MIN   ( 0                                      ) ,\
+    HID_LOGICAL_MAX_N ( 0xff, 2                                ) ,\
+    HID_REPORT_SIZE   ( 8                                      ) ,\
+    HID_REPORT_COUNT  ( report_size                            ) ,\
+    HID_INPUT         ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ) ,\
+    /* Usage Data Out */ \
+    HID_USAGE         ( HID_USAGE_FIDO_DATA_OUT                ) ,\
+    HID_LOGICAL_MIN   ( 0                                      ) ,\
+    HID_LOGICAL_MAX_N ( 0xff, 2                                ) ,\
+    HID_REPORT_SIZE   ( 8                                      ) ,\
+    HID_REPORT_COUNT  ( report_size                            ) ,\
+    HID_OUTPUT        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ) ,\
+  HID_COLLECTION_END \
+
+uint8_t const desc_hid_report[] =
+{
+    TUD_HID_REPORT_DESC_FIDO_U2F(CFG_TUD_HID_EP_BUFSIZE)
+};
+#define EPNUM_HID   0x03
+
+static uint8_t desc_hid[] = {
+  // Interface number, string index, protocol, report descriptor len, EP In & Out address, size & polling interval
+  TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID+5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, 0x80 | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10)
+};
+
+uint8_t const * tud_hid_descriptor_report_cb(uint8_t itf)
+{
+  printf("report_cb %d\n", itf);
+  return desc_hid_report;
+}
+#endif
 
 uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 {
@@ -150,10 +211,15 @@ uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
     {
         uint8_t *p = desc_config_extended;
         memcpy(p, &desc_config, sizeof(tusb_desc_configuration_t)); p += sizeof(tusb_desc_configuration_t);
+#ifdef USB_ITF_HID
+        memcpy(p, &desc_hid, sizeof(desc_hid)); p += sizeof(desc_hid);
+#endif
+#ifdef USB_ITF_CCID
         memcpy(p, &desc_interface, sizeof(tusb_desc_interface_t)); p += sizeof(tusb_desc_interface_t);
         memcpy(p, &desc_ccid, sizeof(struct ccid_class_descriptor)); p += sizeof(struct ccid_class_descriptor);
         memcpy(p, &desc_ep1, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
         memcpy(p, &desc_ep2, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
+#endif
         initd = 1;
     }
     return (const uint8_t *)desc_config_extended;
@@ -183,10 +249,15 @@ char const* string_desc_arr [] =
 {
     (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
     "Pol Henarejos",                     // 1: Manufacturer
-    "Pico HSM CCID",                       // 2: Product
+    "Pico Key",                       // 2: Product
     "11223344",                      // 3: Serials, should use chip ID
-    "Pico HSM Config",               // 4: Vendor Interface
-    "Pico HSM Interface"
+    "Pico Key Config"               // 4: Vendor Interface
+#ifdef USB_ITF_HID
+    ,"Pico Key HID Interface"
+#endif
+#ifdef USB_ITF_CCID
+    ,"Pico Key CCID Interface"
+#endif
 };
 
 static uint16_t _desc_str[32];

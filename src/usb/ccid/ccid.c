@@ -105,9 +105,9 @@ uint8_t ccid_status = 1;
 static uint8_t itf_num;
 
 void ccid_write_offset(uint16_t size, uint16_t offset) {
-    if (*usb_get_tx()+offset != 0x81)
-        DEBUG_PAYLOAD(usb_get_tx()+offset,size+10);
-    usb_write_offset(size+10, offset);
+    if (*usb_get_tx(ITF_CCID)+offset != 0x81)
+        DEBUG_PAYLOAD(usb_get_tx(ITF_CCID)+offset,size+10);
+    usb_write_offset(ITF_CCID, size+10, offset);
 }
 
 void ccid_write(uint16_t size) {
@@ -117,14 +117,14 @@ void ccid_write(uint16_t size) {
 struct ccid_header *ccid_response;
 struct ccid_header *ccid_header;
 
-int driver_init() {
-    ccid_header = (struct ccid_header *)usb_get_rx();
+int driver_init_ccid() {
+    ccid_header = (struct ccid_header *)usb_get_rx(ITF_CCID);
     apdu.header = &ccid_header->apdu;
 
-    ccid_response = (struct ccid_header *)usb_get_tx();
+    ccid_response = (struct ccid_header *)usb_get_tx(ITF_CCID);
     apdu.rdata = &ccid_response->apdu;
 
-    usb_set_timeout_counter(1500);
+    usb_set_timeout_counter(ITF_CCID, 1500);
 
     return CCID_OK;
 }
@@ -133,33 +133,34 @@ void tud_vendor_rx_cb(uint8_t itf) {
     (void) itf;
 
     uint32_t len = tud_vendor_available();
-    usb_rx(NULL, len);
+    usb_rx(ITF_CCID, NULL, len);
 }
 
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
     printf("written %ld\n",sent_bytes);
-    usb_write_flush();
+    usb_write_flush(ITF_CCID);
 }
 
-int driver_write(const uint8_t *buffer, size_t buffer_size) {
+int driver_write_ccid(const uint8_t *buffer, size_t buffer_size) {
     return tud_vendor_write(buffer, buffer_size);
 }
 
-size_t driver_read(uint8_t *buffer, size_t buffer_size) {
+size_t driver_read_ccid(uint8_t *buffer, size_t buffer_size) {
     return tud_vendor_read(buffer, buffer_size);
 }
 
-int driver_process_usb_nopacket() {
+int driver_process_usb_nopacket_ccid() {
     return 0;
 }
 
-int driver_process_usb_packet(uint16_t rx_read) {
+int driver_process_usb_packet_ccid(uint16_t rx_read) {
     if (rx_read >= 10) {
+        driver_init_ccid();
         //printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
         if (ccid_header->dwLength <= rx_read-10) {
             size_t apdu_sent = 0;
             if (ccid_header->bMessageType != 0x65)
-                DEBUG_PAYLOAD(usb_get_rx(),usb_read_available());
+                DEBUG_PAYLOAD(usb_get_rx(ITF_CCID),usb_read_available(ITF_CCID));
             if (ccid_header->bMessageType == 0x65) {
                 ccid_response->bMessageType = CCID_SLOT_STATUS_RET;
                 ccid_response->dwLength = 0;
@@ -196,9 +197,9 @@ int driver_process_usb_packet(uint16_t rx_read) {
                 ccid_write(0);
             }
             else if (ccid_header->bMessageType == 0x6F) {
-                apdu_sent = apdu_process(&ccid_header->apdu, ccid_header->dwLength);
+                apdu_sent = apdu_process(ITF_CCID, &ccid_header->apdu, ccid_header->dwLength);
             }
-            usb_clear_rx();
+            usb_clear_rx(ITF_CCID);
             return apdu_sent;
         }
     }
@@ -215,11 +216,11 @@ int driver_process_usb_packet(uint16_t rx_read) {
     return 0;
 }
 
-bool driver_mounted() {
+bool driver_mounted_ccid() {
     return tud_vendor_mounted();
 }
 
-void driver_exec_timeout() {
+void driver_exec_timeout_ccid() {
     ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
     ccid_response->dwLength = 0;
     ccid_response->bSlot = 0;
@@ -229,7 +230,7 @@ void driver_exec_timeout() {
     ccid_write(0);
 }
 
-void driver_exec_finished(size_t size_next) {
+void driver_exec_finished_ccid(size_t size_next) {
     ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
     ccid_response->dwLength = size_next;
     ccid_response->bSlot = 0;
@@ -239,9 +240,9 @@ void driver_exec_finished(size_t size_next) {
     ccid_write(size_next);
 }
 
-void driver_exec_finished_cont(size_t size_next, size_t offset) {
+void driver_exec_finished_cont_ccid(size_t size_next, size_t offset) {
 
-    ccid_response = (struct ccid_header *)(usb_get_tx()+offset-10);
+    ccid_response = (struct ccid_header *)(usb_get_tx(ITF_CCID)+offset-10);
     ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
     ccid_response->dwLength = size_next;
     ccid_response->bSlot = 0;
@@ -251,8 +252,8 @@ void driver_exec_finished_cont(size_t size_next, size_t offset) {
     ccid_write_offset(size_next, offset-10);
 }
 
-uint8_t *driver_prepare_response() {
-    ccid_response = (struct ccid_header *)usb_get_tx();
+uint8_t *driver_prepare_response_ccid() {
+    ccid_response = (struct ccid_header *)usb_get_tx(ITF_CCID);
     return &ccid_response->apdu;
 }
 #define USB_CONFIG_ATT_ONE TU_BIT(7)

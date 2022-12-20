@@ -22,16 +22,9 @@
 #include "pico/unique_id.h"
 #include <string.h>
 
-
-extern int driver_init();
-extern void driver_task();
 extern bool wait_button();
 
 extern void low_flash_init_core1();
-
-extern int driver_write(const uint8_t *, size_t);
-extern size_t driver_read(uint8_t *, size_t);
-extern size_t usb_rx(const uint8_t *buffer, size_t len);
 
 static inline const uint16_t make_uint16_t(uint8_t b1, uint8_t b2) {
     return (b1 << 8) | b2;

@@ -91,7 +91,7 @@ extern struct apdu apdu;
 
 extern uint16_t set_res_sw (uint8_t sw1, uint8_t sw2);
 extern int process_apdu();
-extern size_t apdu_process(const uint8_t *buffer, size_t buffer_size);
+extern size_t apdu_process(uint8_t, const uint8_t *buffer, size_t buffer_size);
 extern void apdu_finish();
 extern size_t apdu_next();
 extern void apdu_thread();

@@ -74,7 +74,14 @@ tusb_desc_configuration_t const desc_config  =
 {
     .bLength             = sizeof(tusb_desc_configuration_t),
   	.bDescriptorType     = TUSB_DESC_CONFIGURATION,
-    .wTotalLength        = (sizeof(tusb_desc_configuration_t) + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)) + TUD_HID_INOUT_DESC_LEN,
+    .wTotalLength        = (sizeof(tusb_desc_configuration_t)
+#ifdef USB_ITF_CCID
+    + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)
+#endif
+#ifdef USB_ITF_HID
+    + TUD_HID_INOUT_DESC_LEN
+#endif
+    ),
   	.bNumInterfaces      = ITF_TOTAL,
   	.bConfigurationValue = 1,
   	.iConfiguration      = 4,

@@ -26,6 +26,8 @@
 #ifndef _TUSB_CONFIG_H_
 #define _TUSB_CONFIG_H_
 
+#include "usb.h"
+
 #ifdef __cplusplus
  extern "C" {
 #endif
@@ -103,9 +105,17 @@
 //------------- CLASS -------------//
 #define CFG_TUD_CDC               0
 #define CFG_TUD_MSC               0
+#ifdef USB_ITF_HID
 #define CFG_TUD_HID               1
+#else
+#define CFG_TUD_HID               0
+#endif
 #define CFG_TUD_MIDI              0
+#ifdef USB_ITF_CCID
 #define CFG_TUD_VENDOR            1
+#else
+#define CFG_TUD_VENDOR            0
+#endif
 
 // HID buffer size Should be sufficient to hold ID (if any) + Data
 #define CFG_TUD_HID_EP_BUFSIZE    64

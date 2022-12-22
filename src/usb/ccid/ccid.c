@@ -178,7 +178,7 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
                 ccid_response->abRFU0 = 0;
                 ccid_response->abRFU1 = 0;
                 //printf("1 %x %x %x || %x %x %x\r\n",ccid_response->apdu,apdu.rdata,ccid_response,ccid_header,ccid_header->apdu,apdu.data);
-                memcpy(apdu.rdata, ccid_atr+1, size_atr);
+                memcpy(&ccid_response->apdu, ccid_atr+1, size_atr);
                 card_start(apdu_thread);
                 ccid_status = 0;
                 ccid_write(size_atr);

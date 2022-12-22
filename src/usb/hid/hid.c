@@ -162,6 +162,8 @@ int driver_process_usb_nopacket_hid() {
     return 0;
 }
 
+extern const uint8_t fido_aid[];
+
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
     if (read >= 5) {
@@ -278,7 +280,13 @@ int driver_process_usb_packet_hid(uint16_t read) {
         }
         else if (last_cmd == CTAPHID_MSG && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
 
-            current_app = apps[0].select_aid(&apps[0]);
+            if (current_app == NULL || memcmp(current_app->aid, fido_aid+1, MIN(current_app->aid[0], fido_aid[0])) != 0) {
+                for (int a = 0; a < num_apps; a++) {
+                    if ((current_app = apps[a].select_aid(&apps[a], fido_aid+1, fido_aid[0]))) {
+                        break;
+                    }
+                }
+            }
             if (thread_type != 1)
                 card_start(apdu_thread);
             thread_type = 1;

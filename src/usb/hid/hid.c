@@ -287,7 +287,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
                     }
                 }
             }
-            if (thread_type != 1)
+            //if (thread_type != 1)
                 card_start(apdu_thread);
             thread_type = 1;
 
@@ -301,7 +301,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
         }
         else if ((last_cmd == CTAPHID_CBOR || (last_cmd >= CTAPHID_VENDOR_FIRST && last_cmd <= CTAPHID_VENDOR_LAST)) && (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
 
-            if (thread_type != 2)
+            //if (thread_type != 2)
                 card_start(cbor_thread);
             thread_type = 2;
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0)

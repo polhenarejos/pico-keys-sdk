@@ -119,7 +119,7 @@ struct ccid_header *ccid_header;
 
 int driver_init_ccid() {
     ccid_header = (struct ccid_header *)usb_get_rx(ITF_CCID);
-    apdu.header = &ccid_header->apdu;
+//    apdu.header = &ccid_header->apdu;
 
     ccid_response = (struct ccid_header *)usb_get_tx(ITF_CCID);
 

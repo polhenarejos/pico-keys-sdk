@@ -122,7 +122,6 @@ int driver_init_ccid() {
     apdu.header = &ccid_header->apdu;
 
     ccid_response = (struct ccid_header *)usb_get_tx(ITF_CCID);
-    apdu.rdata = &ccid_response->apdu;
 
     usb_set_timeout_counter(ITF_CCID, 1500);
 
@@ -254,6 +253,7 @@ void driver_exec_finished_cont_ccid(size_t size_next, size_t offset) {
 
 uint8_t *driver_prepare_response_ccid() {
     ccid_response = (struct ccid_header *)usb_get_tx(ITF_CCID);
+    apdu.rdata = &ccid_response->apdu;
     return &ccid_response->apdu;
 }
 #define USB_CONFIG_ATT_ONE TU_BIT(7)

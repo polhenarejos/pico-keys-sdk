@@ -25,11 +25,18 @@
 typedef struct app {
     const uint8_t *aid;
     int (*process_apdu)();
-    struct app* (*select_aid)();
+    struct app* (*select_aid)(struct app *, const uint8_t *, uint8_t);
     int (*unload)();
 } app_t;
 
-extern int register_app(app_t * (*)());
+extern int register_app(app_t * (*)(app_t *, const uint8_t *, uint8_t));
+
+typedef struct cmd
+{
+    uint8_t ins;
+    int (*cmd_handler)();
+} cmd_t;
+
 
 #if defined(DEBUG_APDU) && DEBUG_APDU == 1
 #define DEBUG_PAYLOAD(_p,_s) { \

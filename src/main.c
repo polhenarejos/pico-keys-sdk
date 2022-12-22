@@ -50,7 +50,7 @@ uint8_t num_apps = 0;
 
 app_t *current_app = NULL;
 
-int register_app(app_t * (*select_aid)()) {
+int register_app(app_t * (*select_aid)(app_t *, const uint8_t *, uint8_t)) {
     if (num_apps < sizeof(apps)/sizeof(app_t)) {
         apps[num_apps].select_aid = select_aid;
         num_apps++;

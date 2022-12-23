@@ -26,13 +26,12 @@ extern uint32_t timeout;
 
 int process_apdu() {
     led_set_blink(BLINK_PROCESSING);
-    if (!current_app)
-    {
-        if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
-            for (int a = 0; a < num_apps; a++) {
-                if ((current_app = apps[a].select_aid(&apps[a], apdu.data, apdu.nc))) {
-                    return set_res_sw(0x90,0x00);
-                }
+    if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
+        if (current_app && current_app->unload)
+            current_app->unload();
+        for (int a = 0; a < num_apps; a++) {
+            if ((current_app = apps[a].select_aid(&apps[a], apdu.data, apdu.nc))) {
+                return set_res_sw(0x90,0x00);
             }
         }
         return set_res_sw(0x6a, 0x82);

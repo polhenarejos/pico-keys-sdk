@@ -284,6 +284,8 @@ file_t *search_dynamic_file(uint16_t fid) {
 }
 
 int delete_dynamic_file(file_t *f) {
+    if (f == NULL)
+        return NULL;
     for (int i = 0; i < dynamic_files; i++) {
         if (dynamic_file[i].fid == f->fid) {
             for (int j = i+1; j < dynamic_files; j++)
@@ -439,6 +441,8 @@ bool file_has_data(file_t *f) {
 }
 
 int delete_file(file_t *ef) {
+    if (ef == NULL)
+        return CCID_OK;
     meta_delete(ef->fid);
     if (flash_clear_file(ef) != CCID_OK)
         return CCID_EXEC_ERROR;

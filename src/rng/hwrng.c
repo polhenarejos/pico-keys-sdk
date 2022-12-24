@@ -168,19 +168,11 @@ uint32_t neug_get() {
     return v;
 }
 
-void neug_wait_full(void) { //should be called only on core1
+void neug_wait_full() {
     struct rng_rb *rb = &the_ring_buffer;
-
+    uint core = get_core_num();
     while (!rb->full) {
-        sleep_ms(1);
-    }
-}
-
-void neug_wait_full_ext(bool blocking) {
-    struct rng_rb *rb = &the_ring_buffer;
-
-    while (!rb->full) {
-        if (blocking == true)
+        if (core == 1)
             sleep_ms(1);
         else
             neug_task();

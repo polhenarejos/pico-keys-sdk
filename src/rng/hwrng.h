@@ -26,8 +26,7 @@
 void neug_init(uint32_t *buf, uint8_t size);
 uint32_t neug_get();
 void neug_flush(void);
-void neug_wait_full(void);
-void neug_wait_full_ext(bool);
+void neug_wait_full();
 void neug_fini(void);
 
 #endif

@@ -285,7 +285,7 @@ file_t *search_dynamic_file(uint16_t fid) {
 
 int delete_dynamic_file(file_t *f) {
     if (f == NULL)
-        return NULL;
+        return CCID_ERR_FILE_NOT_FOUND;
     for (int i = 0; i < dynamic_files; i++) {
         if (dynamic_file[i].fid == f->fid) {
             for (int j = i+1; j < dynamic_files; j++)

@@ -36,7 +36,7 @@ int process_apdu() {
         }
         return set_res_sw(0x6a, 0x82);
     }
-    if (current_app->process_apdu)
+    if (current_app && current_app->process_apdu)
         return current_app->process_apdu();
     return set_res_sw(0x6D, 0x00);
 }

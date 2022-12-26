@@ -87,8 +87,10 @@ bool asn1_find_tag(const uint8_t *data, size_t data_len, uint16_t itag, size_t *
     size_t tlen = 0;
     while (walk_tlv(data, data_len, &p, &tag, &tlen, &tdata)) {
         if (itag == tag) {
-            *tag_data = tdata;
-            *tag_len = tlen;
+            if (tag_data != NULL)
+                *tag_data = tdata;
+            if (tag_len != NULL)
+                *tag_len = tlen;
             return true;
         }
     }

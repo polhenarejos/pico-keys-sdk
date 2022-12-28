@@ -275,7 +275,7 @@ static void ccid_reset_cb(uint8_t rhport) {
 
 static uint16_t ccid_open(uint8_t rhport, tusb_desc_interface_t const *itf_desc, uint16_t max_len) {
     uint8_t *itf_vendor = (uint8_t *)malloc(sizeof(uint8_t)*max_len);
-    TU_LOG1("-------- CCID OPEN\r\n");
+    //TU_LOG1("-------- CCID OPEN\r\n");
     TU_VERIFY(itf_desc->bInterfaceClass == TUSB_CLASS_SMART_CARD && itf_desc->bInterfaceSubClass == 0 && itf_desc->bInterfaceProtocol == 0, 0);
 
     //vendord_open expects a CLASS_VENDOR interface class

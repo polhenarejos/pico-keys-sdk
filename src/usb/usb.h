@@ -39,7 +39,8 @@
 
 enum {
 #ifdef USB_ITF_HID
-    ITF_HID,
+    ITF_HID = 0,
+    ITF_KEYBOARD,
 #endif
 #ifdef USB_ITF_CCID
     ITF_CCID,
@@ -47,6 +48,11 @@ enum {
     ITF_TOTAL
 };
 
+enum
+{
+    REPORT_ID_KEYBOARD = 1,
+    REPORT_ID_COUNT
+};
 
 extern void usb_task();
 extern queue_t usb_to_card_q;

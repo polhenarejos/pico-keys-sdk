@@ -205,7 +205,7 @@ void card_exit() {
     led_set_blink(BLINK_SUSPENDED);
     card_locked_itf = ITF_TOTAL;
 }
-
+extern void hid_task();
 void usb_task() {
     bool mounted = false;
     for (uint8_t itf = 0; itf < ITF_TOTAL; itf++) {
@@ -265,6 +265,7 @@ void usb_task() {
             }
         }
     }
+    hid_task();
 }
 
 void timeout_stop() {

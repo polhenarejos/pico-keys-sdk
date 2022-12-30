@@ -93,9 +93,72 @@ uint32_t hid_write(uint16_t size) {
 uint16_t send_buffer_size = 0;
 bool last_write_result = false;
 
+static uint8_t keyboard_buffer[256];
+static uint8_t keyboard_buffer_len = 0;
+static const uint8_t conv_table[128][2] =  { HID_ASCII_TO_KEYCODE };
+static uint8_t keyboard_w = 0;
+static bool sent_key = false;
+
+void add_keyboard_buffer(const uint8_t *data, size_t data_len) {
+    keyboard_buffer_len = MIN(sizeof(keyboard_buffer), data_len);
+    memcpy(keyboard_buffer, data, keyboard_buffer_len);
+}
+
+static void send_hid_report(uint8_t report_id) {
+    if (!tud_hid_ready())
+        return;
+
+    switch(report_id) {
+        case REPORT_ID_KEYBOARD: {
+            if (keyboard_w < keyboard_buffer_len) {
+                if (sent_key == false) {
+                    uint8_t keycode[6] = { 0 };
+                    uint8_t modifier = 0;
+                    uint8_t chr = keyboard_buffer[keyboard_w];
+                    if (conv_table[chr][0])
+                        modifier = KEYBOARD_MODIFIER_LEFTSHIFT;
+                    keycode[0] = conv_table[chr][1];
+                    if (tud_hid_n_keyboard_report(ITF_KEYBOARD, REPORT_ID_KEYBOARD, modifier, keycode) == true)
+                        sent_key = true;
+                }
+                else {
+                    if (tud_hid_n_keyboard_report(ITF_KEYBOARD, REPORT_ID_KEYBOARD, 0, NULL) == true) {
+                        keyboard_w++;
+                        sent_key = false;
+                    }
+                }
+            }
+            else if (keyboard_w == keyboard_buffer_len && keyboard_buffer_len > 0) {
+                keyboard_w = keyboard_buffer_len = 0;
+            }
+        }
+        break;
+
+        default: break;
+    }
+}
+
+void hid_task(void) {
+    // Poll every 10ms
+    const uint32_t interval_ms = 10;
+    static uint32_t start_ms = 0;
+
+    if (board_millis() - start_ms < interval_ms)
+        return;
+    start_ms += interval_ms;
+
+    // Remote wakeup
+    if ( tud_suspended() && keyboard_buffer_len > 0) {
+        tud_remote_wakeup();
+    }
+    else {
+        send_hid_report(REPORT_ID_KEYBOARD);
+    }
+}
+
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, /*uint16_t*/ uint8_t len) {
-    uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4] + 1;
-    if (send_buffer_size > 0) {
+    if (send_buffer_size > 0 && instance == ITF_HID) {
+        uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4] + 1;
         if (last_write_result == true) {
             ctap_resp->cid = ctap_req->cid;
             ctap_resp->cont.seq = seq;
@@ -108,7 +171,7 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, /*uint1
 }
 
 int driver_write_hid(const uint8_t *buffer, size_t buffer_size) {
-    last_write_result = tud_hid_report(0, buffer, buffer_size);
+    last_write_result = tud_hid_n_report(ITF_HID, 0, buffer, buffer_size);
     printf("result %d\n", last_write_result);
     if (last_write_result == false)
         return 0;
@@ -127,7 +190,7 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
     (void) report_id;
     (void) report_type;
 
-    usb_rx(ITF_HID, buffer, bufsize);
+    usb_rx(itf, buffer, bufsize);
 }
 
 uint32_t last_cmd_time = 0, last_packet_time = 0;

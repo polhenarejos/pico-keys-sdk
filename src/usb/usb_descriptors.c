@@ -79,7 +79,7 @@ tusb_desc_configuration_t const desc_config  =
     + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)
 #endif
 #ifdef USB_ITF_HID
-    + TUD_HID_INOUT_DESC_LEN
+    + TUD_HID_INOUT_DESC_LEN + TUD_HID_DESC_LEN
 #endif
     ),
   	.bNumInterfaces      = ITF_TOTAL,
@@ -156,12 +156,13 @@ static uint8_t desc_config_extended[sizeof(tusb_desc_configuration_t)
 + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) + 2*sizeof(tusb_desc_endpoint_t)
 #endif
 #ifdef USB_ITF_HID
-+ TUD_HID_INOUT_DESC_LEN
++ TUD_HID_INOUT_DESC_LEN + TUD_HID_DESC_LEN
 #endif
 ];
 
 #ifdef USB_ITF_HID
 #define HID_USAGE_PAGE_FIDO            0xF1D0
+
 enum
 {
   HID_USAGE_FIDO_U2FHID   = 0x01, // U2FHID usage for top-level collection
@@ -195,17 +196,28 @@ uint8_t const desc_hid_report[] =
 {
     TUD_HID_REPORT_DESC_FIDO_U2F(CFG_TUD_HID_EP_BUFSIZE)
 };
+uint8_t const desc_hid_report_kb[] =
+{
+    TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD))
+};
 #define EPNUM_HID   0x03
 
 static uint8_t desc_hid[] = {
-  // Interface number, string index, protocol, report descriptor len, EP In & Out address, size & polling interval
-  TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID+5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, 0x80 | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10)
+    TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID+5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, 0x80 | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10)
+};
+
+static uint8_t desc_hid_kb[] = {
+    TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD+5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), 0x80 | (EPNUM_HID+1), 16, 5)
 };
 
 uint8_t const * tud_hid_descriptor_report_cb(uint8_t itf)
 {
-  printf("report_cb %d\n", itf);
-  return desc_hid_report;
+    printf("report_cb %d\n", itf);
+    if (itf == ITF_HID)
+        return desc_hid_report;
+    else if (itf == ITF_KEYBOARD)
+        return desc_hid_report_kb;
+    return NULL;
 }
 #endif
 
@@ -220,6 +232,7 @@ uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
         memcpy(p, &desc_config, sizeof(tusb_desc_configuration_t)); p += sizeof(tusb_desc_configuration_t);
 #ifdef USB_ITF_HID
         memcpy(p, &desc_hid, sizeof(desc_hid)); p += sizeof(desc_hid);
+        memcpy(p, &desc_hid_kb, sizeof(desc_hid_kb)); p += sizeof(desc_hid_kb);
 #endif
 #ifdef USB_ITF_CCID
         memcpy(p, &desc_interface, sizeof(tusb_desc_interface_t)); p += sizeof(tusb_desc_interface_t);
@@ -261,6 +274,7 @@ char const* string_desc_arr [] =
     "Pico Key Config"               // 4: Vendor Interface
 #ifdef USB_ITF_HID
     ,"Pico Key HID Interface"
+    ,"Pico Key HID Keyboard Interface"
 #endif
 #ifdef USB_ITF_CCID
     ,"Pico Key CCID Interface"

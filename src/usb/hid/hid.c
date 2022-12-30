@@ -229,6 +229,7 @@ extern const uint8_t fido_aid[];
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
+    apdu.sw = 0;
     if (read >= 5) {
         driver_init_hid();
         last_packet_time = board_millis();

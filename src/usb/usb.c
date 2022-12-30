@@ -79,7 +79,7 @@ size_t usb_rx(uint8_t itf, const uint8_t *buffer, size_t len) {
 #endif
         }
         else
-            memcpy(rx_buffer + w_offset[itf], buffer, size);
+            memcpy(rx_buffer[itf] + w_offset[itf], buffer, size);
         w_offset[itf] += size;
     }
     return size;
@@ -246,55 +246,6 @@ void usb_task() {
                         uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
                         queue_try_add(&usb_to_card_q, &flag);
                     }
-                    /*
-                    if (m == EV_RX_DATA_READY) {
-                        c->ccid_state = ccid_handle_data(c);
-                        timeout = 0;
-                        c->timeout_cnt = 0;
-                    }
-                    else if (m == EV_EXEC_FINISHED) {
-                        if (c->ccid_state == CCID_STATE_EXECUTE) {
-                            exec_done:
-                            if (c->a->sw == CCID_THREAD_TERMINATED) {
-                                c->sw1sw2[0] = 0x90;
-                                c->sw1sw2[1] = 0x00;
-                                c->state = APDU_STATE_RESULT;
-                                ccid_send_data_block(c);
-                                c->ccid_state = CCID_STATE_EXITED;
-                                c->application = 0;
-                                return;
-                            }
-
-                            c->a->cmd_apdu_data_len = 0;
-                            c->sw1sw2[0] = c->a->sw >> 8;
-                            c->sw1sw2[1] = c->a->sw & 0xff;
-                            if (c->a->res_apdu_data_len <= c->a->expected_res_size) {
-                                c->state = APDU_STATE_RESULT;
-                                ccid_send_data_block(c);
-                                c->ccid_state = CCID_STATE_WAIT;
-                            }
-                            else {
-                                c->state = APDU_STATE_RESULT_GET_RESPONSE;
-                                c->p = c->a->res_apdu_data;
-                                c->len = c->a->res_apdu_data_len;
-                                ccid_send_data_block_gr(c, c->a->expected_res_size);
-                                c->ccid_state = CCID_STATE_WAIT;
-                            }
-                        }
-                        else {
-                            DEBUG_INFO ("ERR05\r\n");
-                        }
-                        led_set_blink(BLINK_MOUNTED);
-                    }
-                    else if (m == EV_TX_FINISHED){
-                        if (c->state == APDU_STATE_RESULT)
-                            ccid_reset(c);
-                        else
-                            c->tx_busy = 0;
-                        if (c->state == APDU_STATE_WAIT_COMMAND || c->state == APDU_STATE_COMMAND_CHAINING || c->state == APDU_STATE_RESULT_GET_RESPONSE)
-                            ccid_prepare_receive(c);
-                    }
-                    */
                 }
                 else {
                     if (timeout > 0) {

@@ -21,7 +21,9 @@
 #define NEUG_PRE_LOOP 32
 
 #include <stdlib.h>
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
+#endif
 
 void neug_init(uint32_t *buf, uint8_t size);
 uint32_t neug_get();

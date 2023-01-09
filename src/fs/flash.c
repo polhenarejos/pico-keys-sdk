@@ -19,8 +19,14 @@
 #include <stdint.h>
 #include <string.h>
 
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
+#else
+#define XIP_BASE                0
+#define FLASH_SECTOR_SIZE       4096
+#define PICO_FLASH_SIZE_BYTES   (8*1024*1024)
+#endif
 #include "hsm.h"
 #include "file.h"
 

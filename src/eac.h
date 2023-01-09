@@ -19,7 +19,9 @@
 #define _EAC_H_
 
 #include <stdlib.h>
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
+#endif
 #include "hsm.h"
 
 typedef enum MSE_protocol {

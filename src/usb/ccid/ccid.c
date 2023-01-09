@@ -44,8 +44,6 @@
 #include "apdu.h"
 #include "usb.h"
 
-const uint8_t *ccid_atr = NULL;
-
 #if MAX_RES_APDU_DATA_SIZE > MAX_CMD_APDU_DATA_SIZE
 #define USB_BUF_SIZE (MAX_RES_APDU_DATA_SIZE+20+9)
 #else

@@ -19,7 +19,12 @@
 #define _ASN1_H_
 
 #include <stdlib.h>
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
+#else
+#include <stdint.h>
+#include <stdbool.h>
+#endif
 
 extern int walk_tlv(const uint8_t *cdata, size_t cdata_len, uint8_t **p, uint16_t *tag, size_t *tag_len, uint8_t **data);
 extern int format_tlv_len(size_t len, uint8_t *out);

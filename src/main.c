@@ -18,11 +18,17 @@
 #include <stdio.h>
 
 // Pico
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
+#else
+#include <sys/time.h>
+#include "emulation.h"
+#endif
 
 // For memcpy
 #include <string.h>
 
+#ifndef ENABLE_EMULATION
 // Include descriptor struct definitions
 //#include "usb_common.h"
 // USB register definitions from pico-sdk
@@ -35,12 +41,16 @@
 #include "hardware/resets.h"
 
 #include "pico/multicore.h"
+#endif
+
 #include "random.h"
 #include "hsm.h"
 #include "apdu.h"
+#ifndef ENABLE_EMULATION
 #include "usb.h"
 #include "hardware/rtc.h"
 #include "bsp/board.h"
+#endif
 
 extern void do_flash();
 extern void low_flash_init();
@@ -49,6 +59,8 @@ app_t apps[4];
 uint8_t num_apps = 0;
 
 app_t *current_app = NULL;
+
+const uint8_t *ccid_atr = NULL;
 
 int register_app(app_t * (*select_aid)(app_t *, const uint8_t *, uint8_t)) {
     if (num_apps < sizeof(apps)/sizeof(app_t)) {
@@ -65,6 +77,15 @@ void led_set_blink(uint32_t mode) {
     blink_interval_ms = mode;
 }
 
+uint32_t timeout = 0;
+void timeout_stop() {
+    timeout = 0;
+}
+
+void timeout_start() {
+    timeout = board_millis();
+}
+
 void execute_tasks();
 
 static bool req_button_pending = false;
@@ -76,6 +97,14 @@ bool is_req_button_pending() {
 uint32_t button_timeout = 15000;
 bool cancel_button = false;
 
+#ifdef ENABLE_EMULATION
+uint32_t board_millis() {
+    struct timeval start;
+    gettimeofday(&start, NULL);
+    return (start.tv_sec * 1000 + start.tv_usec/1000);
+}
+
+#else
 bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
@@ -104,6 +133,7 @@ bool wait_button() {
     req_button_pending = false;
     return timeout || cancel_button;
 }
+#endif
 
 struct apdu apdu;
 
@@ -142,7 +172,7 @@ void led_off_all() {
 }
 
 void init_rtc() {
-
+#ifndef ENABLE_EMULATION
     rtc_init();
     datetime_t dt = {
             .year  = 2020,
@@ -154,19 +184,22 @@ void init_rtc() {
             .sec   = 00
     };
     rtc_set_datetime(&dt);
+#endif
 }
 
 extern void neug_task();
-
-pico_unique_board_id_t unique_id;
+extern void usb_task();
 
 void execute_tasks() {
     usb_task();
+#ifndef ENABLE_EMULATION
     tud_task(); // tinyusb device task
+#endif
     led_blinking_task();
 }
 
 int main(void) {
+#ifndef ENABLE_EMULATION
     usb_init();
 
     board_init();
@@ -191,6 +224,9 @@ int main(void) {
     tusb_init();
 
     //prepare_ccid();
+#else
+    emul_init("127.0.0.1",35963);
+#endif
 
     random_init();
 

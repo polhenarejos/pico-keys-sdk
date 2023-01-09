@@ -18,28 +18,39 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
 
 #include "hwrng.h"
 #include "hardware/structs/rosc.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
-#include "pico/unique_id.h"
+#include "bsp/board.h"
 
 #include "pico/time.h"
-static inline uint32_t board_millis(void)
-{
-    return to_ms_since_boot(get_absolute_time());
-}
+#else
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
+
+mbedtls_ctr_drbg_context ctr_drbg;
+extern uint32_t board_millis();
+#endif
 
 void adc_start() {
+#ifndef ENABLE_EMULATION
     adc_init();
     adc_gpio_init(27);
     adc_select_input(1);
+#endif
 }
 
 void adc_stop() {
 }
+#ifdef ENABLE_EMULATION
+uint32_t adc_read() {
+    return 0;
+}
+#endif
 
 static uint64_t random_word = 0xcbf29ce484222325;
 static uint8_t ep_round = 0;
@@ -47,6 +58,12 @@ static uint8_t ep_round = 0;
 static void ep_init() {
     random_word = 0xcbf29ce484222325;
     ep_round = 0;
+#ifdef ENABLE_EMULATION
+    mbedtls_entropy_context entropy;
+    mbedtls_entropy_init( &entropy );
+    mbedtls_ctr_drbg_init( &ctr_drbg );
+    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) "RANDOM_GEN", 10 );
+#endif
 }
 
 /* Here, we assume a little endian architecture.  */
@@ -55,6 +72,7 @@ static int ep_process () {
         ep_init();
     }
     uint64_t word = 0x0;
+#ifndef ENABLE_EMULATION
     for (int n = 0; n < 64; n++) {
         uint8_t bit1, bit2;
         do
@@ -65,6 +83,9 @@ static int ep_process () {
         } while(bit1 == bit2);
         word = (word << 1) | bit1;
     }
+#else
+    mbedtls_ctr_drbg_random( &ctr_drbg, (uint8_t *)&word, sizeof( word ) );
+#endif
     random_word ^= word^board_millis()^adc_read();
     random_word *= 0x00000100000001B3;
     if (++ep_round == 8) {
@@ -87,6 +108,8 @@ struct rng_rb {
 };
 
 static void rb_init(struct rng_rb *rb, uint32_t *p, uint8_t size) {
+#ifdef ENABLE_EMULATION
+#endif
     rb->buf = p;
     rb->size = size;
     rb->head = rb->tail = 0;
@@ -125,7 +148,6 @@ void *neug_task() {
     if ((n = ep_process())) {
 	    int i;
 	    const uint32_t *vp;
-
 	    vp = ep_output();
 
 	    for (i = 0; i < n; i++) {
@@ -134,13 +156,10 @@ void *neug_task() {
 		        break;
 	    }
 	}
-
     return NULL;
 }
 
 void neug_init(uint32_t *buf, uint8_t size) {
-    pico_unique_board_id_t unique_id;
-    pico_get_unique_board_id(&unique_id);
     struct rng_rb *rb = &the_ring_buffer;
 
     rb_init(rb, buf, size);
@@ -170,11 +189,15 @@ uint32_t neug_get() {
 
 void neug_wait_full() {
     struct rng_rb *rb = &the_ring_buffer;
+#ifndef ENABLE_EMULATION
     uint core = get_core_num();
+#endif
     while (!rb->full) {
+#ifndef ENABLE_EMULATION
         if (core == 1)
             sleep_ms(1);
         else
+#endif
             neug_task();
     }
 }

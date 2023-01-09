@@ -15,7 +15,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef ENABLE_EMULATION
 #include <pico/unique_id.h>
+#endif
 #include "mbedtls/md.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/aes.h"
@@ -34,12 +36,15 @@ void hash_multi(const uint8_t *input, size_t len, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
     int iters = 256;
+#ifndef ENABLE_EMULATION
     pico_unique_board_id_t unique_id;
 
     pico_get_unique_board_id(&unique_id);
-
+#endif
     mbedtls_sha256_starts (&ctx, 0);
+#ifndef ENABLE_EMULATION
     mbedtls_sha256_update (&ctx, unique_id.id, sizeof(unique_id.id));
+#endif
 
     while (iters > len)
     {

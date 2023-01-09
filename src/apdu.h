@@ -19,8 +19,11 @@
 #define _APDU_H_
 
 #include <stdlib.h>
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
+#endif
 #include <stdio.h>
+#include <inttypes.h>
 
 typedef struct app {
     const uint8_t *aid;
@@ -40,9 +43,9 @@ typedef struct cmd
 
 #if defined(DEBUG_APDU) && DEBUG_APDU == 1
 #define DEBUG_PAYLOAD(_p,_s) { \
-    printf("Payload %s (%d bytes):\r\n", #_p,_s);\
+    printf("Payload %s (%d bytes):\r\n", #_p,(int)(_s));\
     for (int _i = 0; _i < _s; _i += 16) {\
-        printf("%07Xh : ",(unsigned int)(_i+_p));\
+        printf("%"PRIxPTR"h : ",(uintptr_t)(_i+_p));\
         for (int _j = 0; _j < 16; _j++) {\
             if (_j < _s-_i) printf("%02X ",(_p)[_i+_j]);\
             else printf("   ");\
@@ -57,7 +60,7 @@ typedef struct cmd
     }
 #define DEBUG_DATA(_p, _s)                               \
     {                                                    \
-        printf("Data %s (%d bytes):\r\n", #_p, _s);      \
+        printf("Data %s (%d bytes):\r\n", #_p, (int)(_s));      \
         char *tmp = (char *)calloc(1, 2 * _s + 1); \
         for (int _i = 0; _i < _s; _i++)                  \
         {                                                \

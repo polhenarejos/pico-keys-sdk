@@ -142,6 +142,7 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
     return make_uint16_t(sw1, sw2);
 }
 
+#ifndef ENABLE_EMULATION
 void apdu_thread() {
     card_init_core1();
     while (1) {
@@ -171,6 +172,7 @@ void apdu_thread() {
         current_app = NULL;
     }
 }
+#endif
 
 void apdu_finish() {
     apdu.rdata[apdu.rlen] = apdu.sw >> 8;

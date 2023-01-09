@@ -20,7 +20,12 @@
 #define _FILE_H_
 
 #include <stdlib.h>
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
+#else
+#include <stdbool.h>
+#include <stdint.h>
+#endif
 
 #define FILE_TYPE_UNKNOWN       0x00
 #define FILE_TYPE_DF            0x04

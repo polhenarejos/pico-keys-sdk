@@ -18,7 +18,11 @@
 #ifndef _USB_H_
 #define _USB_H_
 
+#ifndef ENABLE_EMULATION
 #include "pico/util/queue.h"
+#else
+#include <stdbool.h>
+#endif
 
 /* USB thread */
 #define EV_CARD_CHANGE        1
@@ -38,12 +42,16 @@
 
 
 enum {
+#ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
     ITF_HID = 0,
     ITF_KEYBOARD,
 #endif
 #ifdef USB_ITF_CCID
     ITF_CCID,
+#endif
+#else
+    ITF_EMUL = 0,
 #endif
     ITF_TOTAL
 };
@@ -55,8 +63,10 @@ enum
 };
 
 extern void usb_task();
+#ifndef ENABLE_EMULATION
 extern queue_t usb_to_card_q;
 extern queue_t card_to_usb_q;
+#endif
 extern uint8_t card_locked_itf;
 
 #ifdef USB_ITF_HID
@@ -83,14 +93,25 @@ extern size_t driver_read_ccid(uint8_t *, size_t);
 extern int driver_process_usb_nopacket_ccid();
 #endif
 
+#ifdef ENABLE_EMULATION
+extern int driver_process_usb_packet_emul(uint16_t rx_read);
+extern void driver_exec_finished_emul(size_t size_next);
+extern void driver_exec_finished_cont_emul(size_t size_next, size_t offset);
+extern void driver_exec_timeout_emul();
+extern bool driver_mounted_emul();
+extern uint8_t *driver_prepare_response_emul();
+extern int driver_write_emul(const uint8_t *, size_t);
+extern size_t driver_read_emul(uint8_t *, size_t);
+extern int driver_process_usb_nopacket_emul();
+extern uint16_t emul_read();
+#endif
+
 extern size_t usb_rx(uint8_t itf, const uint8_t *buffer, size_t len);
 
 extern void card_start(void (*func)(void));
 extern void card_exit();
 extern void usb_init();
 extern uint8_t *usb_prepare_response(uint8_t itf);
-extern void timeout_stop();
-extern void timeout_start();
 extern uint8_t *usb_get_rx(uint8_t itf);
 extern uint8_t *usb_get_tx(uint8_t itf);
 extern uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset);

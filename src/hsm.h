@@ -19,7 +19,16 @@
 #define _HSM_H_
 
 #include "file.h"
+#ifndef ENABLE_EMULATION
 #include "pico/unique_id.h"
+#else
+#include <stdint.h>
+extern uint32_t board_millis();
+#define MIN(a,b) \
+   ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+     _a < _b ? _a : _b; })
+#endif
 #include <string.h>
 
 extern bool wait_button();
@@ -32,7 +41,7 @@ static inline const uint16_t make_uint16_t(uint8_t b1, uint8_t b2) {
 static inline const uint16_t get_uint16_t(const uint8_t *b, uint16_t offset) {
     return make_uint16_t(b[offset], b[offset+1]);
 }
-static inline const void put_uint16_t(uint16_t n, uint8_t *b) {
+static inline void put_uint16_t(uint16_t n, uint8_t *b) {
     *b++ = (n >> 8) & 0xff;
     *b = n & 0xff;
 }
@@ -41,7 +50,8 @@ extern int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t 
 extern void low_flash_available();
 extern int flash_clear_file(file_t *file);
 
-extern pico_unique_board_id_t unique_id;
+extern void timeout_stop();
+extern void timeout_start();
 
 enum  {
     BLINK_NOT_MOUNTED = (250 << 16) | 250,

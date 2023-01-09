@@ -16,19 +16,18 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pico/unique_id.h"
-
 #include <stdio.h>
 
 // Pico
+#ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "tusb.h"
+#include "bsp/board.h"
+#endif
 #include "hsm.h"
 #include "usb.h"
 #include "apdu.h"
-
-#include "bsp/board.h"
 
 // For memcpy
 #include <string.h>
@@ -46,7 +45,9 @@ void usb_set_timeout_counter(uint8_t itf, uint32_t v) {
 }
 
 uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset) {
+#ifndef ENABLE_EMULATION
     uint8_t pkt_max = 64;
+#endif
     int w = 0;
     if (len > sizeof(tx_buffer[itf]))
         len = sizeof(tx_buffer[itf]);
@@ -59,6 +60,10 @@ uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset) {
 #ifdef USB_ITF_CCID
     if (itf == ITF_CCID)
         w = driver_write_ccid(tx_buffer[itf]+offset, MIN(len, pkt_max));
+#endif
+#ifdef ENABLE_EMULATION
+    if (itf == ITF_EMUL)
+        w = driver_write_emul(tx_buffer[itf]+offset, len);
 #endif
     w_len[itf] -= w;
     tx_r_offset[itf] += w;
@@ -95,6 +100,10 @@ uint32_t usb_write_flush(uint8_t itf) {
 #ifdef USB_ITF_CCID
         if (itf == ITF_CCID)
             w = driver_write_ccid(tx_buffer[itf]+tx_r_offset[itf], MIN(w_len[itf], 64));
+#endif
+#ifdef ENABLE_EMULATION
+        if (itf == ITF_EMUL)
+            w = driver_write_emul(tx_buffer[itf]+tx_r_offset[itf], w_len[itf]);
 #endif
         tx_r_offset[itf] += w;
         w_len[itf] -= w;
@@ -135,20 +144,27 @@ void usb_clear_rx(uint8_t itf) {
 
 #define USB_BCD   0x0200
 
-uint32_t timeout = 0;
-
+#ifndef ENABLE_EMULATION
 queue_t usb_to_card_q;
 queue_t card_to_usb_q;
+#endif
 
 void usb_init() {
+#ifndef ENABLE_EMULATION
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
+#endif
 }
 
 extern int driver_process_usb_nopacket();
+extern uint32_t timeout;
 
 static int usb_event_handle(uint8_t itf) {
+#ifndef ENABLE_EMULATION
     uint16_t rx_read = usb_read_available(itf);
+#else
+    uint16_t rx_read = emul_read();
+#endif
     int proc_packet = 0;
 #ifdef USB_ITF_HID
     if (itf == ITF_HID)
@@ -158,10 +174,16 @@ static int usb_event_handle(uint8_t itf) {
     if (itf == ITF_CCID)
         proc_packet = driver_process_usb_packet_ccid(rx_read);
 #endif
+#ifdef ENABLE_EMULATION
+    if (itf == ITF_EMUL)
+        proc_packet = driver_process_usb_packet_emul(rx_read);
+#endif
     if (proc_packet > 0) {
         card_locked_itf = itf;
+#ifndef ENABLE_EMULATION
         uint32_t flag = EV_CMD_AVAILABLE;
         queue_add_blocking(&usb_to_card_q, &flag);
+#endif
         timeout_start();
     }
     else {
@@ -179,12 +201,15 @@ static int usb_event_handle(uint8_t itf) {
 
 extern void low_flash_init();
 void card_init_core1() {
+#ifndef ENABLE_EMULATION
     low_flash_init_core1();
+#endif
 }
 
 size_t finished_data_size = 0;
 
 void card_start(void (*func)(void)) {
+#ifndef ENABLE_EMULATION
     uint32_t m = 0;
     while (queue_is_empty(&usb_to_card_q) == false) {
         if (queue_try_remove(&usb_to_card_q, &m) == false)
@@ -197,17 +222,24 @@ void card_start(void (*func)(void)) {
     multicore_reset_core1();
     multicore_launch_core1(func);
     led_set_blink(BLINK_MOUNTED);
+#endif
 }
 
 void card_exit() {
+#ifndef ENABLE_EMULATION
     uint32_t flag = EV_EXIT;
     queue_try_add(&usb_to_card_q, &flag);
     led_set_blink(BLINK_SUSPENDED);
+#endif
     card_locked_itf = ITF_TOTAL;
 }
 extern void hid_task();
 void usb_task() {
+#ifndef ENABLE_EMULATION
     bool mounted = false;
+#else
+    bool mounted = true;
+#endif
     for (uint8_t itf = 0; itf < ITF_TOTAL; itf++) {
 #ifdef USB_ITF_HID
         if (itf == ITF_HID)
@@ -223,6 +255,7 @@ void usb_task() {
 
             }
             usb_write_flush(itf);
+#ifndef ENABLE_EMULATION
             if (card_locked_itf == itf) {
                 uint32_t m = 0x0;
                 bool has_m = queue_try_remove(&card_to_usb_q, &m);
@@ -263,18 +296,14 @@ void usb_task() {
                     }
                 }
             }
+#endif
         }
     }
+#ifdef USB_ITF_HID
     hid_task();
+#endif
 }
 
-void timeout_stop() {
-    timeout = 0;
-}
-
-void timeout_start() {
-    timeout = board_millis();
-}
 
 uint8_t *usb_prepare_response(uint8_t itf) {
 #ifdef USB_ITF_HID
@@ -284,6 +313,10 @@ uint8_t *usb_prepare_response(uint8_t itf) {
 #ifdef USB_ITF_CCID
     if (itf == ITF_CCID)
         return driver_prepare_response_ccid();
+#endif
+#ifdef ENABLE_EMULATION
+    if (itf == ITF_EMUL)
+        return driver_prepare_response_emul();
 #endif
     return NULL;
 }

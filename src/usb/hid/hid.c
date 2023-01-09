@@ -74,10 +74,12 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
   (void) report_type;
   (void) buffer;
   (void) reqlen;
-  printf("get_report\n");
+  printf("get_report %d %d %d\n",itf,report_id,report_type);
   DEBUG_PAYLOAD(buffer, reqlen);
+  buffer[1] = HSM_SDK_VERSION_MAJOR;
+  buffer[2] = HSM_SDK_VERSION_MINOR;
 
-  return 0;
+  return reqlen;
 }
 
 uint32_t hid_write_offset(uint16_t size, uint16_t offset) {
@@ -189,7 +191,9 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
     (void) itf;
     (void) report_id;
     (void) report_type;
-
+    printf("set_report %d %d %d\n",itf,report_id,report_type);
+    if (itf == ITF_KEYBOARD)
+        DEBUG_PAYLOAD(buffer,bufsize);
     usb_rx(itf, buffer, bufsize);
 }
 
@@ -229,7 +233,6 @@ extern const uint8_t fido_aid[];
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
-    apdu.sw = 0;
     if (read >= 5) {
         driver_init_hid();
         last_packet_time = board_millis();
@@ -296,7 +299,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             ctap_resp->init.cmd = CTAPHID_INIT;
             ctap_resp->init.bcntl = 17;
             ctap_resp->init.bcnth = 0;
-            driver_exec_finished_hid(17);
+            hid_write(64);
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
         }

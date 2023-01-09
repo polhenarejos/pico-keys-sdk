@@ -25,6 +25,7 @@ typedef unsigned int      uint32_t;
 typedef unsigned long int uint64_t;
 #else
 #include <stdint.h>
+#include <stdlib.h>
 #endif
 
 #ifdef __cplusplus
@@ -58,7 +59,9 @@ typedef struct {
       uint8_t data[HID_RPT_SIZE - 5];  // Data payload
     } cont;
   };
-}__packed CTAPHID_FRAME;
+} __attribute__ ((__packed__)) CTAPHID_FRAME;
+
+extern CTAPHID_FRAME *ctap_req, *ctap_resp;
 
 #define FRAME_TYPE(f) ((f)->type & TYPE_MASK)
 #define FRAME_CMD(f)  ((f)->init.cmd & ~TYPE_MASK)
@@ -106,7 +109,7 @@ typedef struct {
 
 typedef struct {
   uint8_t nonce[INIT_NONCE_SIZE];       // Client application nonce
-}__packed CTAPHID_INIT_REQ;
+} __attribute__ ((__packed__)) CTAPHID_INIT_REQ;
 
 typedef struct {
   uint8_t nonce[INIT_NONCE_SIZE];       // Client application nonce
@@ -116,7 +119,7 @@ typedef struct {
   uint8_t versionMinor;                 // Minor version number
   uint8_t versionBuild;                 // Build version number
   uint8_t capFlags;                     // Capabilities flags
-}__packed CTAPHID_INIT_RESP;
+} __attribute__ ((__packed__)) CTAPHID_INIT_RESP;
 
 // CTAPHID_SYNC command defines
 

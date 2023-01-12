@@ -29,6 +29,9 @@ endif()
 if (NOT DEFINED ENABLE_EMULATION)
     set(ENABLE_EMULATION 0)
 endif()
+if (NOT DEFINED ENABLE_EMULATION)
+    set(ENABLE_EMULATION 0)
+endif()
 
 option(ENABLE_DELAYED_BOOT "Enable/disable delayed boot" OFF)
 if(ENABLE_DELAYED_BOOT)
@@ -106,7 +109,7 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library
 )
 
-if(${USB_ITF_HID} OR ${ENABLE_EMULATION})
+if(USB_ITF_HID OR ENABLE_EMULATION)
 set(SOURCES ${SOURCES}
 ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
 ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser.c

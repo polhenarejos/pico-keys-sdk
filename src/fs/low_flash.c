@@ -55,7 +55,11 @@ static page_flash_t flash_pages[TOTAL_FLASH_PAGES];
 static mutex_t mtx_flash;
 static semaphore_t sem_wait;
 #endif
+#ifndef ENABLE_EMULATION
 static bool locked_out = false;
+#else
+static bool locked_out = true;
+#endif
 
 static uint8_t ready_pages = 0;
 
@@ -63,8 +67,7 @@ bool flash_available = false;
 
 
 //this function has to be called from the core 0
-void do_flash()
-{
+void do_flash() {
 #ifndef ENABLE_EMULATION
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
 #endif
@@ -104,11 +107,11 @@ void do_flash()
 #ifdef ENABLE_EMULATION
             msync(map, PICO_FLASH_SIZE_BYTES, MS_SYNC);
 #endif
-            flash_available = false;
             if (ready_pages != 0) {
                 printf("ERROR: DO FLASH DOES NOT HAVE ZERO PAGES\n");
             }
         }
+        flash_available = false;
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
     }
@@ -169,7 +172,11 @@ page_flash_t *find_free_page(uintptr_t addr) {
             p = &flash_pages[r];
             if (!flash_pages[r].ready && !flash_pages[r].erase)
             {
+#ifndef ENABLE_EMULATION
                 memcpy(p->page, (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
+#else
+                memcpy(p->page, (uint8_t *)(map+addr_alg), FLASH_SECTOR_SIZE);
+#endif
                 ready_pages++;
                 p->address = addr_alg;
                 p->ready = true;
@@ -230,8 +237,7 @@ uint8_t *flash_read(uintptr_t addr) {
     mutex_enter_blocking(&mtx_flash);
 #endif
     if (ready_pages > 0) {
-        for (int r = 0; r < TOTAL_FLASH_PAGES; r++)
-        {
+        for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
             if (flash_pages[r].ready && flash_pages[r].address == addr_alg) {
                 uint8_t *v = &flash_pages[r].page[addr&(FLASH_SECTOR_SIZE-1)];
 #ifndef ENABLE_EMULATION
@@ -244,6 +250,8 @@ uint8_t *flash_read(uintptr_t addr) {
     uint8_t *v = (uint8_t *)addr;
 #ifndef ENABLE_EMULATION
     mutex_exit(&mtx_flash);
+#else
+    v += (uintptr_t)map;
 #endif
     return v;
 }

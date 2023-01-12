@@ -58,8 +58,9 @@ void process_fci(const file_t *pe, int fmd) {
             res_APDU[res_APDU_size++] = len & 0xff;
         }
         else {
-            res_APDU[res_APDU_size++] = pe->data[1];
-            res_APDU[res_APDU_size++] = pe->data[0];
+            uint16_t v = file_get_size(pe);
+            res_APDU[res_APDU_size++] = v >> 8;
+            res_APDU[res_APDU_size++] = v & 0xff;
         }
     }
     else {

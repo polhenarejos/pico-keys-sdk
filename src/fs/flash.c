@@ -53,6 +53,7 @@ extern int flash_program_halfword (uintptr_t addr, uint16_t data);
 extern int flash_program_uintptr(uintptr_t, uintptr_t);
 extern uintptr_t flash_read_uintptr(uintptr_t addr);
 extern uint16_t flash_read_uint16(uintptr_t addr);
+extern uint8_t *flash_read(uintptr_t addr);
 
 extern void low_flash_available();
 
@@ -133,7 +134,7 @@ int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t 
             flash_clear_file(file);
             if (offset > 0) {
                 old_data = (uint8_t *)calloc(1, offset+len);
-                memcpy(old_data, file->data+sizeof(uint16_t), offset);
+                memcpy(old_data, flash_read((uintptr_t)(file->data+sizeof(uint16_t))), offset);
                 memcpy(old_data+offset, data, len);
                 len = offset+len;
                 data = old_data;

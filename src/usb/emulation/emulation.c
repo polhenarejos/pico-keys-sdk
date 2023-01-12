@@ -87,7 +87,7 @@ uint8_t *driver_prepare_response_emul() {
 
 int driver_write_emul(const uint8_t *buffer, size_t buffer_size) {
     uint16_t size = htons(buffer_size);
-    DEBUG_PAYLOAD(buffer,buffer_size);
+    //DEBUG_PAYLOAD(buffer,buffer_size);
     int ret = 0;
     do {
         ret = send(sock, &size, sizeof(size), 0);
@@ -131,6 +131,7 @@ int driver_process_usb_packet_emul(uint16_t len) {
             process_apdu();
             apdu_finish();
             size_t ret = apdu_next();
+            DEBUG_PAYLOAD(rdata, ret);
             emul_write(ret);
         }
     }

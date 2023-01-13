@@ -41,6 +41,10 @@ uint8_t *map = NULL;
 
 #define TOTAL_FLASH_PAGES 4
 
+extern const uintptr_t start_data_pool;
+extern const uintptr_t end_rom_pool;
+
+
 typedef struct page_flash {
     uint8_t page[FLASH_SECTOR_SIZE];
     uintptr_t address;
@@ -175,7 +179,7 @@ page_flash_t *find_free_page(uintptr_t addr) {
 #ifndef ENABLE_EMULATION
                 memcpy(p->page, (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
 #else
-                memcpy(p->page, (uint8_t *)(map+addr_alg), FLASH_SECTOR_SIZE);
+                memcpy(p->page, (addr >= start_data_pool && addr <= end_rom_pool) ? (uint8_t *)(map+addr_alg) : (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
 #endif
                 ready_pages++;
                 p->address = addr_alg;
@@ -230,9 +234,6 @@ int flash_program_word (uintptr_t addr, uint32_t data) {
 int flash_program_uintptr (uintptr_t addr, uintptr_t data) {
     return flash_program_block(addr,  (const uint8_t *)&data, sizeof(uintptr_t));
 }
-
-extern const uintptr_t start_data_pool;
-extern const uintptr_t end_rom_pool;
 
 uint8_t *flash_read(uintptr_t addr) {
     uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;

@@ -231,6 +231,9 @@ int flash_program_uintptr (uintptr_t addr, uintptr_t data) {
     return flash_program_block(addr,  (const uint8_t *)&data, sizeof(uintptr_t));
 }
 
+extern const uintptr_t start_data_pool;
+extern const uintptr_t end_rom_pool;
+
 uint8_t *flash_read(uintptr_t addr) {
     uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
 #ifndef ENABLE_EMULATION
@@ -251,7 +254,8 @@ uint8_t *flash_read(uintptr_t addr) {
 #ifndef ENABLE_EMULATION
     mutex_exit(&mtx_flash);
 #else
-    v += (uintptr_t)map;
+    if (addr >= start_data_pool && addr <= end_rom_pool)
+        v += (uintptr_t)map;
 #endif
     return v;
 }

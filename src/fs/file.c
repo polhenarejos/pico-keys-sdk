@@ -353,17 +353,21 @@ int meta_delete(uint16_t fid) {
         uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
         if (cfid == fid) {
             size_t new_len = data_len-1-tag_len-format_tlv_len(tag_len, NULL);
-            fdata = (uint8_t *)calloc(1, new_len);
-            if (tpos > data) {
-                memcpy(fdata, data, tpos-data);
+            if (new_len == 0)
+                flash_clear_file(ef);
+            else {
+                fdata = (uint8_t *)calloc(1, new_len);
+                if (tpos > data) {
+                    memcpy(fdata, data, tpos-data);
+                }
+                if (data+data_len > p) {
+                    memcpy(fdata+(tpos-data), p, data+data_len-p);
+                }
+                int r = flash_write_data_to_file(ef, fdata, new_len);
+                free(fdata);
+                if (r != CCID_OK)
+                    return CCID_EXEC_ERROR;
             }
-            if (data+data_len > p) {
-                memcpy(fdata+(tpos-data), p, data+data_len-p);
-            }
-            int r = flash_write_data_to_file(ef, fdata, new_len);
-            free(fdata);
-            if (r != CCID_OK)
-                return CCID_EXEC_ERROR;
             low_flash_available();
             break;
         }

@@ -29,6 +29,7 @@
 #endif
 #include "hsm.h"
 #include "file.h"
+#include <stdio.h>
 
 /*
  * ------------------------------------------------------
@@ -91,8 +92,9 @@ uintptr_t allocate_free_addr(uint16_t size, bool persistent) {
             return 0x0;
         }
         //we check if |base-(next_addr+size_next_addr)| > |base-potential_addr| only if fid != 1xxx (not size blocked)
-        else if (addr_alg <= potential_addr && base-(next_base+flash_read_uint16(next_base+sizeof(uintptr_t)+sizeof(uintptr_t)+sizeof(uint16_t))+2*sizeof(uint16_t)+2*sizeof(uintptr_t)) > base-potential_addr && (flash_read_uint16(next_base+sizeof(uintptr_t)) & 0x1000) != 0x1000) {
+        else if (addr_alg <= potential_addr && base-(next_base+flash_read_uint16(next_base+sizeof(uintptr_t)+sizeof(uintptr_t)+sizeof(uint16_t))+2*sizeof(uint16_t)+2*sizeof(uintptr_t)) > base-potential_addr && (flash_read_uint16(next_base+2*sizeof(uintptr_t)) & 0x1000) != 0x1000) {
             flash_program_uintptr(potential_addr, next_base);
+            flash_program_uintptr(next_base+sizeof(uintptr_t), potential_addr);
             flash_program_uintptr(potential_addr+sizeof(uintptr_t), base);
             flash_program_uintptr(base, potential_addr);
             return potential_addr;
@@ -107,12 +109,15 @@ int flash_clear_file(file_t *file) {
     uintptr_t base_addr = (uintptr_t)(file->data-sizeof(uintptr_t)-sizeof(uint16_t)-sizeof(uintptr_t));
     uintptr_t prev_addr = flash_read_uintptr(base_addr+sizeof(uintptr_t));
     uintptr_t next_addr = flash_read_uintptr(base_addr);
-    //printf("nc %x->%x   %x->%x\r\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);
+    //printf("nc %lx->%lx   %lx->%lx\r\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);
     flash_program_uintptr(prev_addr, next_addr);
     flash_program_halfword((uintptr_t)file->data, 0);
     if (next_addr > 0)
         flash_program_uintptr(next_addr+sizeof(uintptr_t), prev_addr);
-    //printf("na %x->%x\r\n",prev_addr,flash_read_uintptr(prev_addr));
+    flash_program_uintptr(base_addr, 0);
+    flash_program_uintptr(base_addr+sizeof(uintptr_t), 0);
+    file->data = NULL;
+    //printf("na %lx->%lx\r\n",prev_addr,flash_read_uintptr(prev_addr));
     return CCID_OK;
 }
 

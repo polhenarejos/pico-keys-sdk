@@ -20,6 +20,7 @@
 #define _RANDOM_H_
 
 #include <stdlib.h>
+#include <stdint.h>
 #ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
 #endif

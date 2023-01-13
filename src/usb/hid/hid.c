@@ -31,7 +31,7 @@ typedef struct msg_packet {
     uint16_t len;
     uint16_t current_len;
     uint8_t data[CTAP_MAX_PACKET_SIZE];
-} __packed msg_packet_t;
+} __attribute__ ((__packed__)) msg_packet_t;
 
 msg_packet_t msg_packet = { 0 };
 

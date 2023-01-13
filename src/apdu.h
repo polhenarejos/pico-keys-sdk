@@ -51,10 +51,6 @@ typedef struct cmd
             else printf("   ");\
             if (_j == 7) printf(" ");\
             } printf(":  "); \
-        for (int _j = 0; _j < MIN(16,_s-_i); _j++) {\
-            printf("%c",(_p)[_i+_j] == 0x0a || (_p)[_i+_j] == 0x0d ? '\\' : (_p)[_i+_j]);\
-            if (_j == 7) printf(" ");\
-            }\
             printf("\r\n");\
         } printf("\r\n"); \
     }

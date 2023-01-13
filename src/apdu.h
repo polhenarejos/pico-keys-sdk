@@ -83,7 +83,7 @@ struct apdu {
     uint16_t sw;
     uint8_t *rdata;
     uint16_t rlen;
-} __packed;
+} __attribute__ ((__packed__));
 
 #define CLA(a) a.header[0]
 #define INS(a) a.header[1]

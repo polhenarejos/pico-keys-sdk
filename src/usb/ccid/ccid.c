@@ -97,7 +97,7 @@ struct ccid_header {
     uint8_t abRFU0;
     uint16_t abRFU1;
     uint8_t apdu; //Actually it is an array
-} __packed;
+} __attribute__ ((__packed__));
 
 uint8_t ccid_status = 1;
 static uint8_t itf_num;

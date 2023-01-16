@@ -103,8 +103,11 @@ int driver_write_emul(const uint8_t *buffer, size_t buffer_size) {
 }
 
 uint32_t emul_write_offset(uint16_t size, uint16_t offset) {
-    //DEBUG_PAYLOAD(usb_get_tx(ITF_EMUL)+offset, size);
-    return usb_write_offset(ITF_EMUL, size, offset);
+    if (size > 0) {
+        //DEBUG_PAYLOAD(usb_get_tx(ITF_EMUL)+offset, size);
+        return usb_write_offset(ITF_EMUL, size, offset);
+    }
+    return 0;
 }
 
 uint32_t emul_write(uint16_t size) {
@@ -112,6 +115,7 @@ uint32_t emul_write(uint16_t size) {
 }
 
 void driver_exec_finished_cont_emul(size_t size_next, size_t offset) {
+    emul_write_offset(size_next, offset);
 }
 
 int driver_process_usb_packet_emul(uint16_t len) {
@@ -127,8 +131,8 @@ int driver_process_usb_packet_emul(uint16_t len) {
         }
         else {
             DEBUG_PAYLOAD(data, len);
-            apdu_process(ITF_EMUL, data, len);
-            process_apdu();
+            if (apdu_process(ITF_EMUL, data, len) > 0)
+                process_apdu();
             apdu_finish();
             size_t ret = apdu_next();
             DEBUG_PAYLOAD(rdata, ret);

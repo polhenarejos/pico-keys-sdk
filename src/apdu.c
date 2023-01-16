@@ -84,7 +84,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
     }
     //printf("apdu.nc %ld, apdu.ne %ld\r\n",apdu.nc,apdu.ne);
     if (apdu.header[1] == 0xc0) {
-        //printf("apdu.ne %ld, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
+        printf("apdu.ne %u, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
         timeout_stop();
         *(uint16_t *)rdata_gr = rdata_bk;
         if (apdu.rlen <= apdu.ne) {
@@ -95,6 +95,10 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
 #ifdef USB_ITF_CCID
             if (itf == ITF_CCID)
                 driver_exec_finished_cont_ccid(apdu.rlen+2, rdata_gr-usb_get_tx(itf));
+#endif
+#ifdef ENABLE_EMULATION
+            if (itf == ITF_EMUL)
+                driver_exec_finished_cont_emul(apdu.rlen+2, rdata_gr-usb_get_tx(itf));
 #endif
             //Prepare next RAPDU
             apdu.sw = 0;
@@ -119,6 +123,10 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
 #ifdef USB_ITF_CCID
                 if (itf == ITF_CCID)
                     driver_exec_finished_cont_ccid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(card_locked_itf));
+#endif
+#ifdef ENABLE_EMULATION
+                if (itf == ITF_EMUL)
+                    driver_exec_finished_cont_emul(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(card_locked_itf));
 #endif
             }
             apdu.rlen -= apdu.ne;
@@ -178,10 +186,12 @@ void apdu_finish() {
     apdu.rdata[apdu.rlen] = apdu.sw >> 8;
     apdu.rdata[apdu.rlen+1] = apdu.sw & 0xff;
     timeout_stop();
+#ifndef ENABLE_EMULATION
     if ((apdu.rlen + 2 + 10) % 64 == 0)
     { // FIX for strange behaviour with PSCS and multiple of 64
         apdu.ne = apdu.rlen - 2;
     }
+#endif
 }
 
 size_t apdu_next() {

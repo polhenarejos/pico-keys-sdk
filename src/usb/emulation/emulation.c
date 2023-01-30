@@ -56,6 +56,7 @@ int msleep(long msec)
 
 int emul_init(char *host, uint16_t port) {
     struct sockaddr_in serv_addr;
+    printf("\n Starting emulation envionrment\n");
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         printf("\n Socket creation error \n");
         return -1;

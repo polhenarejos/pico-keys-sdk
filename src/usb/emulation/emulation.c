@@ -56,9 +56,9 @@ int msleep(long msec)
 
 int emul_init(char *host, uint16_t port) {
     struct sockaddr_in serv_addr;
-    printf("\n Starting emulation envionrment\n");
+    fprintf(stderr, "\n Starting emulation envionrment\n");
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("\n Socket creation error \n");
+        fprintf(stderr, "\n Socket creation error \n");
         return -1;
     }
 
@@ -68,12 +68,12 @@ int emul_init(char *host, uint16_t port) {
     // Convert IPv4 and IPv6 addresses from text to binary
     // form
     if (inet_pton(AF_INET, host, &serv_addr.sin_addr) <= 0) {
-        printf("\nInvalid address/ Address not supported \n");
+        fprintf(stderr, "\nInvalid address/ Address not supported \n");
         return -1;
     }
 
     if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        printf("\nConnection Failed \n");
+        fprintf(stderr, "\nConnection Failed \n");
         return -1;
     }
     int x = fcntl(sock ,F_GETFL, 0);

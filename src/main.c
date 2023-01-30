@@ -225,7 +225,7 @@ int main(void) {
 
     //prepare_ccid();
 #else
-    emul_init("localhost",35963);
+    emul_init("127.0.0.1",35963);
 #endif
 
     random_init();

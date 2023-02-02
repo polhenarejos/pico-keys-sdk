@@ -84,7 +84,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
     }
     //printf("apdu.nc %ld, apdu.ne %ld\r\n",apdu.nc,apdu.ne);
     if (apdu.header[1] == 0xc0) {
-        printf("apdu.ne %u, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
+        //printf("apdu.ne %u, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
         timeout_stop();
         *(uint16_t *)rdata_gr = rdata_bk;
         if (apdu.rlen <= apdu.ne) {
@@ -113,22 +113,18 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
                 rdata_gr[1] = 0;
             else
                 rdata_gr[1] = apdu.rlen - apdu.ne;
-            if (card_locked_itf == ITF_TOTAL)
-                printf("CRITICAL ERROR: CARD LOCKED WITHOUT ITF\n");
-            else {
 #ifdef USB_ITF_HID
-                if (itf == ITF_HID)
-                    driver_exec_finished_cont_hid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(card_locked_itf));
+            if (itf == ITF_HID)
+                driver_exec_finished_cont_hid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(itf));
 #endif
 #ifdef USB_ITF_CCID
-                if (itf == ITF_CCID)
-                    driver_exec_finished_cont_ccid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(card_locked_itf));
+            if (itf == ITF_CCID)
+                driver_exec_finished_cont_ccid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(itf));
 #endif
 #ifdef ENABLE_EMULATION
-                if (itf == ITF_EMUL)
-                    driver_exec_finished_cont_emul(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(card_locked_itf));
+            if (itf == ITF_EMUL)
+                driver_exec_finished_cont_emul(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(itf));
 #endif
-            }
             apdu.rlen -= apdu.ne;
         }
         return 0;

@@ -90,8 +90,8 @@ struct apdu {
 #define P1(a) a.header[2]
 #define P2(a) a.header[3]
 
-#define res_APDU apdu.rdata
-#define res_APDU_size apdu.rlen
+#define res_APDU (apdu.rdata)
+#define res_APDU_size (apdu.rlen)
 
 extern struct apdu apdu;
 

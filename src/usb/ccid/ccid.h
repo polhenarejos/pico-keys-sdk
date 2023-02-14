@@ -20,8 +20,8 @@
 
 extern const uint8_t historical_bytes[];
 
-#define MAX_CMD_APDU_DATA_SIZE (24+4+512*4)
-#define MAX_RES_APDU_DATA_SIZE (5+9+512*4)
+#define MAX_CMD_APDU_DATA_SIZE (24 + 4 + 512 * 4)
+#define MAX_RES_APDU_DATA_SIZE (5 + 9 + 512 * 4)
 #define CCID_MSG_HEADER_SIZE    10
 #define USB_LL_BUF_SIZE         64
 

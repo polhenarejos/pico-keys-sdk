@@ -24,18 +24,16 @@
 #include "crypto_utils.h"
 #include "hsm.h"
 
-void double_hash_pin(const uint8_t *pin, size_t len, uint8_t output[32])
-{
+void double_hash_pin(const uint8_t *pin, size_t len, uint8_t output[32]) {
     uint8_t o1[32];
     hash_multi(pin, len, o1);
     for (int i = 0; i < sizeof(o1); i++) {
-        o1[i] ^= pin[i%len];
+        o1[i] ^= pin[i % len];
     }
     hash_multi(o1, sizeof(o1), output);
 }
 
-void hash_multi(const uint8_t *input, size_t len, uint8_t output[32])
-{
+void hash_multi(const uint8_t *input, size_t len, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
     int iters = 256;
@@ -60,8 +58,7 @@ void hash_multi(const uint8_t *input, size_t len, uint8_t output[32])
     mbedtls_sha256_free(&ctx);
 }
 
-void hash256(const uint8_t *input, size_t len, uint8_t output[32])
-{
+void hash256(const uint8_t *input, size_t len, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
 
@@ -72,8 +69,7 @@ void hash256(const uint8_t *input, size_t len, uint8_t output[32])
     mbedtls_sha256_free(&ctx);
 }
 
-void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output)
-{
+void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output) {
     mbedtls_md(mbedtls_md_info_from_type(md), input, len, output);
 }
 
@@ -82,8 +78,7 @@ int aes_encrypt(const uint8_t *key,
                 int key_size,
                 int mode,
                 uint8_t *data,
-                int len)
-{
+                int len) {
     mbedtls_aes_context aes;
     mbedtls_aes_init(&aes);
     uint8_t tmp_iv[IV_SIZE];
@@ -107,8 +102,7 @@ int aes_decrypt(const uint8_t *key,
                 int key_size,
                 int mode,
                 uint8_t *data,
-                int len)
-{
+                int len) {
     mbedtls_aes_context aes;
     mbedtls_aes_init(&aes);
     uint8_t tmp_iv[IV_SIZE];
@@ -128,12 +122,10 @@ int aes_decrypt(const uint8_t *key,
     return mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_DECRYPT, len, &iv_offset, tmp_iv, data, data);
 }
 
-int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, int len)
-{
+int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, int len) {
     return aes_encrypt(key, iv, 256, HSM_AES_MODE_CFB, data, len);
 }
-int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, int len)
-{
+int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, int len) {
     return aes_decrypt(key, iv, 256, HSM_AES_MODE_CFB, data, len);
 }
 
@@ -184,8 +176,7 @@ struct ec_curve_mbed_id ec_curves_mbed[] = {
     {   { NULL, 0 }, MBEDTLS_ECP_DP_NONE }
 };
 
-mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t prime_len)
-{
+mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t prime_len) {
     for (struct ec_curve_mbed_id *ec = ec_curves_mbed; ec->id != MBEDTLS_ECP_DP_NONE; ec++) {
         if (prime_len == ec->curve.len && memcmp(prime, ec->curve.value, prime_len) == 0) {
             return ec->id;

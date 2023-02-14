@@ -65,7 +65,7 @@ extern CTAPHID_FRAME *ctap_req, *ctap_resp;
 
 #define FRAME_TYPE(f) ((f)->type & TYPE_MASK)
 #define FRAME_CMD(f)  ((f)->init.cmd & ~TYPE_MASK)
-#define MSG_LEN(f)    ((f)->init.bcnth*256 + (f)->init.bcntl)
+#define MSG_LEN(f)    ((f)->init.bcnth * 256 + (f)->init.bcntl)
 #define FRAME_SEQ(f)  ((f)->cont.seq & ~TYPE_MASK)
 
 // HID usage- and usage-page definitions

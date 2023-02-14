@@ -24,8 +24,7 @@ uint8_t *rdata_gr = NULL;
 uint16_t rdata_bk = 0x0;
 extern uint32_t timeout;
 
-int process_apdu()
-{
+int process_apdu() {
     led_set_blink(BLINK_PROCESSING);
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
         if (current_app && current_app->unload) {
@@ -44,8 +43,7 @@ int process_apdu()
     return set_res_sw(0x6D, 0x00);
 }
 
-size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size)
-{
+size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
     apdu.header = (uint8_t *) buffer;
     apdu.nc = apdu.ne = 0;
     if (buffer_size == 4) {
@@ -53,35 +51,39 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size)
         if (apdu.ne == 0) {
             apdu.ne = 256;
         }
-    } else if (buffer_size == 5) {
+    }
+    else if (buffer_size == 5) {
         apdu.nc = 0;
         apdu.ne = apdu.header[4];
         if (apdu.ne == 0) {
             apdu.ne = 256;
         }
-    } else if (apdu.header[4] == 0x0 && buffer_size >= 7) {
+    }
+    else if (apdu.header[4] == 0x0 && buffer_size >= 7) {
         if (buffer_size == 7) {
             apdu.ne = (apdu.header[5] << 8) | apdu.header[6];
             if (apdu.ne == 0) {
                 apdu.ne = 65536;
             }
-        } else {
+        }
+        else {
             apdu.ne = 0;
             apdu.nc = (apdu.header[5] << 8) | apdu.header[6];
-            apdu.data = apdu.header+7;
-            if (apdu.nc+7+2 == buffer_size) {
-                apdu.ne = (apdu.header[buffer_size-2] << 8) | apdu.header[buffer_size-1];
+            apdu.data = apdu.header + 7;
+            if (apdu.nc + 7 + 2 == buffer_size) {
+                apdu.ne = (apdu.header[buffer_size - 2] << 8) | apdu.header[buffer_size - 1];
                 if (apdu.ne == 0) {
                     apdu.ne = 65536;
                 }
             }
         }
-    } else {
+    }
+    else {
         apdu.nc = apdu.header[4];
-        apdu.data = apdu.header+5;
+        apdu.data = apdu.header + 5;
         apdu.ne = 0;
-        if (apdu.nc+5+1 == buffer_size) {
-            apdu.ne = apdu.header[buffer_size-1];
+        if (apdu.nc + 5 + 1 == buffer_size) {
+            apdu.ne = apdu.header[buffer_size - 1];
             if (apdu.ne == 0) {
                 apdu.ne = 256;
             }
@@ -95,51 +97,54 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size)
         if (apdu.rlen <= apdu.ne) {
 #ifdef USB_ITF_HID
             if (itf == ITF_HID) {
-                driver_exec_finished_cont_hid(apdu.rlen+2, rdata_gr-usb_get_tx(itf));
+                driver_exec_finished_cont_hid(apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
             }
 #endif
 #ifdef USB_ITF_CCID
             if (itf == ITF_CCID) {
-                driver_exec_finished_cont_ccid(apdu.rlen+2, rdata_gr-usb_get_tx(itf));
+                driver_exec_finished_cont_ccid(apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
             }
 #endif
 #ifdef ENABLE_EMULATION
             if (itf == ITF_EMUL) {
-                driver_exec_finished_cont_emul(apdu.rlen+2, rdata_gr-usb_get_tx(itf));
+                driver_exec_finished_cont_emul(apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
             }
 #endif
             //Prepare next RAPDU
             apdu.sw = 0;
             apdu.rlen = 0;
             usb_prepare_response(itf);
-        } else {
+        }
+        else {
             rdata_gr += apdu.ne;
             rdata_bk = *rdata_gr;
             rdata_gr[0] = 0x61;
             if (apdu.rlen - apdu.ne >= 256) {
                 rdata_gr[1] = 0;
-            } else {
+            }
+            else {
                 rdata_gr[1] = apdu.rlen - apdu.ne;
             }
 #ifdef USB_ITF_HID
             if (itf == ITF_HID) {
-                driver_exec_finished_cont_hid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(itf));
+                driver_exec_finished_cont_hid(apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
             }
 #endif
 #ifdef USB_ITF_CCID
             if (itf == ITF_CCID) {
-                driver_exec_finished_cont_ccid(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(itf));
+                driver_exec_finished_cont_ccid(apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
             }
 #endif
 #ifdef ENABLE_EMULATION
             if (itf == ITF_EMUL) {
-                driver_exec_finished_cont_emul(apdu.ne+2, rdata_gr-apdu.ne-usb_get_tx(itf));
+                driver_exec_finished_cont_emul(apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
             }
 #endif
             apdu.rlen -= apdu.ne;
         }
         return 0;
-    } else {
+    }
+    else {
         apdu.sw = 0;
         apdu.rlen = 0;
         apdu.rdata = usb_prepare_response(itf);
@@ -149,8 +154,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size)
     return 0;
 }
 
-uint16_t set_res_sw(uint8_t sw1, uint8_t sw2)
-{
+uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
     apdu.sw = (sw1 << 8) | sw2;
     if (sw1 != 0x90) {
         res_APDU_size = 0;
@@ -159,8 +163,7 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2)
 }
 
 #ifndef ENABLE_EMULATION
-void apdu_thread()
-{
+void apdu_thread() {
     card_init_core1();
     while (1) {
         uint32_t m = 0;
@@ -169,7 +172,8 @@ void apdu_thread()
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE) {
             set_res_sw(0x6f, 0x00);
             goto done;
-        } else if (m == EV_EXIT) {
+        }
+        else if (m == EV_EXIT) {
             break;
         }
 
@@ -190,10 +194,9 @@ done:   ;
 }
 #endif
 
-void apdu_finish()
-{
+void apdu_finish() {
     apdu.rdata[apdu.rlen] = apdu.sw >> 8;
-    apdu.rdata[apdu.rlen+1] = apdu.sw & 0xff;
+    apdu.rdata[apdu.rlen + 1] = apdu.sw & 0xff;
     timeout_stop();
 #ifndef ENABLE_EMULATION
     if ((apdu.rlen + 2 + 10) % 64 == 0) {     // FIX for strange behaviour with PSCS and multiple of 64
@@ -202,18 +205,19 @@ void apdu_finish()
 #endif
 }
 
-size_t apdu_next()
-{
+size_t apdu_next() {
     if (apdu.sw != 0) {
         if (apdu.rlen <= apdu.ne) {
             return apdu.rlen + 2;
-        } else {
-            rdata_gr = apdu.rdata+apdu.ne;
+        }
+        else {
+            rdata_gr = apdu.rdata + apdu.ne;
             rdata_bk = *(uint16_t *) rdata_gr;
             rdata_gr[0] = 0x61;
             if (apdu.rlen - apdu.ne >= 256) {
                 rdata_gr[1] = 0;
-            } else {
+            }
+            else {
                 rdata_gr[1] = apdu.rlen - apdu.ne;
             }
             apdu.rlen -= apdu.ne;

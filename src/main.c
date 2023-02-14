@@ -62,9 +62,8 @@ app_t *current_app = NULL;
 
 const uint8_t *ccid_atr = NULL;
 
-int register_app(app_t *(*select_aid)(app_t *, const uint8_t *, uint8_t))
-{
-    if (num_apps < sizeof(apps)/sizeof(app_t)) {
+int register_app(app_t *(*select_aid)(app_t *, const uint8_t *, uint8_t)) {
+    if (num_apps < sizeof(apps) / sizeof(app_t)) {
         apps[num_apps].select_aid = select_aid;
         num_apps++;
         return 1;
@@ -74,19 +73,16 @@ int register_app(app_t *(*select_aid)(app_t *, const uint8_t *, uint8_t))
 
 static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
-void led_set_blink(uint32_t mode)
-{
+void led_set_blink(uint32_t mode) {
     blink_interval_ms = mode;
 }
 
 uint32_t timeout = 0;
-void timeout_stop()
-{
+void timeout_stop() {
     timeout = 0;
 }
 
-void timeout_start()
-{
+void timeout_start() {
     timeout = board_millis();
 }
 
@@ -94,8 +90,7 @@ void execute_tasks();
 
 static bool req_button_pending = false;
 
-bool is_req_button_pending()
-{
+bool is_req_button_pending() {
     return req_button_pending;
 }
 
@@ -103,16 +98,14 @@ uint32_t button_timeout = 15000;
 bool cancel_button = false;
 
 #ifdef ENABLE_EMULATION
-uint32_t board_millis()
-{
+uint32_t board_millis() {
     struct timeval start;
     gettimeofday(&start, NULL);
-    return start.tv_sec * 1000 + start.tv_usec/1000;
+    return start.tv_sec * 1000 + start.tv_usec / 1000;
 }
 
 #else
-bool wait_button()
-{
+bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
     cancel_button = false;
@@ -144,8 +137,7 @@ bool wait_button()
 
 struct apdu apdu;
 
-void led_blinking_task()
-{
+void led_blinking_task() {
 #ifdef PICO_DEFAULT_LED_PIN
     static uint32_t start_ms = 0;
     static uint8_t led_state = false;
@@ -168,8 +160,7 @@ void led_blinking_task()
 #endif
 }
 
-void led_off_all()
-{
+void led_off_all() {
 #ifdef PIMORONI_TINY2040
     gpio_put(TINY2040_LED_R_PIN, 1);
     gpio_put(TINY2040_LED_G_PIN, 1);
@@ -181,8 +172,7 @@ void led_off_all()
 #endif
 }
 
-void init_rtc()
-{
+void init_rtc() {
 #ifndef ENABLE_EMULATION
     rtc_init();
     datetime_t dt = {
@@ -201,8 +191,7 @@ void init_rtc()
 extern void neug_task();
 extern void usb_task();
 
-void execute_tasks()
-{
+void execute_tasks() {
     usb_task();
 #ifndef ENABLE_EMULATION
     tud_task(); // tinyusb device task
@@ -210,8 +199,7 @@ void execute_tasks()
     led_blinking_task();
 }
 
-int main(void)
-{
+int main(void) {
 #ifndef ENABLE_EMULATION
     usb_init();
 

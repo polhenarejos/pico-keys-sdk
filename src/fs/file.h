@@ -29,7 +29,7 @@
 
 #define FILE_TYPE_UNKNOWN       0x00
 #define FILE_TYPE_DF            0x04
-#define FILE_TYPE_INTERNAL_EF	0x03
+#define FILE_TYPE_INTERNAL_EF   0x03
 #define FILE_TYPE_WORKING_EF    0x01
 #define FILE_TYPE_BSO           0x10
 #define FILE_PERSISTENT         0x20
@@ -68,8 +68,7 @@
 
 #define MAX_DEPTH 4
 
-typedef struct file
-{
+typedef struct file {
     const uint16_t fid;
     const uint8_t parent; //entry number in the whole table!!
     const uint8_t *name;
@@ -126,4 +125,3 @@ extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
 extern int delete_file(file_t *ef);
 
 #endif
-

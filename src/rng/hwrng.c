@@ -36,7 +36,8 @@ mbedtls_ctr_drbg_context ctr_drbg;
 extern uint32_t board_millis();
 #endif
 
-void adc_start() {
+void adc_start()
+{
 #ifndef ENABLE_EMULATION
     adc_init();
     adc_gpio_init(27);
@@ -44,10 +45,12 @@ void adc_start() {
 #endif
 }
 
-void adc_stop() {
+void adc_stop()
+{
 }
 #ifdef ENABLE_EMULATION
-uint32_t adc_read() {
+uint32_t adc_read()
+{
     return 0;
 }
 #endif
@@ -55,19 +58,25 @@ uint32_t adc_read() {
 static uint64_t random_word = 0xcbf29ce484222325;
 static uint8_t ep_round = 0;
 
-static void ep_init() {
+static void ep_init()
+{
     random_word = 0xcbf29ce484222325;
     ep_round = 0;
 #ifdef ENABLE_EMULATION
     mbedtls_entropy_context entropy;
-    mbedtls_entropy_init( &entropy );
-    mbedtls_ctr_drbg_init( &ctr_drbg );
-    mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) "RANDOM_GEN", 10 );
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    mbedtls_ctr_drbg_seed(&ctr_drbg,
+                          mbedtls_entropy_func,
+                          &entropy,
+                          (const unsigned char *) "RANDOM_GEN",
+                          10);
 #endif
 }
 
 /* Here, we assume a little endian architecture.  */
-static int ep_process () {
+static int ep_process()
+{
     if (ep_round == 0) {
         ep_init();
     }
@@ -75,16 +84,15 @@ static int ep_process () {
 #ifndef ENABLE_EMULATION
     for (int n = 0; n < 64; n++) {
         uint8_t bit1, bit2;
-        do
-        {
+        do {
             bit1 = rosc_hw->randombit&0xff;
             //sleep_ms(1);
             bit2 = rosc_hw->randombit&0xff;
-        } while(bit1 == bit2);
+        } while (bit1 == bit2);
         word = (word << 1) | bit1;
     }
 #else
-    mbedtls_ctr_drbg_random( &ctr_drbg, (uint8_t *)&word, sizeof( word ) );
+    mbedtls_ctr_drbg_random(&ctr_drbg, (uint8_t *) &word, sizeof(word));
 #endif
     random_word ^= word^board_millis()^adc_read();
     random_word *= 0x00000100000001B3;
@@ -95,19 +103,21 @@ static int ep_process () {
     return 0;
 }
 
-static const uint32_t *ep_output() {
-    return (uint32_t *)&random_word;
+static const uint32_t *ep_output()
+{
+    return (uint32_t *) &random_word;
 }
 
 struct rng_rb {
     uint32_t *buf;
     uint8_t head, tail;
     uint8_t size;
-    unsigned int full :1;
-    unsigned int empty :1;
+    unsigned int full : 1;
+    unsigned int empty : 1;
 };
 
-static void rb_init(struct rng_rb *rb, uint32_t *p, uint8_t size) {
+static void rb_init(struct rng_rb *rb, uint32_t *p, uint8_t size)
+{
 #ifdef ENABLE_EMULATION
 #endif
     rb->buf = p;
@@ -117,22 +127,28 @@ static void rb_init(struct rng_rb *rb, uint32_t *p, uint8_t size) {
     rb->empty = 1;
 }
 
-static void rb_add(struct rng_rb *rb, uint32_t v) {
+static void rb_add(struct rng_rb *rb, uint32_t v)
+{
     rb->buf[rb->tail++] = v;
-    if (rb->tail == rb->size)
+    if (rb->tail == rb->size) {
         rb->tail = 0;
-    if (rb->tail == rb->head)
+    }
+    if (rb->tail == rb->head) {
         rb->full = 1;
+    }
     rb->empty = 0;
 }
 
-static uint32_t rb_del(struct rng_rb *rb) {
+static uint32_t rb_del(struct rng_rb *rb)
+{
     uint32_t v = rb->buf[rb->head++];
 
-    if (rb->head == rb->size)
+    if (rb->head == rb->size) {
         rb->head = 0;
-    if (rb->head == rb->tail)
+    }
+    if (rb->head == rb->tail) {
         rb->empty = 1;
+    }
     rb->full = 0;
 
     return v;
@@ -140,26 +156,29 @@ static uint32_t rb_del(struct rng_rb *rb) {
 
 static struct rng_rb the_ring_buffer;
 
-void *neug_task() {
+void *neug_task()
+{
     struct rng_rb *rb = &the_ring_buffer;
 
     int n;
 
     if ((n = ep_process())) {
-	    int i;
-	    const uint32_t *vp;
-	    vp = ep_output();
+        int i;
+        const uint32_t *vp;
+        vp = ep_output();
 
-	    for (i = 0; i < n; i++) {
-	        rb_add (rb, *vp++);
-	        if (rb->full)
-		        break;
-	    }
-	}
+        for (i = 0; i < n; i++) {
+            rb_add(rb, *vp++);
+            if (rb->full) {
+                break;
+            }
+        }
+    }
     return NULL;
 }
 
-void neug_init(uint32_t *buf, uint8_t size) {
+void neug_init(uint32_t *buf, uint8_t size)
+{
     struct rng_rb *rb = &the_ring_buffer;
 
     rb_init(rb, buf, size);
@@ -169,40 +188,45 @@ void neug_init(uint32_t *buf, uint8_t size) {
     ep_init();
 }
 
-void neug_flush(void) {
+void neug_flush(void)
+{
     struct rng_rb *rb = &the_ring_buffer;
 
-    while (!rb->empty)
-        rb_del (rb);
+    while (!rb->empty) {
+        rb_del(rb);
+    }
 }
 
-uint32_t neug_get() {
+uint32_t neug_get()
+{
     struct rng_rb *rb = &the_ring_buffer;
     uint32_t v;
 
-    while (rb->empty)
+    while (rb->empty) {
         neug_task();
+    }
     v = rb_del(rb);
 
     return v;
 }
 
-void neug_wait_full() {
+void neug_wait_full()
+{
     struct rng_rb *rb = &the_ring_buffer;
 #ifndef ENABLE_EMULATION
     uint core = get_core_num();
 #endif
     while (!rb->full) {
 #ifndef ENABLE_EMULATION
-        if (core == 1)
+        if (core == 1) {
             sleep_ms(1);
-        else
+        } else
 #endif
-            neug_task();
+        neug_task();
     }
 }
 
-void neug_fini(void) {
+void neug_fini(void)
+{
     neug_get();
 }
-

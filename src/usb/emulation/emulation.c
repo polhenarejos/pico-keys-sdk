@@ -38,8 +38,7 @@ int msleep(long msec)
     struct timespec ts;
     int res;
 
-    if (msec < 0)
-    {
+    if (msec < 0) {
         errno = EINVAL;
         return -1;
     }
@@ -54,7 +53,8 @@ int msleep(long msec)
     return res;
 }
 
-int emul_init(char *host, uint16_t port) {
+int emul_init(char *host, uint16_t port)
+{
     struct sockaddr_in serv_addr;
     fprintf(stderr, "\n Starting emulation envionrment\n");
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -72,38 +72,43 @@ int emul_init(char *host, uint16_t port) {
         return -1;
     }
 
-    if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+    if (connect(sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         fprintf(stderr, "\nConnection Failed \n");
         return -1;
     }
-    int x = fcntl(sock ,F_GETFL, 0);
+    int x = fcntl(sock, F_GETFL, 0);
     fcntl(sock, F_SETFL, x | O_NONBLOCK);
     return 0;
 }
 
-uint8_t *driver_prepare_response_emul() {
+uint8_t *driver_prepare_response_emul()
+{
     apdu.rdata = usb_get_tx(ITF_EMUL);
     return apdu.rdata;
 }
 
-int driver_write_emul(const uint8_t *buffer, size_t buffer_size) {
+int driver_write_emul(const uint8_t *buffer, size_t buffer_size)
+{
     uint16_t size = htons(buffer_size);
     //DEBUG_PAYLOAD(buffer,buffer_size);
     int ret = 0;
     do {
         ret = send(sock, &size, sizeof(size), 0);
-        if (ret < 0)
+        if (ret < 0) {
             msleep(10);
-    } while(ret <= 0);
+        }
+    } while (ret <= 0);
     do {
-        ret = send(sock, buffer, (uint16_t)buffer_size, 0);
-        if (ret < 0)
+        ret = send(sock, buffer, (uint16_t) buffer_size, 0);
+        if (ret < 0) {
             msleep(10);
-    } while(ret <= 0);
+        }
+    } while (ret <= 0);
     return buffer_size;
 }
 
-uint32_t emul_write_offset(uint16_t size, uint16_t offset) {
+uint32_t emul_write_offset(uint16_t size, uint16_t offset)
+{
     if (size > 0) {
         //DEBUG_PAYLOAD(usb_get_tx(ITF_EMUL)+offset, size);
         return usb_write_offset(ITF_EMUL, size, offset);
@@ -111,29 +116,33 @@ uint32_t emul_write_offset(uint16_t size, uint16_t offset) {
     return 0;
 }
 
-uint32_t emul_write(uint16_t size) {
+uint32_t emul_write(uint16_t size)
+{
     return emul_write_offset(size, 0);
 }
 
-void driver_exec_finished_cont_emul(size_t size_next, size_t offset) {
+void driver_exec_finished_cont_emul(size_t size_next, size_t offset)
+{
     emul_write_offset(size_next, offset);
 }
 
-int driver_process_usb_packet_emul(uint16_t len) {
+int driver_process_usb_packet_emul(uint16_t len)
+{
     if (len > 0) {
         uint8_t *data = usb_get_rx(ITF_EMUL), *rdata = usb_get_tx(ITF_EMUL);
         if (len == 1) {
             uint8_t c = data[0];
             if (c == 4) {
-                if (ccid_atr)
+                if (ccid_atr) {
                     memcpy(rdata, ccid_atr+1, ccid_atr[0]);
+                }
                 emul_write(ccid_atr ? ccid_atr[0] : 0);
             }
-        }
-        else {
+        } else {
             DEBUG_PAYLOAD(data, len);
-            if (apdu_process(ITF_EMUL, data, len) > 0)
+            if (apdu_process(ITF_EMUL, data, len) > 0) {
                 process_apdu();
+            }
             apdu_finish();
             size_t ret = apdu_next();
             DEBUG_PAYLOAD(rdata, ret);
@@ -144,7 +153,8 @@ int driver_process_usb_packet_emul(uint16_t len) {
     return 0;
 }
 
-uint16_t emul_read() {
+uint16_t emul_read()
+{
     uint16_t len = 0;
     fd_set input;
     FD_ZERO(&input);
@@ -165,8 +175,9 @@ uint16_t emul_read() {
         if (len > 0) {
             while (true) {
                 valread = recv(sock, usb_get_rx(ITF_EMUL), len, 0);
-                if (valread > 0)
+                if (valread > 0) {
                     return valread;
+                }
                 msleep(10);
             }
         }

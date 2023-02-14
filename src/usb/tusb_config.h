@@ -29,7 +29,7 @@
 #include "usb.h"
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 //--------------------------------------------------------------------+
@@ -55,7 +55,8 @@
 #error CFG_TUSB_MCU must be defined
 #endif
 
-#if CFG_TUSB_MCU == OPT_MCU_LPC18XX || CFG_TUSB_MCU == OPT_MCU_LPC43XX || CFG_TUSB_MCU == OPT_MCU_MIMXRT10XX || \
+#if CFG_TUSB_MCU == OPT_MCU_LPC18XX || CFG_TUSB_MCU == OPT_MCU_LPC43XX || \
+    CFG_TUSB_MCU == OPT_MCU_MIMXRT10XX || \
     CFG_TUSB_MCU == OPT_MCU_NUC505 || CFG_TUSB_MCU == OPT_MCU_CXD56
 #define CFG_TUSB_RHPORT0_MODE     (OPT_MODE_DEVICE | OPT_MODE_HIGH_SPEED)
 #else
@@ -88,7 +89,7 @@
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
-#define CFG_TUSB_MEM_ALIGN        __attribute__ ((aligned(4)))
+#define CFG_TUSB_MEM_ALIGN        __attribute__((aligned(4)))
 #endif
 
 //--------------------------------------------------------------------
@@ -121,8 +122,7 @@
 #define CFG_TUD_HID_EP_BUFSIZE    64
 
 #ifdef __cplusplus
- }
+}
 #endif
 
 #endif /* _TUSB_CONFIG_H_ */
-

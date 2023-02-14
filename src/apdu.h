@@ -28,36 +28,35 @@
 typedef struct app {
     const uint8_t *aid;
     int (*process_apdu)();
-    struct app* (*select_aid)(struct app *, const uint8_t *, uint8_t);
+    struct app * (*select_aid)(struct app *, const uint8_t *, uint8_t);
     int (*unload)();
 } app_t;
 
-extern int register_app(app_t * (*)(app_t *, const uint8_t *, uint8_t));
+extern int register_app(app_t *(*)(app_t *, const uint8_t *, uint8_t));
 
-typedef struct cmd
-{
+typedef struct cmd {
     uint8_t ins;
     int (*cmd_handler)();
 } cmd_t;
 
 
 #if defined(DEBUG_APDU) && DEBUG_APDU == 1
-#define DEBUG_PAYLOAD(_p,_s) { \
-    printf("Payload %s (%d bytes):\r\n", #_p,(int)(_s));\
-    for (int _i = 0; _i < _s; _i += 16) {\
-        printf("%"PRIxPTR"h : ",(uintptr_t)(_i+_p));\
-        for (int _j = 0; _j < 16; _j++) {\
-            if (_j < _s-_i) printf("%02X ",(_p)[_i+_j]);\
-            else printf("   ");\
-            if (_j == 7) printf(" ");\
+#define DEBUG_PAYLOAD(_p, _s) { \
+        printf("Payload %s (%d bytes):\r\n", #_p, (int) (_s)); \
+        for (int _i = 0; _i < _s; _i += 16) { \
+            printf("%" PRIxPTR "h : ", (uintptr_t) (_i+_p)); \
+            for (int _j = 0; _j < 16; _j++) { \
+                if (_j < _s-_i) printf("%02X ", (_p)[_i+_j]); \
+                else printf("   "); \
+                if (_j == 7) printf(" "); \
             } printf(":  "); \
-            printf("\r\n");\
+            printf("\r\n"); \
         } printf("\r\n"); \
-    }
+}
 #define DEBUG_DATA(_p, _s)                               \
     {                                                    \
-        printf("Data %s (%d bytes):\r\n", #_p, (int)(_s));      \
-        char *tmp = (char *)calloc(1, 2 * _s + 1); \
+        printf("Data %s (%d bytes):\r\n", #_p, (int) (_s));      \
+        char *tmp = (char *) calloc(1, 2 * _s + 1); \
         for (int _i = 0; _i < _s; _i++)                  \
         {                                                \
             sprintf(&tmp[2 * _i], "%02X", (_p)[_i]);       \
@@ -67,8 +66,8 @@ typedef struct cmd
     }
 
 #else
-#define DEBUG_PAYLOAD(_p,_s)
-#define DEBUG_DATA(_p,_s)
+#define DEBUG_PAYLOAD(_p, _s)
+#define DEBUG_DATA(_p, _s)
 #endif
 
 extern uint8_t num_apps;
@@ -83,7 +82,7 @@ struct apdu {
     uint16_t sw;
     uint8_t *rdata;
     uint16_t rlen;
-} __attribute__ ((__packed__));
+} __attribute__((__packed__));
 
 #define CLA(a) a.header[0]
 #define INS(a) a.header[1]
@@ -95,7 +94,7 @@ struct apdu {
 
 extern struct apdu apdu;
 
-extern uint16_t set_res_sw (uint8_t sw1, uint8_t sw2);
+extern uint16_t set_res_sw(uint8_t sw1, uint8_t sw2);
 extern int process_apdu();
 extern size_t apdu_process(uint8_t, const uint8_t *buffer, size_t buffer_size);
 extern void apdu_finish();

@@ -56,8 +56,7 @@ enum {
     ITF_TOTAL
 };
 
-enum
-{
+enum {
     REPORT_ID_KEYBOARD = 1,
     REPORT_ID_COUNT
 };

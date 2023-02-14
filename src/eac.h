@@ -28,7 +28,7 @@ typedef enum MSE_protocol {
     MSE_AES = 0,
     MSE_3DES,
     MSE_NONE
-}MSE_protocol;
+} MSE_protocol;
 
 extern void sm_derive_all_keys(const uint8_t *input, size_t input_len);
 extern void sm_set_protocol(MSE_protocol proto);

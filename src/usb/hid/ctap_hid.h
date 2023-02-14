@@ -45,21 +45,21 @@ extern "C" {
 #define TYPE_CONT               0x00    // Continuation frame identifier
 
 typedef struct {
-  uint32_t cid;                        // Channel identifier
-  union {
-    uint8_t type;                      // Frame type - b7 defines type
-    struct {
-      uint8_t cmd;                     // Command - b7 set
-      uint8_t bcnth;                   // Message byte count - high part
-      uint8_t bcntl;                   // Message byte count - low part
-      uint8_t data[HID_RPT_SIZE - 7];  // Data payload
-    } init;
-    struct {
-      uint8_t seq;                     // Sequence number - b7 cleared
-      uint8_t data[HID_RPT_SIZE - 5];  // Data payload
-    } cont;
-  };
-} __attribute__ ((__packed__)) CTAPHID_FRAME;
+    uint32_t cid;                      // Channel identifier
+    union {
+        uint8_t type;                  // Frame type - b7 defines type
+        struct {
+            uint8_t cmd;               // Command - b7 set
+            uint8_t bcnth;             // Message byte count - high part
+            uint8_t bcntl;             // Message byte count - low part
+            uint8_t data[HID_RPT_SIZE - 7]; // Data payload
+        } init;
+        struct {
+            uint8_t seq;               // Sequence number - b7 cleared
+            uint8_t data[HID_RPT_SIZE - 5]; // Data payload
+        } cont;
+    };
+} __attribute__((__packed__)) CTAPHID_FRAME;
 
 extern CTAPHID_FRAME *ctap_req, *ctap_resp;
 
@@ -108,27 +108,27 @@ extern CTAPHID_FRAME *ctap_req, *ctap_resp;
 #define CAPFLAG_CBOR            0x04    // Device supports CBOR command
 
 typedef struct {
-  uint8_t nonce[INIT_NONCE_SIZE];       // Client application nonce
-} __attribute__ ((__packed__)) CTAPHID_INIT_REQ;
+    uint8_t nonce[INIT_NONCE_SIZE];     // Client application nonce
+} __attribute__((__packed__)) CTAPHID_INIT_REQ;
 
 typedef struct {
-  uint8_t nonce[INIT_NONCE_SIZE];       // Client application nonce
-  uint32_t cid;                         // Channel identifier
-  uint8_t versionInterface;             // Interface version
-  uint8_t versionMajor;                 // Major version number
-  uint8_t versionMinor;                 // Minor version number
-  uint8_t versionBuild;                 // Build version number
-  uint8_t capFlags;                     // Capabilities flags
-} __attribute__ ((__packed__)) CTAPHID_INIT_RESP;
+    uint8_t nonce[INIT_NONCE_SIZE];     // Client application nonce
+    uint32_t cid;                       // Channel identifier
+    uint8_t versionInterface;           // Interface version
+    uint8_t versionMajor;               // Major version number
+    uint8_t versionMinor;               // Minor version number
+    uint8_t versionBuild;               // Build version number
+    uint8_t capFlags;                   // Capabilities flags
+} __attribute__((__packed__)) CTAPHID_INIT_RESP;
 
 // CTAPHID_SYNC command defines
 
 typedef struct {
-  uint8_t nonce;                        // Client application nonce
+    uint8_t nonce;                      // Client application nonce
 } CTAPHID_SYNC_REQ;
 
 typedef struct {
-  uint8_t nonce;                        // Client application nonce
+    uint8_t nonce;                      // Client application nonce
 } CTAPHID_SYNC_RESP;
 
 // Low-level error codes. Return as negatives.

@@ -52,12 +52,9 @@ else()
     endif(USB_ITF_CCID)
 endif()
 add_definitions(-DDEBUG_APDU=${DEBUG_APDU})
-
-configure_file(${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include/mbedtls COPYONLY)
+add_definitions(-DMBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
 
 message(STATUS "USB VID/PID: ${USB_VID}:${USB_PID}")
-
-configure_file(${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include/mbedtls COPYONLY)
 
 set(SOURCES ${SOURCES}
 ${CMAKE_CURRENT_LIST_DIR}/src/main.c
@@ -76,6 +73,7 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1write.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/bignum.c
+${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ccm.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cipher.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cipher_wrap.c
@@ -84,13 +82,13 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecdsa.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecdh.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp_curves.c
+${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/gcm.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/hkdf.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md5.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/oid.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkcs5.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/platform_util.c
-${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/rsa.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/rsa_alt_helpers.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha1.c

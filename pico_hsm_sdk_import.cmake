@@ -73,6 +73,7 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1write.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/bignum.c
+${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/bignum_core.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ccm.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cipher.c
@@ -83,6 +84,7 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecdh.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp_curves.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/gcm.c
+${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/hash_info.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/hkdf.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md5.c

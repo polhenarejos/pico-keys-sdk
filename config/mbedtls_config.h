@@ -2212,7 +2212,9 @@
  *
  * This module provides the CTR_DRBG AES random number generator.
  */
-//#define MBEDTLS_CTR_DRBG_C
+#ifdef ENABLE_EMULATION
+#define MBEDTLS_CTR_DRBG_C
+#endif
 
 /**
  * \def MBEDTLS_DEBUG_C
@@ -2347,7 +2349,9 @@
  *
  * This module provides a generic entropy pool
  */
-//#define MBEDTLS_ENTROPY_C
+#ifdef ENABLE_EMULATION
+#define MBEDTLS_ENTROPY_C
+#endif
 
 /**
  * \def MBEDTLS_ERROR_C

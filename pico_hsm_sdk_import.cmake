@@ -133,7 +133,9 @@ function(add_impl_library target)
     target_compile_definitions(${target} INTERFACE LIB_${TARGET_UPPER}=1)
 endfunction()
 if (ENABLE_EMULATION)
-    set(CMAKE_OSX_SYSROOT "/Library/Developer/CommandLineTools//SDKs/MacOSX11.3.sdk")
+    if(APPLE)
+        set(CMAKE_OSX_SYSROOT "/Library/Developer/CommandLineTools//SDKs/MacOSX11.3.sdk")
+    endif()
     add_definitions(-DENABLE_EMULATION)
     set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
@@ -177,7 +179,7 @@ else()
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )
     if (NOT TARGET pico_hsm_sdk)
-        pico_add_impl_library(pico_hsm_sdk)
+        pico_add_library(pico_hsm_sdk)
 
         target_sources(pico_hsm_sdk INTERFACE
                 ${SOURCES}

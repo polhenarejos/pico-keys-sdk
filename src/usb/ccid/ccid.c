@@ -135,12 +135,16 @@ void tud_vendor_rx_cb(uint8_t itf) {
 }
 
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
-    printf("written %ld\n", sent_bytes);
+    //printf("written %ld\n", sent_bytes);
     usb_write_flush(ITF_CCID);
 }
 
 int driver_write_ccid(const uint8_t *buffer, size_t buffer_size) {
-    return tud_vendor_write(buffer, buffer_size);
+    int r = tud_vendor_write(buffer, buffer_size);
+    if (r > 0) {
+        return MAX(tud_vendor_flush(), r);
+    }
+    return r;
 }
 
 size_t driver_read_ccid(uint8_t *buffer, size_t buffer_size) {

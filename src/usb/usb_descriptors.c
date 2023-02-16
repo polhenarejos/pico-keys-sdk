@@ -132,7 +132,7 @@ tusb_desc_endpoint_t const desc_ep1 = {
     .bDescriptorType     = TUSB_DESC_ENDPOINT,
     .bEndpointAddress    = TUSB_DIR_IN_MASK | 1,
     .bmAttributes.xfer   = TUSB_XFER_BULK,
-    .wMaxPacketSize.size = (64),
+    .wMaxPacketSize = (64),
     .bInterval           = 0
 };
 
@@ -141,7 +141,7 @@ tusb_desc_endpoint_t const desc_ep2 = {
     .bDescriptorType     = TUSB_DESC_ENDPOINT,
     .bEndpointAddress    = 2,
     .bmAttributes.xfer   = TUSB_XFER_BULK,
-    .wMaxPacketSize.size = (64),
+    .wMaxPacketSize = (64),
     .bInterval           = 0
 };
 #endif

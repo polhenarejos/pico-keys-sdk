@@ -74,7 +74,7 @@ tusb_desc_configuration_t const desc_config  = {
     .wTotalLength        = (sizeof(tusb_desc_configuration_t)
 #ifdef USB_ITF_CCID
                             + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +
-                            2 * sizeof(tusb_desc_endpoint_t)
+                            3 * sizeof(tusb_desc_endpoint_t)
 #endif
 #ifdef USB_ITF_HID
                             + TUD_HID_INOUT_DESC_LEN + TUD_HID_DESC_LEN
@@ -120,7 +120,7 @@ tusb_desc_interface_t const desc_interface = {
     .bDescriptorType    = TUSB_DESC_INTERFACE,
     .bInterfaceNumber   = ITF_CCID,
     .bAlternateSetting  = 0,
-    .bNumEndpoints      = 2,
+    .bNumEndpoints      = 3,
     .bInterfaceClass    = TUSB_CLASS_SMART_CARD,
     .bInterfaceSubClass = 0,
     .bInterfaceProtocol = 0,
@@ -139,8 +139,17 @@ tusb_desc_endpoint_t const desc_ep1 = {
 tusb_desc_endpoint_t const desc_ep2 = {
     .bLength             = sizeof(tusb_desc_endpoint_t),
     .bDescriptorType     = TUSB_DESC_ENDPOINT,
-    .bEndpointAddress    = 2,
+    .bEndpointAddress    = 1,
     .bmAttributes.xfer   = TUSB_XFER_BULK,
+    .wMaxPacketSize = (64),
+    .bInterval           = 0
+};
+
+tusb_desc_endpoint_t const desc_ep3 = {
+    .bLength             = sizeof(tusb_desc_endpoint_t),
+    .bDescriptorType     = TUSB_DESC_ENDPOINT,
+    .bEndpointAddress    = TUSB_DIR_IN_MASK | 2,
+    .bmAttributes.xfer   = TUSB_XFER_INTERRUPT,
     .wMaxPacketSize = (64),
     .bInterval           = 0
 };
@@ -149,7 +158,7 @@ tusb_desc_endpoint_t const desc_ep2 = {
 static uint8_t desc_config_extended[sizeof(tusb_desc_configuration_t)
 #ifdef USB_ITF_CCID
                                     + sizeof(tusb_desc_interface_t) +
-                                    sizeof(struct ccid_class_descriptor) + 2 *
+                                    sizeof(struct ccid_class_descriptor) + 3 *
                                     sizeof(tusb_desc_endpoint_t)
 #endif
 #ifdef USB_ITF_HID
@@ -213,6 +222,7 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
         p += sizeof(struct ccid_class_descriptor);
         memcpy(p, &desc_ep1, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
         memcpy(p, &desc_ep2, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
+        memcpy(p, &desc_ep3, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
 #endif
         initd = 1;
     }

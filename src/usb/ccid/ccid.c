@@ -101,6 +101,7 @@ struct ccid_header {
 
 uint8_t ccid_status = 1;
 static uint8_t itf_num;
+extern tusb_desc_endpoint_t const desc_ep3;
 
 void ccid_write_offset(uint16_t size, uint16_t offset) {
     if (*usb_get_tx(ITF_CCID) + offset != 0x81) {
@@ -268,8 +269,6 @@ uint8_t *driver_prepare_response_ccid() {
 static void ccid_init_cb(void) {
     TU_LOG1("-------- CCID INIT\r\n");
     vendord_init();
-
-    //ccid_notify_slot_change(c);
 }
 
 static void ccid_reset_cb(uint8_t rhport) {
@@ -288,11 +287,16 @@ static uint16_t ccid_open(uint8_t rhport, tusb_desc_interface_t const *itf_desc,
     //vendord_open expects a CLASS_VENDOR interface class
     memcpy(itf_vendor, itf_desc, sizeof(uint8_t) * max_len);
     ((tusb_desc_interface_t *) itf_vendor)->bInterfaceClass = TUSB_CLASS_VENDOR_SPECIFIC;
-    vendord_open(rhport, (tusb_desc_interface_t *) itf_vendor, max_len);
+    ((tusb_desc_interface_t *) itf_vendor)->bNumEndpoints -= 1;
+    vendord_open(rhport, (tusb_desc_interface_t *) itf_vendor, max_len-sizeof(tusb_desc_endpoint_t));
+    TU_ASSERT(usbd_edpt_open(rhport, &desc_ep3), 0);
     free(itf_vendor);
 
+    uint8_t msg[] = {0x50, 0x03};
+    usbd_edpt_xfer(rhport, desc_ep3.bEndpointAddress, msg, sizeof(msg));
+
     uint16_t const drv_len = sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +
-                             2 * sizeof(tusb_desc_endpoint_t);
+                             3 * sizeof(tusb_desc_endpoint_t);
     TU_VERIFY(max_len >= drv_len, 0);
 
     itf_num = itf_desc->bInterfaceNumber;

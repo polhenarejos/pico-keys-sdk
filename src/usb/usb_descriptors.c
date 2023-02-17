@@ -158,36 +158,6 @@ static uint8_t desc_config_extended[sizeof(tusb_desc_configuration_t)
 ];
 
 #ifdef USB_ITF_HID
-#define HID_USAGE_PAGE_FIDO            0xF1D0
-
-enum {
-    HID_USAGE_FIDO_U2FHID   = 0x01,// U2FHID usage for top-level collection
-    HID_USAGE_FIDO_DATA_IN  = 0x20,// Raw IN data report
-    HID_USAGE_FIDO_DATA_OUT = 0x21 // Raw OUT data report
-};
-
-#define TUD_HID_REPORT_DESC_FIDO_U2F(report_size, ...) \
-    HID_USAGE_PAGE_N(HID_USAGE_PAGE_FIDO, 2), \
-    HID_USAGE(HID_USAGE_FIDO_U2FHID), \
-    HID_COLLECTION(HID_COLLECTION_APPLICATION), \
-    /* Report ID if any */ \
-    __VA_ARGS__ \
-    /* Usage Data In */ \
-    HID_USAGE(HID_USAGE_FIDO_DATA_IN), \
-    HID_LOGICAL_MIN(0), \
-    HID_LOGICAL_MAX_N(0xff, 2), \
-    HID_REPORT_SIZE(8), \
-    HID_REPORT_COUNT(report_size), \
-    HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), \
-    /* Usage Data Out */ \
-    HID_USAGE(HID_USAGE_FIDO_DATA_OUT), \
-    HID_LOGICAL_MIN(0), \
-    HID_LOGICAL_MAX_N(0xff, 2), \
-    HID_REPORT_SIZE(8), \
-    HID_REPORT_COUNT(report_size), \
-    HID_OUTPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), \
-    HID_COLLECTION_END \
-
 uint8_t const desc_hid_report[] = {
     TUD_HID_REPORT_DESC_FIDO_U2F(CFG_TUD_HID_EP_BUFSIZE)
 };

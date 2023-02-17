@@ -167,7 +167,7 @@ void hid_task(void) {
     }
 }
 
-void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, /*uint16_t*/ uint8_t len) {
+void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len) {
     if (send_buffer_size > 0 && instance == ITF_HID) {
         uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4] + 1;
         if (last_write_result == true) {

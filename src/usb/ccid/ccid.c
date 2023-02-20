@@ -205,7 +205,7 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
                 /* Values from gnuk. Not specified in ICCD spec. */
                 const uint8_t params[] =  {
                     0x11, /* bmFindexDindex */
-                    0x11, /* bmTCCKST1 */
+                    0x10, /* bmTCCKST1 */
                     0xFE, /* bGuardTimeT1 */
                     0x55, /* bmWaitingIntegersT1 */
                     0x03, /* bClockStop */
@@ -217,7 +217,7 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
                 ccid_response->bSlot = 0;
                 ccid_response->bSeq = ccid_header->bSeq;
                 ccid_response->abRFU0 = ccid_status;
-                ccid_response->abRFU1 = 1;
+                ccid_response->abRFU1 = 0x0100;
                 memcpy(&ccid_response->apdu, params, sizeof(params));
                 ccid_write(sizeof(params));
             }
@@ -228,16 +228,6 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
             return apdu_sent;
         }
     }
-    /*
-       if (usb_read_available() && c->epo->ready) {
-        if ()
-        uint32_t count = usb_read(endp1_rx_buf, sizeof(endp1_rx_buf));
-        //if (endp1_rx_buf[0] != 0x65)
-            DEBUG_PAYLOAD(endp1_rx_buf, count);
-        //DEBUG_PAYLOAD(endp1_rx_buf, count);
-        ccid_rx_ready(count);
-       }
-     */
     return 0;
 }
 

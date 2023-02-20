@@ -50,19 +50,19 @@
 #define USB_BUF_SIZE (MAX_CMD_APDU_DATA_SIZE + 20 + 9)
 #endif
 
-#define CCID_SET_PARAMS     0x61 /* non-ICCD command  */
-#define CCID_POWER_ON       0x62
-#define CCID_POWER_OFF      0x63
-#define CCID_SLOT_STATUS    0x65 /* non-ICCD command */
-#define CCID_SECURE     0x69 /* non-ICCD command */
-#define CCID_GET_PARAMS     0x6C /* non-ICCD command */
-#define CCID_RESET_PARAMS   0x6D /* non-ICCD command */
-#define CCID_XFR_BLOCK      0x6F
-#define CCID_DATA_BLOCK_RET 0x80
+#define CCID_SET_PARAMS         0x61 /* non-ICCD command  */
+#define CCID_POWER_ON           0x62
+#define CCID_POWER_OFF          0x63
+#define CCID_SLOT_STATUS        0x65 /* non-ICCD command */
+#define CCID_SECURE             0x69 /* non-ICCD command */
+#define CCID_GET_PARAMS         0x6C /* non-ICCD command */
+#define CCID_RESET_PARAMS       0x6D /* non-ICCD command */
+#define CCID_XFR_BLOCK          0x6F
+#define CCID_DATA_BLOCK_RET     0x80
 #define CCID_SLOT_STATUS_RET    0x81 /* non-ICCD result */
-#define CCID_PARAMS_RET     0x82 /* non-ICCD result */
+#define CCID_PARAMS_RET         0x82 /* non-ICCD result */
 
-#define CCID_MSG_SEQ_OFFSET 6
+#define CCID_MSG_SEQ_OFFSET     6
 #define CCID_MSG_STATUS_OFFSET  7
 #define CCID_MSG_ERROR_OFFSET   8
 #define CCID_MSG_CHAIN_OFFSET   9
@@ -162,10 +162,10 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
         //printf("%d %d %x\r\n",tccid->dwLength,rx_read-10,tccid->bMessageType);
         if (ccid_header->dwLength <= rx_read - 10) {
             size_t apdu_sent = 0;
-            if (ccid_header->bMessageType != 0x65) {
+            if (ccid_header->bMessageType != CCID_SLOT_STATUS) {
                 DEBUG_PAYLOAD(usb_get_rx(ITF_CCID), usb_read_available(ITF_CCID));
             }
-            if (ccid_header->bMessageType == 0x65) {
+            if (ccid_header->bMessageType == CCID_SLOT_STATUS) {
                 ccid_response->bMessageType = CCID_SLOT_STATUS_RET;
                 ccid_response->dwLength = 0;
                 ccid_response->bSlot = 0;
@@ -174,9 +174,9 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
                 ccid_response->abRFU1 = 0;
                 ccid_write(0);
             }
-            else if (ccid_header->bMessageType == 0x62) {
+            else if (ccid_header->bMessageType == CCID_POWER_ON) {
                 size_t size_atr = (ccid_atr ? ccid_atr[0] : 0);
-                ccid_response->bMessageType = 0x80;
+                ccid_response->bMessageType = CCID_DATA_BLOCK_RET;
                 ccid_response->dwLength = size_atr;
                 ccid_response->bSlot = 0;
                 ccid_response->bSeq = ccid_header->bSeq;
@@ -188,7 +188,7 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
                 ccid_status = 0;
                 ccid_write(size_atr);
             }
-            else if (ccid_header->bMessageType == 0x63) {
+            else if (ccid_header->bMessageType == CCID_POWER_OFF) {
                 if (ccid_status == 0) {
                     card_exit(0);
                 }
@@ -201,7 +201,27 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
                 ccid_response->abRFU1 = 0;
                 ccid_write(0);
             }
-            else if (ccid_header->bMessageType == 0x6F) {
+            else if (ccid_header->bMessageType == CCID_SET_PARAMS || ccid_header->bMessageType == CCID_GET_PARAMS || ccid_header->bMessageType == CCID_RESET_PARAMS) {
+                /* Values from gnuk. Not specified in ICCD spec. */
+                const uint8_t params[] =  {
+                    0x11, /* bmFindexDindex */
+                    0x11, /* bmTCCKST1 */
+                    0xFE, /* bGuardTimeT1 */
+                    0x55, /* bmWaitingIntegersT1 */
+                    0x03, /* bClockStop */
+                    0xFE, /* bIFSC */
+                    0    /* bNadValue */
+                };
+                ccid_response->bMessageType = CCID_PARAMS_RET;
+                ccid_response->dwLength = sizeof(params);
+                ccid_response->bSlot = 0;
+                ccid_response->bSeq = ccid_header->bSeq;
+                ccid_response->abRFU0 = ccid_status;
+                ccid_response->abRFU1 = 1;
+                memcpy(&ccid_response->apdu, params, sizeof(params));
+                ccid_write(sizeof(params));
+            }
+            else if (ccid_header->bMessageType == CCID_XFR_BLOCK) {
                 apdu_sent = apdu_process(ITF_CCID, &ccid_header->apdu, ccid_header->dwLength);
             }
             usb_clear_rx(ITF_CCID);

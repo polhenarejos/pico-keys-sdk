@@ -190,9 +190,10 @@ static uint8_t desc_hid_kb[] = {
     TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE,
                        sizeof(desc_hid_report_kb), 0x80 | (EPNUM_HID + 1), 16, 5)
 };
-
+#include "apdu.h"
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {
     printf("report_cb %d\n", itf);
+DEBUG_DATA(desc_hid_report, sizeof(desc_hid_report));
     if (itf == ITF_HID) {
         return desc_hid_report;
     }

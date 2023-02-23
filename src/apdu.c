@@ -95,6 +95,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
         timeout_stop();
         *(uint16_t *) rdata_gr = rdata_bk;
         if (apdu.rlen <= apdu.ne) {
+#ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
             if (itf == ITF_HID) {
                 driver_exec_finished_cont_hid(apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
@@ -105,10 +106,8 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
                 driver_exec_finished_cont_ccid(apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
             }
 #endif
-#ifdef ENABLE_EMULATION
-            if (itf == ITF_EMUL) {
-                driver_exec_finished_cont_emul(apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
-            }
+#else
+            driver_exec_finished_cont_emul(itf, apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
 #endif
             //Prepare next RAPDU
             apdu.sw = 0;
@@ -125,6 +124,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
             else {
                 rdata_gr[1] = apdu.rlen - apdu.ne;
             }
+#ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
             if (itf == ITF_HID) {
                 driver_exec_finished_cont_hid(apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
@@ -135,10 +135,8 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
                 driver_exec_finished_cont_ccid(apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
             }
 #endif
-#ifdef ENABLE_EMULATION
-            if (itf == ITF_EMUL) {
-                driver_exec_finished_cont_emul(apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
-            }
+#else
+            driver_exec_finished_cont_emul(itf, apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
 #endif
             apdu.rlen -= apdu.ne;
         }

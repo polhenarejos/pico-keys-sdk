@@ -42,16 +42,12 @@
 
 
 enum {
-#ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
     ITF_HID = 0,
     ITF_KEYBOARD,
 #endif
 #ifdef USB_ITF_CCID
     ITF_CCID,
-#endif
-#else
-    ITF_EMUL = 0,
 #endif
     ITF_TOTAL
 };
@@ -93,16 +89,16 @@ extern int driver_process_usb_nopacket_ccid();
 #endif
 
 #ifdef ENABLE_EMULATION
-extern int driver_process_usb_packet_emul(uint16_t rx_read);
-extern void driver_exec_finished_emul(size_t size_next);
-extern void driver_exec_finished_cont_emul(size_t size_next, size_t offset);
-extern void driver_exec_timeout_emul();
-extern bool driver_mounted_emul();
-extern uint8_t *driver_prepare_response_emul();
-extern int driver_write_emul(const uint8_t *, size_t);
-extern size_t driver_read_emul(uint8_t *, size_t);
-extern int driver_process_usb_nopacket_emul();
-extern uint16_t emul_read();
+extern int driver_process_usb_packet_emul(uint8_t, uint16_t rx_read);
+extern void driver_exec_finished_emul(uint8_t, size_t size_next);
+extern void driver_exec_finished_cont_emul(uint8_t, size_t size_next, size_t offset);
+extern void driver_exec_timeout_emul(uint8_t);
+extern bool driver_mounted_emul(uint8_t);
+extern uint8_t *driver_prepare_response_emul(uint8_t);
+extern int driver_write_emul(uint8_t, const uint8_t *, size_t);
+extern size_t driver_read_emul(uint8_t, uint8_t *, size_t);
+extern int driver_process_usb_nopacket_emul(uint8_t);
+extern uint16_t emul_read(uint8_t);
 #endif
 
 extern size_t usb_rx(uint8_t itf, const uint8_t *buffer, size_t len);

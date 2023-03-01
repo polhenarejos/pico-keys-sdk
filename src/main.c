@@ -46,6 +46,49 @@
 #include "random.h"
 #include "hsm.h"
 #include "apdu.h"
+#ifdef PICO_DEFAULT_WS2812_PIN
+#include "hardware/pio.h"
+#include "hardware/clocks.h"
+#define ws2812_wrap_target 0
+#define ws2812_wrap 3
+#define ws2812_T1 2
+#define ws2812_T2 5
+#define ws2812_T3 3
+static const uint16_t ws2812_program_instructions[] = {
+            //     .wrap_target
+    0x6221, //  0: out    x, 1            side 0 [2]
+    0x1123, //  1: jmp    !x, 3           side 1 [1]
+    0x1400, //  2: jmp    0               side 1 [4]
+    0xa442, //  3: nop                    side 0 [4]
+            //     .wrap
+};
+static const struct pio_program ws2812_program = {
+    .instructions = ws2812_program_instructions,
+    .length = 4,
+    .origin = -1,
+};
+
+static inline pio_sm_config ws2812_program_get_default_config(uint offset) {
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, offset + ws2812_wrap_target, offset + ws2812_wrap);
+    sm_config_set_sideset(&c, 1, false, false);
+    return c;
+}
+static inline void ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, float freq, bool rgbw) {
+    pio_gpio_init(pio, pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+    pio_sm_config c = ws2812_program_get_default_config(offset);
+    sm_config_set_sideset_pins(&c, pin);
+    sm_config_set_out_shift(&c, false, true, rgbw ? 32 : 24);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+    int cycles_per_bit = ws2812_T1 + ws2812_T2 + ws2812_T3;
+    float div = clock_get_hz(clk_sys) / (freq * cycles_per_bit);
+    sm_config_set_clkdiv(&c, div);
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+#endif
+
 #ifndef ENABLE_EMULATION
 #include "usb.h"
 #include "hardware/rtc.h"
@@ -138,16 +181,18 @@ bool wait_button() {
 struct apdu apdu;
 
 void led_blinking_task() {
-#ifdef PICO_DEFAULT_LED_PIN
     static uint32_t start_ms = 0;
     static uint8_t led_state = false;
-    static uint8_t led_color = PICO_DEFAULT_LED_PIN;
 #ifdef PICO_DEFAULT_LED_PIN_INVERTED
     uint32_t interval = !led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
 #else
     uint32_t interval = led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
 #endif
+#ifdef PICO_DEFAULT_LED_PIN
+    static uint8_t led_color = PICO_DEFAULT_LED_PIN;
+#elif defined (PICO_DEFAULT_WS2812_PIN)
 
+#endif
 
     // Blink every interval ms
     if (board_millis() - start_ms < interval) {
@@ -155,9 +200,15 @@ void led_blinking_task() {
     }
     start_ms += interval;
 
+#ifdef PICO_DEFAULT_LED_PIN
     gpio_put(led_color, led_state);
-    led_state ^= 1; // toggle
+#elif defined (PICO_DEFAULT_WS2812_PIN)
+    if (led_state == 0)
+        pio_sm_put_blocking(pio0, 0, 0);
+    else
+        pio_sm_put_blocking(pio0, 0, 0xff000000);
 #endif
+    led_state ^= 1; // toggle
 }
 
 void led_off_all() {
@@ -165,10 +216,14 @@ void led_off_all() {
     gpio_put(TINY2040_LED_R_PIN, 1);
     gpio_put(TINY2040_LED_G_PIN, 1);
     gpio_put(TINY2040_LED_B_PIN, 1);
-#else
-#ifdef PICO_DEFAULT_LED_PIN
+#elif defined(PICO_DEFAULT_LED_PIN)
     gpio_put(PICO_DEFAULT_LED_PIN, 0);
-#endif
+#elif (PICO_DEFAULT_WS2812_PIN)
+    PIO pio = pio0;
+    int sm = 0;
+    uint offset = pio_add_program(pio, &ws2812_program);
+
+    ws2812_program_init(pio, sm, offset, PICO_DEFAULT_WS2812_PIN, 800000, true);
 #endif
 }
 

@@ -134,6 +134,8 @@ int emul_init(char *host, uint16_t port) {
 
 uint8_t *driver_prepare_response_emul(uint8_t itf) {
     apdu.rdata = usb_get_tx(itf);
+    if (itf == ITF_HID)
+        apdu.rdata += 7;
     return apdu.rdata;
 }
 

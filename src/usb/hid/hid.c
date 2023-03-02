@@ -46,7 +46,7 @@ bool driver_mounted_hid() {
 }
 
 CTAPHID_FRAME *ctap_req = NULL, *ctap_resp = NULL;
-
+void send_keepalive();
 int driver_init_hid() {
 #ifndef ENABLE_EMULATION
     tud_init(BOARD_TUD_RHPORT);
@@ -439,6 +439,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             if (apdu_sent < 0) {
                 return ctap_error(-apdu_sent);
             }
+            send_keepalive();
         }
         else if (ctap_req->init.cmd == CTAPHID_CANCEL) {
             ctap_error(0x2D);

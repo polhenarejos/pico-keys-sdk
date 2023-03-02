@@ -126,6 +126,14 @@ function(add_impl_library target)
     string(TOUPPER ${target} TARGET_UPPER)
     target_compile_definitions(${target} INTERFACE LIB_${TARGET_UPPER}=1)
 endfunction()
+if(${USB_ITF_HID})
+    set(SOURCES ${SOURCES}
+    ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
+    )
+    set(INCLUDES ${INCLUDES}
+    ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid
+    )
+endif()
 if (ENABLE_EMULATION)
     if(APPLE)
         set(CMAKE_OSX_SYSROOT "/Library/Developer/CommandLineTools//SDKs/MacOSX11.3.sdk")
@@ -151,14 +159,6 @@ if (ENABLE_EMULATION)
         )
     endif()
 else()
-    if(${USB_ITF_HID})
-        set(SOURCES ${SOURCES}
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
-        )
-        set(INCLUDES ${INCLUDES}
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid
-        )
-    endif()
 
     if (${USB_ITF_CCID})
         set(SOURCES ${SOURCES}

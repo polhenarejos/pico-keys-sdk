@@ -15,13 +15,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef ENABLE_EMULATION
 #include "tusb.h"
+#include "bsp/board.h"
+#endif
 #include "ctap_hid.h"
 #include "hsm.h"
 #include "hsm_version.h"
 #include "apdu.h"
 #include "usb.h"
-#include "bsp/board.h"
 
 static bool mounted = false;
 extern int cbor_process(uint8_t, const uint8_t *, size_t);
@@ -46,7 +48,9 @@ bool driver_mounted_hid() {
 CTAPHID_FRAME *ctap_req = NULL, *ctap_resp = NULL;
 
 int driver_init_hid() {
+#ifndef ENABLE_EMULATION
     tud_init(BOARD_TUD_RHPORT);
+#endif
     ctap_req = (CTAPHID_FRAME *) usb_get_rx(ITF_HID);
     apdu.header = ctap_req->init.data;
 
@@ -62,6 +66,7 @@ int driver_init_hid() {
 // USB HID
 //--------------------------------------------------------------------+
 
+#ifndef ENABLE_EMULATION
 // Invoked when received GET_REPORT control request
 // Application must fill buffer report's content and return its length.
 // Return zero will cause the stack to STALL request
@@ -83,6 +88,7 @@ uint16_t tud_hid_get_report_cb(uint8_t itf,
 
     return reqlen;
 }
+#endif
 
 uint32_t hid_write_offset(uint16_t size, uint16_t offset) {
     if (*usb_get_tx(ITF_HID) != 0x81) {
@@ -98,6 +104,7 @@ uint32_t hid_write(uint16_t size) {
 uint16_t send_buffer_size = 0;
 bool last_write_result = false;
 
+#ifndef ENABLE_EMULATION
 static uint8_t keyboard_buffer[256];
 static uint8_t keyboard_buffer_len = 0;
 static const uint8_t conv_table[128][2] =  { HID_ASCII_TO_KEYCODE };
@@ -135,6 +142,7 @@ static void send_hid_report(uint8_t report_id) {
                                                   NULL) == true) {
                         keyboard_w++;
                         sent_key = false;
+
                     }
                 }
             }
@@ -166,6 +174,7 @@ void hid_task(void) {
         send_hid_report(REPORT_ID_KEYBOARD);
     }
 }
+#endif
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len) {
     if (send_buffer_size > 0 && instance == ITF_HID) {
@@ -181,6 +190,7 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_
     }
 }
 
+#ifndef ENABLE_EMULATION
 int driver_write_hid(const uint8_t *buffer, size_t buffer_size) {
     last_write_result = tud_hid_n_report(ITF_HID, 0, buffer, buffer_size);
     printf("result %d\n", last_write_result);
@@ -189,11 +199,13 @@ int driver_write_hid(const uint8_t *buffer, size_t buffer_size) {
     }
     return MIN(64, buffer_size);
 }
+#endif
 
 size_t driver_read_hid(uint8_t *buffer, size_t buffer_size) {
     return 0;
 }
 
+#ifndef ENABLE_EMULATION
 // Invoked when received SET_REPORT control request or
 // received data on OUT endpoint ( Report ID = 0, Type = 0 )
 void tud_hid_set_report_cb(uint8_t itf,
@@ -211,6 +223,7 @@ void tud_hid_set_report_cb(uint8_t itf,
     }
     usb_rx(itf, buffer, bufsize);
 }
+#endif
 
 uint32_t last_cmd_time = 0, last_packet_time = 0;
 int ctap_error(uint8_t error) {
@@ -334,7 +347,9 @@ int driver_process_usb_packet_hid(uint16_t read) {
             }
             ctap_resp = (CTAPHID_FRAME *) usb_get_tx(ITF_HID);
             memcpy(ctap_resp, ctap_req, sizeof(CTAPHID_FRAME));
+#ifndef ENABLE_EMULATION
             sleep_ms(1000); //For blinking the device during 1 seg
+#endif
             hid_write(64);
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
@@ -388,7 +403,9 @@ int driver_process_usb_packet_hid(uint16_t read) {
                 }
             }
             //if (thread_type != 1)
+#ifndef ENABLE_EMULATION
             card_start(apdu_thread);
+#endif
             thread_type = 1;
 
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
@@ -407,7 +424,9 @@ int driver_process_usb_packet_hid(uint16_t read) {
                   (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
 
             //if (thread_type != 2)
+#ifndef ENABLE_EMULATION
             card_start(cbor_thread);
+#endif
             thread_type = 2;
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
                 apdu_sent = cbor_process(last_cmd, msg_packet.data, msg_packet.len);

@@ -35,6 +35,11 @@
 int ccid_sock = 0;
 int hid_server_sock = 0;
 int hid_client_sock = -1;
+extern uint8_t thread_type;
+extern const uint8_t *cbor_data;
+extern size_t cbor_len;
+extern uint8_t cmd;
+extern int cbor_parse(uint8_t cmd, const uint8_t *data, size_t len);
 
 int msleep(long msec) {
     struct timespec ts;
@@ -140,7 +145,13 @@ int get_sock_itf(uint8_t itf) {
     return -1;
 }
 
-int driver_write_emul(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
+extern void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len);
+const uint8_t *complete_report = NULL;
+uint16_t complete_len = 0;
+extern bool last_write_result;
+extern uint16_t send_buffer_size;
+int driver_write_emul(uint8_t itf, const uint8_t *buffer, size_t buffer_size)
+{
     uint16_t size = htons(buffer_size);
     int sock = get_sock_itf(itf);
     // DEBUG_PAYLOAD(buffer,buffer_size);
@@ -157,6 +168,11 @@ int driver_write_emul(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
             msleep(10);
         }
     } while (ret <= 0);
+    if (itf == ITF_HID) {
+        last_write_result = true;
+        complete_report = buffer;
+        complete_len = buffer_size;
+    }
     return buffer_size;
 }
 
@@ -173,7 +189,12 @@ uint32_t emul_write(uint8_t itf, uint16_t size) {
 }
 
 void driver_exec_finished_cont_emul(uint8_t itf, size_t size_next, size_t offset) {
-    emul_write_offset(itf, size_next, offset);
+    if (itf == ITF_HID) {
+        driver_exec_finished_cont_hid(size_next, offset);
+    }
+    else {
+        emul_write_offset(itf, size_next, offset);
+    }
 }
 
 int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
@@ -201,7 +222,21 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
             }
         }
         else if (itf == ITF_HID) {
+            if (driver_process_usb_packet_hid(len) > 0) {
+                if (thread_type == 1) {
+                    process_apdu();
+                    apdu_finish();
+                    finished_data_size = apdu_next();
+                }
+                else if (thread_type == 2) {
+                    apdu.sw = cbor_parse(cmd, cbor_data, cbor_len);
+                    if (apdu.sw == 0)
+                        DEBUG_DATA(res_APDU + 1, res_APDU_size);
 
+                    finished_data_size = res_APDU_size+1;
+                }
+                driver_exec_finished_hid(finished_data_size);
+            }
         }
     }
     usb_clear_rx(itf);
@@ -210,7 +245,7 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
 
 uint16_t emul_read(uint8_t itf) {
     /* First we look for a client */
-    if (itf == ITF_HID && hid_client_sock == -1) {
+    if (itf == ITF_HID) {
         struct sockaddr_in client_sockaddr;
         socklen_t client_socklen = sizeof client_sockaddr;
 
@@ -226,11 +261,20 @@ uint16_t emul_read(uint8_t itf) {
         if (poll(&pfd, 1, timeout) == -1)
             return 0;
 
-        if(pfd.revents & POLLIN)
+        if(pfd.revents & POLLIN) {
+            if (hid_client_sock > 0)
+                close(hid_client_sock);
             hid_client_sock = accept(hid_server_sock, (struct sockaddr *) &client_sockaddr,
                     &client_socklen);
+            printf("hid_client connected!\n");
+        }
+    }
+    if (itf == ITF_HID && send_buffer_size > 0) {
+        last_write_result = true;
+        tud_hid_report_complete_cb(ITF_HID, complete_report, complete_len);
     }
     int sock = get_sock_itf(itf);
+    //printf("get_sockt itf %d - %d\n", itf, sock);
     uint16_t len = 0;
     fd_set input;
     FD_ZERO(&input);
@@ -259,5 +303,7 @@ uint16_t emul_read(uint8_t itf) {
             }
         }
     }
+    //else
+    //    printf("no input for sock %d - %d\n", itf, sock);
     return 0;
 }

@@ -333,7 +333,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             resp->versionMinor = HSM_SDK_VERSION_MINOR;
             resp->capFlags = CAPFLAG_WINK | CAPFLAG_CBOR;
 
-            ctap_resp->cid = CID_BROADCAST;
+            ctap_resp->cid = ctap_req->cid;
             ctap_resp->init.cmd = CTAPHID_INIT;
             ctap_resp->init.bcntl = 17;
             ctap_resp->init.bcnth = 0;

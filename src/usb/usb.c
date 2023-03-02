@@ -196,17 +196,15 @@ static int usb_event_handle(uint8_t itf) {
         timeout_start();
     }
     else {
-#ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
         if (itf == ITF_HID) {
             driver_process_usb_nopacket_hid();
         }
 #endif
 #ifdef USB_ITF_CCID
-        if (itf == ITF_CCID) {
-            driver_process_usb_nopacket_ccid();
-        }
-#endif
+        //if (itf == ITF_CCID) {
+        //    driver_process_usb_nopacket_ccid();
+        //}
 #endif
     }
     return 0;

@@ -134,19 +134,25 @@ int emul_init(char *host, uint16_t port) {
 
 uint8_t *driver_prepare_response_emul(uint8_t itf) {
     apdu.rdata = usb_get_tx(itf);
+#ifdef USB_ITF_HID
     if (itf == ITF_HID) {
         apdu.rdata += 7;
     }
+#endif
     return apdu.rdata;
 }
 
 int get_sock_itf(uint8_t itf) {
+#ifdef USB_ITF_CCID
     if (itf == ITF_CCID) {
         return ccid_sock;
     }
-    else if (itf == ITF_HID) {
+#endif
+#ifdef USB_ITF_HID
+    if (itf == ITF_HID) {
         return hid_client_sock;
     }
+#endif
     return -1;
 }
 
@@ -172,11 +178,13 @@ int driver_write_emul(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
             msleep(10);
         }
     } while (ret <= 0);
+#ifdef USB_ITF_HID
     if (itf == ITF_HID) {
         last_write_result = true;
         complete_report = buffer;
         complete_len = buffer_size;
     }
+#endif
     return buffer_size;
 }
 
@@ -193,17 +201,22 @@ uint32_t emul_write(uint8_t itf, uint16_t size) {
 }
 
 void driver_exec_finished_cont_emul(uint8_t itf, size_t size_next, size_t offset) {
+#ifdef USB_ITF_HID
     if (itf == ITF_HID) {
         driver_exec_finished_cont_hid(size_next, offset);
     }
-    else {
+#endif
+#ifdef USB_ITF_CCID
+    if (itf == ITF_CCID) {
         emul_write_offset(itf, size_next, offset);
     }
+#endif
 }
 
 int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
     if (len > 0) {
         uint8_t *data = usb_get_rx(itf), *rdata = usb_get_tx(itf);
+#ifdef USB_ITF_CCID
         if (itf == ITF_CCID) {
             if (len == 1) {
                 uint8_t c = data[0];
@@ -225,7 +238,9 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
                 emul_write(itf, ret);
             }
         }
-        else if (itf == ITF_HID) {
+    #endif
+    #ifdef USB_ITF_HID
+        if (itf == ITF_HID) {
             if (driver_process_usb_packet_hid(len) > 0) {
                 if (thread_type == 1) {
                     process_apdu();
@@ -243,6 +258,7 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
                 driver_exec_finished_hid(finished_data_size);
             }
         }
+#endif
     }
     usb_clear_rx(itf);
     return 0;
@@ -250,6 +266,7 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
 
 uint16_t emul_read(uint8_t itf) {
     /* First we look for a client */
+#ifdef USB_ITF_HID
     if (itf == ITF_HID) {
         struct sockaddr_in client_sockaddr;
         socklen_t client_socklen = sizeof client_sockaddr;
@@ -275,11 +292,12 @@ uint16_t emul_read(uint8_t itf) {
                                      &client_socklen);
             printf("hid_client connected!\n");
         }
+        if (send_buffer_size > 0) {
+            last_write_result = true;
+            tud_hid_report_complete_cb(ITF_HID, complete_report, complete_len);
+        }
     }
-    if (itf == ITF_HID && send_buffer_size > 0) {
-        last_write_result = true;
-        tud_hid_report_complete_cb(ITF_HID, complete_report, complete_len);
-    }
+#endif
     int sock = get_sock_itf(itf);
     //printf("get_sockt itf %d - %d\n", itf, sock);
     uint16_t len = 0;

@@ -201,7 +201,9 @@ int driver_process_usb_packet_ccid(uint16_t rx_read) {
                 ccid_response->abRFU1 = 0;
                 ccid_write(0);
             }
-            else if (ccid_header->bMessageType == CCID_SET_PARAMS || ccid_header->bMessageType == CCID_GET_PARAMS || ccid_header->bMessageType == CCID_RESET_PARAMS) {
+            else if (ccid_header->bMessageType == CCID_SET_PARAMS ||
+                     ccid_header->bMessageType == CCID_GET_PARAMS ||
+                     ccid_header->bMessageType == CCID_RESET_PARAMS) {
                 /* Values from gnuk. Not specified in ICCD spec. */
                 const uint8_t params[] =  {
                     0x11, /* bmFindexDindex */
@@ -298,11 +300,13 @@ static uint16_t ccid_open(uint8_t rhport, tusb_desc_interface_t const *itf_desc,
     memcpy(itf_vendor, itf_desc, sizeof(uint8_t) * max_len);
     ((tusb_desc_interface_t *) itf_vendor)->bInterfaceClass = TUSB_CLASS_VENDOR_SPECIFIC;
     ((tusb_desc_interface_t *) itf_vendor)->bNumEndpoints -= 1;
-    vendord_open(rhport, (tusb_desc_interface_t *) itf_vendor, max_len-sizeof(tusb_desc_endpoint_t));
+    vendord_open(rhport,
+                 (tusb_desc_interface_t *) itf_vendor,
+                 max_len - sizeof(tusb_desc_endpoint_t));
     TU_ASSERT(usbd_edpt_open(rhport, &desc_ep3), 0);
     free(itf_vendor);
 
-    uint8_t msg[] = {0x50, 0x03};
+    uint8_t msg[] = { 0x50, 0x03 };
     usbd_edpt_xfer(rhport, desc_ep3.bEndpointAddress, msg, sizeof(msg));
 
     uint16_t const drv_len = sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +

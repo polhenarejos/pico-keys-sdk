@@ -118,7 +118,7 @@ int emul_init(char *host, uint16_t port) {
     server_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(hid_server_sock, (struct sockaddr *) &server_sockaddr,
-                sizeof server_sockaddr) != 0)  {
+             sizeof server_sockaddr) != 0) {
         perror("bind");
         close(hid_server_sock);
         return 1;
@@ -134,16 +134,19 @@ int emul_init(char *host, uint16_t port) {
 
 uint8_t *driver_prepare_response_emul(uint8_t itf) {
     apdu.rdata = usb_get_tx(itf);
-    if (itf == ITF_HID)
+    if (itf == ITF_HID) {
         apdu.rdata += 7;
+    }
     return apdu.rdata;
 }
 
 int get_sock_itf(uint8_t itf) {
-    if (itf == ITF_CCID)
+    if (itf == ITF_CCID) {
         return ccid_sock;
-    else if (itf == ITF_HID)
+    }
+    else if (itf == ITF_HID) {
         return hid_client_sock;
+    }
     return -1;
 }
 
@@ -152,8 +155,7 @@ const uint8_t *complete_report = NULL;
 uint16_t complete_len = 0;
 extern bool last_write_result;
 extern uint16_t send_buffer_size;
-int driver_write_emul(uint8_t itf, const uint8_t *buffer, size_t buffer_size)
-{
+int driver_write_emul(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
     uint16_t size = htons(buffer_size);
     int sock = get_sock_itf(itf);
     // DEBUG_PAYLOAD(buffer,buffer_size);
@@ -232,10 +234,11 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
                 }
                 else if (thread_type == 2) {
                     apdu.sw = cbor_parse(cmd, cbor_data, cbor_len);
-                    if (apdu.sw == 0)
+                    if (apdu.sw == 0) {
                         DEBUG_DATA(res_APDU + 1, res_APDU_size);
+                    }
 
-                    finished_data_size = res_APDU_size+1;
+                    finished_data_size = res_APDU_size + 1;
                 }
                 driver_exec_finished_hid(finished_data_size);
             }
@@ -260,14 +263,16 @@ uint16_t emul_read(uint8_t itf) {
 
         timeout = (0 * 1000 + 1000 / 1000);
 
-        if (poll(&pfd, 1, timeout) == -1)
+        if (poll(&pfd, 1, timeout) == -1) {
             return 0;
+        }
 
-        if(pfd.revents & POLLIN) {
-            if (hid_client_sock > 0)
+        if (pfd.revents & POLLIN) {
+            if (hid_client_sock > 0) {
                 close(hid_client_sock);
+            }
             hid_client_sock = accept(hid_server_sock, (struct sockaddr *) &client_sockaddr,
-                    &client_socklen);
+                                     &client_socklen);
             printf("hid_client connected!\n");
         }
     }

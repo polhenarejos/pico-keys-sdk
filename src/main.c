@@ -55,7 +55,7 @@
 #define ws2812_T2 5
 #define ws2812_T3 3
 static const uint16_t ws2812_program_instructions[] = {
-            //     .wrap_target
+    //     .wrap_target
     0x6221, //  0: out    x, 1            side 0 [2]
     0x1123, //  1: jmp    !x, 3           side 1 [1]
     0x1400, //  2: jmp    0               side 1 [4]
@@ -74,7 +74,12 @@ static inline pio_sm_config ws2812_program_get_default_config(uint offset) {
     sm_config_set_sideset(&c, 1, false, false);
     return c;
 }
-static inline void ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, float freq, bool rgbw) {
+static inline void ws2812_program_init(PIO pio,
+                                       uint sm,
+                                       uint offset,
+                                       uint pin,
+                                       float freq,
+                                       bool rgbw) {
     pio_gpio_init(pio, pin);
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
     pio_sm_config c = ws2812_program_get_default_config(offset);
@@ -190,7 +195,7 @@ void led_blinking_task() {
 #endif
 #ifdef PICO_DEFAULT_LED_PIN
     static uint8_t led_color = PICO_DEFAULT_LED_PIN;
-#elif defined (PICO_DEFAULT_WS2812_PIN)
+#elif defined(PICO_DEFAULT_WS2812_PIN)
 
 #endif
 
@@ -202,11 +207,13 @@ void led_blinking_task() {
 
 #ifdef PICO_DEFAULT_LED_PIN
     gpio_put(led_color, led_state);
-#elif defined (PICO_DEFAULT_WS2812_PIN)
-    if (led_state == 0)
+#elif defined(PICO_DEFAULT_WS2812_PIN)
+    if (led_state == 0) {
         pio_sm_put_blocking(pio0, 0, 0);
-    else
+    }
+    else {
         pio_sm_put_blocking(pio0, 0, 0xff000000);
+    }
 #endif
     led_state ^= 1; // toggle
 }

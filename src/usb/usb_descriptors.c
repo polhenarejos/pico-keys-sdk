@@ -193,7 +193,7 @@ static uint8_t desc_hid_kb[] = {
 #include "apdu.h"
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {
     printf("report_cb %d\n", itf);
-DEBUG_DATA(desc_hid_report, sizeof(desc_hid_report));
+    DEBUG_DATA(desc_hid_report, sizeof(desc_hid_report));
     if (itf == ITF_HID) {
         return desc_hid_report;
     }

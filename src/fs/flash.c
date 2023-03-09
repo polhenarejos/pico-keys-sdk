@@ -114,11 +114,11 @@ uintptr_t allocate_free_addr(uint16_t size, bool persistent) {
 }
 
 int flash_clear_file(file_t *file) {
-    if (file == NULL) {
+    if (file == NULL || file->data == NULL) {
         return CCID_OK;
     }
     uintptr_t base_addr =
-        (uintptr_t) (file->data - sizeof(uintptr_t) - sizeof(uint16_t) - sizeof(uintptr_t));
+        (uintptr_t)(file->data - sizeof(uintptr_t) - sizeof(uint16_t) - sizeof(uintptr_t));
     uintptr_t prev_addr = flash_read_uintptr(base_addr + sizeof(uintptr_t));
     uintptr_t next_addr = flash_read_uintptr(base_addr);
     //printf("nc %lx->%lx   %lx->%lx\r\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);

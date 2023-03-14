@@ -224,7 +224,7 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
                     if (ccid_atr) {
                         memcpy(rdata, ccid_atr + 1, ccid_atr[0]);
                     }
-                    emul_write(itf, ccid_atr ? ccid_atr[0] : 0);
+                    driver_write_emul(itf, ccid_atr ? ccid_atr + 1 : NULL, ccid_atr ? ccid_atr[0] : 0);
                 }
             }
             else {

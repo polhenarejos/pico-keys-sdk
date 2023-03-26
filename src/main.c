@@ -225,7 +225,8 @@ void led_off_all() {
     gpio_put(TINY2040_LED_B_PIN, 1);
 #elif defined(PICO_DEFAULT_LED_PIN)
     gpio_put(PICO_DEFAULT_LED_PIN, 0);
-#elif (PICO_DEFAULT_WS2812_PIN)
+#endif
+#if (PICO_DEFAULT_WS2812_PIN)
     PIO pio = pio0;
     int sm = 0;
     uint offset = pio_add_program(pio, &ws2812_program);

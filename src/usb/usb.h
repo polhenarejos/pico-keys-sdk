@@ -71,7 +71,7 @@ extern void driver_exec_finished_cont_hid(size_t size_next, size_t offset);
 extern void driver_exec_timeout_hid();
 extern bool driver_mounted_hid();
 extern uint8_t *driver_prepare_response_hid();
-extern int driver_write_hid(const uint8_t *, size_t);
+extern int driver_write_hid(uint8_t, const uint8_t *, size_t);
 extern size_t driver_read_hid(uint8_t *, size_t);
 extern int driver_process_usb_nopacket_hid();
 #endif

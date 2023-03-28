@@ -160,7 +160,7 @@ extern void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, 
 const uint8_t *complete_report = NULL;
 uint16_t complete_len = 0;
 extern bool last_write_result;
-extern uint16_t send_buffer_size;
+extern uint16_t send_buffer_size[ITF_TOTAL];
 int driver_write_emul(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
     uint16_t size = htons(buffer_size);
     int sock = get_sock_itf(itf);

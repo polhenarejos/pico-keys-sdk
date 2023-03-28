@@ -119,6 +119,8 @@ int register_app(app_t *(*select_aid)(app_t *, const uint8_t *, uint8_t)) {
     return 0;
 }
 
+int (*button_pressed_cb)(uint8_t) = NULL;
+
 static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
 void led_set_blink(uint32_t mode) {
@@ -153,6 +155,9 @@ uint32_t board_millis() {
 }
 
 #else
+bool button_pressed_state = false;
+uint32_t button_pressed_time = 0;
+uint8_t button_press = 0;
 bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
@@ -304,6 +309,24 @@ int main(void) {
         execute_tasks();
         neug_task();
         do_flash();
+        if (board_millis() > 1000) { // wait 1 second to boot up
+            bool current_button_state = board_button_read();
+            if (current_button_state != button_pressed_state) {
+                if (current_button_state == false) { // unpressed
+                    if (button_pressed_time == 0 || button_pressed_time + 1000 > board_millis()) {
+                        button_press++;
+                    }
+                    button_pressed_time = board_millis();
+                }
+                button_pressed_state = current_button_state;
+            }
+            if (button_pressed_time > 0 && button_press > 0 && button_pressed_time + 1000 < board_millis() && button_pressed_state == false) {
+                if (button_pressed_cb != NULL) {
+                    (*button_pressed_cb)(button_press);
+                }
+                button_pressed_time = button_press = 0;
+            }
+        }
     }
 
     return 0;

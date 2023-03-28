@@ -55,8 +55,8 @@ uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset) {
     tx_r_offset[itf] = offset;
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
-    if (itf == ITF_HID) {
-        w = driver_write_hid(tx_buffer[itf] + offset, MIN(len, pkt_max));
+    if (itf == ITF_HID || itf == ITF_KEYBOARD) {
+        w = driver_write_hid(itf, tx_buffer[itf] + offset, MIN(len, pkt_max));
     }
 #endif
 #ifdef USB_ITF_CCID
@@ -100,8 +100,8 @@ uint32_t usb_write_flush(uint8_t itf) {
     if (w_len[itf] > 0) {
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
-        if (itf == ITF_HID) {
-            w = driver_write_hid(tx_buffer[itf] + tx_r_offset[itf], MIN(w_len[itf], 64));
+        if (itf == ITF_HID || itf == ITF_KEYBOARD) {
+            w = driver_write_hid(itf, tx_buffer[itf] + tx_r_offset[itf], MIN(w_len[itf], 64));
         }
 #endif
 #ifdef USB_ITF_CCID

@@ -57,6 +57,8 @@ extern int flash_clear_file(file_t *file);
 extern void timeout_stop();
 extern void timeout_start();
 
+extern int (*button_pressed_cb)(uint8_t);
+
 enum  {
     BLINK_NOT_MOUNTED = (250 << 16) | 250,
     BLINK_MOUNTED     = (250 << 16) | 250,

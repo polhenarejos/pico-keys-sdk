@@ -147,6 +147,7 @@ typedef struct {
 #define CTAP1_ERR_OTHER               0x7f    // Other unspecified error
 
 extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
+extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
 
 #ifdef __cplusplus
 }

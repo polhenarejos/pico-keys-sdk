@@ -169,6 +169,13 @@ void add_keyboard_buffer(const uint8_t *data, size_t data_len, bool encode) {
     keyboard_encode = encode;
 }
 
+void append_keyboard_buffer(const uint8_t *data, size_t data_len) {
+    if (keyboard_buffer_len < sizeof(keyboard_buffer)) {
+        memcpy(keyboard_buffer + keyboard_buffer_len, data, MIN(sizeof(keyboard_buffer) - keyboard_buffer_len, data_len));
+        keyboard_buffer_len += MIN(sizeof(keyboard_buffer) - keyboard_buffer_len, data_len);
+    }
+}
+
 static void send_hid_report(uint8_t report_id) {
     if (!tud_hid_ready()) {
         return;

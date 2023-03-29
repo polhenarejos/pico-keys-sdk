@@ -119,8 +119,8 @@ uint16_t tud_hid_get_report_cb(uint8_t itf,
     (void) report_type;
     (void) buffer;
     (void) reqlen;
-    //printf("get_report %d %d %d\n", itf, report_id, report_type);
-    //DEBUG_PAYLOAD(buffer, reqlen);
+    printf("get_report %d %d %d\n", itf, report_id, report_type);
+    DEBUG_PAYLOAD(buffer, reqlen);
     if (send_buffer_size[ITF_KEYBOARD] > 0) {
         uint8_t seq = otp_curr_seq++;
         memset(buffer, 0, 8);
@@ -161,10 +161,12 @@ static uint8_t keyboard_buffer_len = 0;
 static const uint8_t conv_table[128][2] =  { HID_ASCII_TO_KEYCODE };
 static uint8_t keyboard_w = 0;
 static bool sent_key = false;
+static bool keyboard_encode = false;
 
-void add_keyboard_buffer(const uint8_t *data, size_t data_len) {
+void add_keyboard_buffer(const uint8_t *data, size_t data_len, bool encode) {
     keyboard_buffer_len = MIN(sizeof(keyboard_buffer), data_len);
     memcpy(keyboard_buffer, data, keyboard_buffer_len);
+    keyboard_encode = encode;
 }
 
 static void send_hid_report(uint8_t report_id) {
@@ -179,10 +181,18 @@ static void send_hid_report(uint8_t report_id) {
                     uint8_t keycode[6] = { 0 };
                     uint8_t modifier = 0;
                     uint8_t chr = keyboard_buffer[keyboard_w];
-                    if (conv_table[chr][0]) {
-                        modifier = KEYBOARD_MODIFIER_LEFTSHIFT;
+                    if (keyboard_encode) {
+                        if (conv_table[chr][0]) {
+                            modifier = KEYBOARD_MODIFIER_LEFTSHIFT;
+                        }
+                        keycode[0] = conv_table[chr][1];
                     }
-                    keycode[0] = conv_table[chr][1];
+                    else {
+                        if (chr & 0x80) {
+                            modifier = KEYBOARD_MODIFIER_LEFTSHIFT;
+                        }
+                        keycode[0] = chr & 0x7f;
+                    }
                     if (tud_hid_n_keyboard_report(ITF_KEYBOARD, REPORT_ID_KEYBOARD, modifier,
                                                   keycode) == true) {
                         sent_key = true;
@@ -271,9 +281,9 @@ void tud_hid_set_report_cb(uint8_t itf,
     (void) itf;
     (void) report_id;
     (void) report_type;
-    //printf("set_report %d %d %d\n", itf, report_id, report_type);
+    printf("set_report %d %d %d\n", itf, report_id, report_type);
     if (itf == ITF_KEYBOARD && report_type == 3) {
-        //DEBUG_PAYLOAD(buffer, bufsize);
+        DEBUG_PAYLOAD(buffer, bufsize);
         if (buffer[7] == 0xFF) { // reset
             send_buffer_size[ITF_KEYBOARD] = 0;
             otp_curr_seq = otp_exp_seq = 0;

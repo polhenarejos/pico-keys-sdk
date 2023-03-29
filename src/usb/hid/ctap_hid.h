@@ -146,7 +146,7 @@ typedef struct {
 #define CTAP1_ERR_INVALID_CHANNEL     0x0b    // CID not valid
 #define CTAP1_ERR_OTHER               0x7f    // Other unspecified error
 
-extern void add_keyboard_buffer(const uint8_t *, size_t);
+extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
 
 #ifdef __cplusplus
 }

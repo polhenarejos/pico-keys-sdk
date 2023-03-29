@@ -26,6 +26,7 @@ typedef unsigned long int uint64_t;
 #else
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #endif
 
 #ifdef __cplusplus

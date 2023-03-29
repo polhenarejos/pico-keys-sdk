@@ -309,6 +309,7 @@ int main(void) {
         execute_tasks();
         neug_task();
         do_flash();
+#ifndef ENABLE_EMULATION
         if (board_millis() > 1000) { // wait 1 second to boot up
             bool current_button_state = board_button_read();
             if (current_button_state != button_pressed_state) {
@@ -327,6 +328,7 @@ int main(void) {
                 button_pressed_time = button_press = 0;
             }
         }
+#endif
     }
 
     return 0;

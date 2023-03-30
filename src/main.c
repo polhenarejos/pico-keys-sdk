@@ -136,6 +136,10 @@ void timeout_start() {
     timeout = board_millis();
 }
 
+bool is_busy() {
+    return timeout > 0;
+}
+
 void execute_tasks();
 
 static bool req_button_pending = false;
@@ -310,7 +314,7 @@ int main(void) {
         neug_task();
         do_flash();
 #ifndef ENABLE_EMULATION
-        if (board_millis() > 1000) { // wait 1 second to boot up
+        if (board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up
             bool current_button_state = board_button_read();
             if (current_button_state != button_pressed_state) {
                 if (current_button_state == false) { // unpressed

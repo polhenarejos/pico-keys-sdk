@@ -150,6 +150,8 @@ typedef struct {
 extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
 extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
 
+extern uint16_t calculate_crc(const uint8_t *data, size_t data_len);
+
 #ifdef __cplusplus
 }
 #endif

@@ -311,8 +311,10 @@ void tud_hid_set_report_cb(uint8_t itf,
                         apdu.data = otp_frame_rx;
                         apdu.nc = 64;
                         apdu.rdata = otp_frame_tx;
+                        apdu.header[0] = 0;
                         apdu.header[1] = 0x01;
                         apdu.header[2] = slot_id;
+                        apdu.header[3] = 0;
                         int ret = otp_process_apdu();
                         if (ret == 0x9000 && res_APDU_size > 0) {
                             otp_send_frame(apdu.rdata, apdu.rlen);

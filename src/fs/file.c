@@ -74,14 +74,17 @@ void process_fci(const file_t *pe, int fmd) {
     res_APDU[res_APDU_size++] = 0x82;
     res_APDU[res_APDU_size++] = 1;
     res_APDU[res_APDU_size] = 0;
-    if (pe->type == FILE_TYPE_INTERNAL_EF) {
+    if (pe->type & FILE_TYPE_INTERNAL_EF) {
         res_APDU[res_APDU_size++] |= 0x08;
     }
-    else if (pe->type == FILE_TYPE_WORKING_EF) {
+    else if (pe->type & FILE_TYPE_WORKING_EF) {
         res_APDU[res_APDU_size++] |= pe->ef_structure & 0x7;
     }
-    else if (pe->type == FILE_TYPE_DF) {
+    else if (pe->type & FILE_TYPE_DF) {
         res_APDU[res_APDU_size++] |= 0x38;
+    }
+    else {
+        res_APDU_size++;
     }
 
     res_APDU[res_APDU_size++] = 0x83;

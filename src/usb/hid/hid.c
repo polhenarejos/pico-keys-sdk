@@ -28,6 +28,7 @@
 static bool mounted = false;
 extern int cbor_process(uint8_t, const uint8_t *, size_t);
 extern void init_fido();
+bool is_nitrokey = false;
 
 typedef struct msg_packet {
     uint16_t len;
@@ -59,6 +60,7 @@ int driver_init_hid() {
 
     usb_set_timeout_counter(ITF_HID, 200);
 
+    is_nitrokey = false;
     return 0;
 }
 
@@ -496,11 +498,58 @@ int driver_process_usb_packet_hid(uint16_t read) {
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
         }
-        else if (last_cmd == CTAPHID_MSG &&
+        else if (ctap_req->init.cmd == CTAPHID_UUID) {
+            ctap_resp = (CTAPHID_FRAME *) usb_get_tx(ITF_HID);
+            memset(ctap_resp, 0, 64);
+            ctap_resp->cid = ctap_req->cid;
+            ctap_resp->init.cmd = ctap_req->init.cmd;
+#ifndef ENABLE_EMULATION
+            pico_unique_board_id_t rpiid;
+            pico_get_unique_board_id(&rpiid);
+#else
+            struct {
+                uint8_t id[8];
+            } rpiid = { 0 };
+#endif
+            memcpy(ctap_resp->init.data, rpiid.id, sizeof(rpiid.id));
+            ctap_resp->init.bcntl = 16;
+            hid_write(64);
+            msg_packet.len = msg_packet.current_len = 0;
+            last_packet_time = 0;
+        }
+        else if (ctap_req->init.cmd == CTAPHID_VERSION) {
+            ctap_resp = (CTAPHID_FRAME *) usb_get_tx(ITF_HID);
+            memset(ctap_resp, 0, 64);
+            ctap_resp->cid = ctap_req->cid;
+            ctap_resp->init.cmd = ctap_req->init.cmd;
+            ctap_resp->init.data[0] = HSM_SDK_VERSION_MAJOR;
+            ctap_resp->init.data[1] = HSM_SDK_VERSION_MINOR;
+            ctap_resp->init.bcntl = 4;
+            hid_write(64);
+            msg_packet.len = msg_packet.current_len = 0;
+            last_packet_time = 0;
+        }
+        else if (ctap_req->init.cmd == CTAPHID_ADMIN) {
+            ctap_resp = (CTAPHID_FRAME *) usb_get_tx(ITF_HID);
+            memset(ctap_resp, 0, 64);
+            ctap_resp->cid = ctap_req->cid;
+            ctap_resp->init.cmd = ctap_req->init.cmd;
+            if (ctap_req->init.data[0] == 0x80) { // Status
+                memcpy(ctap_resp->init.data, "\x00\xff\xff\xff\x00", 5);
+                ctap_resp->init.bcntl = 5;
+            }
+            hid_write(64);
+            msg_packet.len = msg_packet.current_len = 0;
+            last_packet_time = 0;
+        }
+        else if ((last_cmd == CTAPHID_MSG || last_cmd == CTAPHID_OTP) &&
                  (msg_packet.len == 0 ||
                   (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
+            if (last_cmd == CTAPHID_OTP) {
+                is_nitrokey = true;
+            }
 
-            if (current_app == NULL ||
+            else if (current_app == NULL ||
                 memcmp(current_app->aid, fido_aid + 1,
                        MIN(current_app->aid[0], fido_aid[0])) != 0) {
                 for (int a = 0; a < num_apps; a++) {
@@ -598,6 +647,11 @@ void driver_exec_finished_hid(size_t size_next) {
             ctap_error(apdu.sw & 0xff);
         }
         else {
+            if (is_nitrokey) {
+                memmove(apdu.rdata + 2, apdu.rdata, size_next - 2);
+                apdu.rdata[0] = apdu.sw >> 8;
+                apdu.rdata[1] = apdu.sw & 0xff;
+            }
             driver_exec_finished_cont_hid(size_next, 7);
         }
     }

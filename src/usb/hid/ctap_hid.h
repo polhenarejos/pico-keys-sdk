@@ -94,6 +94,16 @@ extern CTAPHID_FRAME *ctap_req, *ctap_resp;
 #define CTAPHID_SYNC         (TYPE_INIT | 0x3C)  // Protocol resync command
 #define CTAPHID_ERROR        (TYPE_INIT | 0x3F)  // Error response
 
+#define CTAPHID_UPDATE       (TYPE_INIT | 0x51)
+#define CTAPHID_REBOOT       (TYPE_INIT | 0x53)
+#define CTAPHID_RNG          (TYPE_INIT | 0x60)
+#define CTAPHID_VERSION      (TYPE_INIT | 0x61)
+#define CTAPHID_UUID         (TYPE_INIT | 0x62)
+#define CTAPHID_LOCKED       (TYPE_INIT | 0x63)
+#define CTAPHID_OTP          (TYPE_INIT | 0x70)
+#define CTAPHID_PROVISIONER  (TYPE_INIT | 0x71)
+#define CTAPHID_ADMIN        (TYPE_INIT | 0x72)
+
 #define CTAPHID_VENDOR_FIRST (TYPE_INIT | 0x40)  // First vendor defined command
 #define CTAPHID_VENDOR_LAST  (TYPE_INIT | 0x7F)  // Last vendor defined command
 
@@ -151,6 +161,8 @@ extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
 extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
 
 extern uint16_t calculate_crc(const uint8_t *data, size_t data_len);
+
+extern bool is_nitrokey;
 
 #ifdef __cplusplus
 }

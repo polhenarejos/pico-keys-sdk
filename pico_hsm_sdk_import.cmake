@@ -93,6 +93,7 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha512.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chachapoly.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chacha20.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
+${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
 )
 set(INCLUDES ${INCLUDES}
 ${CMAKE_CURRENT_LIST_DIR}/src

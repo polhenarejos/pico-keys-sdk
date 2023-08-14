@@ -74,11 +74,11 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cipher.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cipher_wrap.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/constant_time.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecdsa.c
+${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/eddsa.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecdh.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp_curves.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/gcm.c
-${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/hash_info.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/hkdf.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md5.c
@@ -88,6 +88,7 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/platform_util.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/rsa.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/rsa_alt_helpers.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha1.c
+${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha3.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha256.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha512.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chachapoly.c
@@ -175,6 +176,13 @@ else()
     )
     if (NOT TARGET pico_hsm_sdk)
         pico_add_library(pico_hsm_sdk)
+        if (CMAKE_COMPILER_IS_GNUCC)
+            set_source_files_properties(
+                ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
+                PROPERTIES
+                COMPILE_OPTIONS "-Wno-stringop-overflow"
+            )
+        endif()
 
         target_sources(pico_hsm_sdk INTERFACE
                 ${SOURCES}

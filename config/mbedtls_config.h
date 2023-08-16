@@ -662,6 +662,9 @@
 /* Montgomery curves (supporting ECP) */
 #define MBEDTLS_ECP_DP_CURVE25519_ENABLED
 #define MBEDTLS_ECP_DP_CURVE448_ENABLED
+/* Edwards curves (supporting ECP, EdDSA) */
+#define MBEDTLS_ECP_DP_ED25519_ENABLED
+#define MBEDTLS_ECP_DP_ED448_ENABLED
 
 /**
  * \def MBEDTLS_ECP_NIST_OPTIM
@@ -2305,6 +2308,21 @@
 #define MBEDTLS_ECDSA_C
 
 /**
+ * \def MBEDTLS_EDDSA_C
+ *
+ * Enable the Edwards-curve DSA library.
+ *
+ * Module:  library/eddsa.c
+ * Caller:
+ *
+ * Requires: MBEDTLS_ECP_C
+ *           MBEDTLS_SHA512_C for Ed25519
+ *           and at least one MBEDTLS_ECP_DP_XXX_ENABLED for a
+ *           Edwards curve.
+ */
+#define MBEDTLS_EDDSA_C
+
+/**
  * \def MBEDTLS_ECJPAKE_C
  *
  * Enable the elliptic curve J-PAKE library.
@@ -2907,6 +2925,17 @@
  * This module adds support for SHA-512.
  */
 #define MBEDTLS_SHA512_C
+
+/**
+ * \def MBEDTLS_SHA3_C
+ *
+ * Enable the SHA3 cryptographic hash algorithm.
+ *
+ * Module:  library/sha3.c
+ *
+ * This module adds support for SHA3.
+ */
+#define MBEDTLS_SHA3_C
 
 /**
  * \def MBEDTLS_SHA512_USE_A64_CRYPTO_IF_PRESENT

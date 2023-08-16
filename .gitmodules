@@ -1,6 +1,6 @@
 [submodule "mbedtls"]
 	path = mbedtls
-	url = https://github.com/ARMmbed/mbedtls
+	url = https://github.com/polhenarejos/mbedtls
 [submodule "tinycbor"]
 	path = tinycbor
 	url = https://github.com/intel/tinycbor.git

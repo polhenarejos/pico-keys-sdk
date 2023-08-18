@@ -40,7 +40,7 @@ int process_apdu() {
     if (current_app && current_app->process_apdu) {
         return current_app->process_apdu();
     }
-    return set_res_sw(0x6D, 0x00);
+    return set_res_sw(0x6a, 0x82);
 }
 
 size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {

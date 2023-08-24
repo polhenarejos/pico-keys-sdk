@@ -56,13 +56,13 @@ typedef struct cmd {
 #define DEBUG_DATA(_p, _s)                               \
     {                                                    \
         printf("Data %s (%d bytes):\r\n", #_p, (int) (_s));      \
-        char *tmp = (char *) calloc(1, 2 * _s + 1); \
+        char *__tmp = (char *) calloc(1, 2 * _s + 1); \
         for (int _i = 0; _i < _s; _i++)                  \
         {                                                \
-            sprintf(&tmp[2 * _i], "%02X", (_p)[_i]);       \
+            sprintf(&__tmp[2 * _i], "%02X", (_p)[_i]);       \
         }                                                \
-        printf("%s\n", tmp);                             \
-        free(tmp);                                       \
+        printf("%s\n", __tmp);                             \
+        free(__tmp);                                       \
     }
 
 #else

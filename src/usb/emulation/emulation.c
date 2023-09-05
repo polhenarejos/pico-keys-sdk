@@ -31,6 +31,7 @@
 #include "apdu.h"
 #include "usb.h"
 #include "ccid/ccid.h"
+#include <netinet/tcp.h>
 
 int ccid_sock = 0;
 int hid_server_sock = 0;
@@ -86,6 +87,8 @@ int emul_init(char *host, uint16_t port) {
     }
     int x = fcntl(ccid_sock, F_GETFL, 0);
     fcntl(ccid_sock, F_SETFL, x | O_NONBLOCK);
+    int flag = 1;
+    setsockopt(ccid_sock, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
 
     // HID server
 

@@ -184,7 +184,7 @@ else()
                 ${INCLUDES}
                 )
 
-        target_link_libraries(pico_hsm_sdk INTERFACE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board hardware_pio)
+        target_link_libraries(pico_hsm_sdk INTERFACE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board hardware_pio pico_cyw43_arch_none)
     endif()
 endif()
 

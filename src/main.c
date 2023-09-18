@@ -46,6 +46,9 @@
 #include "random.h"
 #include "hsm.h"
 #include "apdu.h"
+#ifdef CYW43_WL_GPIO_LED_PIN
+#include "pico/cyw43_arch.h"
+#endif
 #ifdef PICO_DEFAULT_WS2812_PIN
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
@@ -205,7 +208,8 @@ void led_blinking_task() {
 #ifdef PICO_DEFAULT_LED_PIN
     static uint8_t led_color = PICO_DEFAULT_LED_PIN;
 #elif defined(PICO_DEFAULT_WS2812_PIN)
-
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    static uint8_t led_color = CYW43_WL_GPIO_LED_PIN;
 #endif
 
     // Blink every interval ms
@@ -223,6 +227,8 @@ void led_blinking_task() {
     else {
         pio_sm_put_blocking(pio0, 0, 0xff000000);
     }
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    cyw43_arch_gpio_put(led_color, led_state);
 #endif
     led_state ^= 1; // toggle
 }
@@ -234,6 +240,8 @@ void led_off_all() {
     gpio_put(TINY2040_LED_B_PIN, 1);
 #elif defined(PICO_DEFAULT_LED_PIN)
     gpio_put(PICO_DEFAULT_LED_PIN, 0);
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
 #endif
 #if (PICO_DEFAULT_WS2812_PIN)
     PIO pio = pio0;
@@ -285,11 +293,11 @@ int main(void) {
     gpio_set_dir(TINY2040_LED_G_PIN, GPIO_OUT);
     gpio_init(TINY2040_LED_B_PIN);
     gpio_set_dir(TINY2040_LED_B_PIN, GPIO_OUT);
-#else
-#ifdef PICO_DEFAULT_LED_PIN
+#elif defined(PICO_DEFAULT_LED_PIN)
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-#endif
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    cyw43_arch_init();
 #endif
 
     led_off_all();

@@ -122,6 +122,23 @@ ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
 )
 endif()
 
+set(LIBRARIES
+pico_stdlib
+pico_multicore
+hardware_flash
+hardware_sync
+hardware_adc
+pico_unique_id
+hardware_rtc
+tinyusb_device
+tinyusb_board
+hardware_pio
+)
+
+if(PICO_BOARD STREQUAL "pico_w")
+    set(LIBRARIES ${LIBRARIES} pico_cyw43_arch_none)
+endif()
+
 function(add_impl_library target)
     add_library(${target} INTERFACE)
     string(TOUPPER ${target} TARGET_UPPER)
@@ -184,7 +201,7 @@ else()
                 ${INCLUDES}
                 )
 
-        target_link_libraries(pico_hsm_sdk INTERFACE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board hardware_pio pico_cyw43_arch_none)
+        target_link_libraries(pico_hsm_sdk INTERFACE ${LIBRARIES})
     endif()
 endif()
 

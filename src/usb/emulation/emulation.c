@@ -231,14 +231,17 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
                 }
             }
             else {
+                size_t sent = 0;
                 DEBUG_PAYLOAD(data, len);
-                if (apdu_process(itf, data, len) > 0) {
+                if ((sent = apdu_process(itf, data, len)) > 0) {
                     process_apdu();
                 }
                 apdu_finish();
-                size_t ret = apdu_next();
-                DEBUG_PAYLOAD(rdata, ret);
-                emul_write(itf, ret);
+                if (sent > 0) {
+                    size_t ret = apdu_next();
+                    DEBUG_PAYLOAD(rdata, ret);
+                    emul_write(itf, ret);
+                }
             }
         }
     #endif

@@ -50,6 +50,11 @@ typedef struct cmd {
                 else printf("   "); \
                 if (_j == 7) printf(" "); \
             } printf(":  "); \
+            for (int _j = 0; _j < 16; _j++) { \
+                if (_j < _s - _i && (_p)[_i + _j] > 32 && (_p)[_i + _j] != 127 && (_p)[_i + _j] < 176) printf("%c", (_p)[_i + _j]); \
+                else printf(" "); \
+                if (_j == 7) printf(" "); \
+            } \
             printf("\r\n"); \
         } printf("\r\n"); \
 }

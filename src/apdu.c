@@ -38,8 +38,9 @@ int process_apdu() {
                     }
                 }
                 current_app = &apps[a];
-                current_app->select_aid(current_app);
-                return set_res_sw(0x90, 0x00);
+                if (current_app->select_aid(current_app) == CCID_OK) {
+                    return set_res_sw(0x90, 0x00);
+                }
             }
         }
         return set_res_sw(0x6a, 0x82);

@@ -28,11 +28,11 @@
 typedef struct app {
     const uint8_t *aid;
     int (*process_apdu)();
-    struct app * (*select_aid)(struct app *, const uint8_t *, uint8_t);
+    int (*select_aid)(struct app *);
     int (*unload)();
 } app_t;
 
-extern int register_app(app_t *(*)(app_t *, const uint8_t *, uint8_t));
+extern int register_app(int (*)(app_t *), const uint8_t *);
 
 typedef struct cmd {
     uint8_t ins;

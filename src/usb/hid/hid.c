@@ -550,13 +550,12 @@ int driver_process_usb_packet_hid(uint16_t read) {
             }
 
             else if (current_app == NULL ||
-                memcmp(current_app->aid, fido_aid + 1,
-                       MIN(current_app->aid[0], fido_aid[0])) != 0) {
-                for (int a = 0; a < num_apps; a++) {
-                    if ((current_app = apps[a].select_aid(&apps[a], fido_aid + 1, fido_aid[0]))) {
-                        break;
+                current_app->aid != fido_aid) {
+                    if (current_app && current_app->unload) {
+                        current_app->unload();
                     }
-                }
+                    current_app = &apps[a];
+                    current_app->select_aid(current_app);
             }
             //if (thread_type != 1)
 #ifndef ENABLE_EMULATION

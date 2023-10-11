@@ -113,9 +113,10 @@ app_t *current_app = NULL;
 
 const uint8_t *ccid_atr = NULL;
 
-int register_app(app_t *(*select_aid)(app_t *, const uint8_t *, uint8_t)) {
+int register_app(int (*select_aid)(app_t *), const uint8_t *aid) {
     if (num_apps < sizeof(apps) / sizeof(app_t)) {
         apps[num_apps].select_aid = select_aid;
+        apps[num_apps].aid = aid;
         num_apps++;
         return 1;
     }

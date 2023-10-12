@@ -31,6 +31,7 @@ int process_apdu() {
             if (!memcmp(apps[a].aid + 1, apdu.data, MIN(apdu.nc, apps[a].aid[0]))) {
                 if (current_app) {
                     if (current_app->aid && !memcmp(current_app->aid + 1, apdu.data, apdu.nc)) {
+                        current_app->select_aid(current_app);
                         return set_res_sw(0x90, 0x00);
                     }
                     if (current_app->unload) {

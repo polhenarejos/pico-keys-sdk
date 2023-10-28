@@ -29,6 +29,8 @@ static bool mounted = false;
 extern int cbor_process(uint8_t, const uint8_t *, size_t);
 extern void init_fido();
 bool is_nitrokey = false;
+extern uint8_t get_version_major();
+extern uint8_t get_version_minor();
 
 typedef struct msg_packet {
     uint16_t len;
@@ -438,8 +440,8 @@ int driver_process_usb_packet_hid(uint16_t read) {
             memcpy(resp->nonce, req->nonce, sizeof(resp->nonce));
             resp->cid = 0x01000000;
             resp->versionInterface = CTAPHID_IF_VERSION;
-            resp->versionMajor = HSM_SDK_VERSION_MAJOR;
-            resp->versionMinor = HSM_SDK_VERSION_MINOR;
+            resp->versionMajor = get_version_major();
+            resp->versionMinor = get_version_minor();
             resp->capFlags = CAPFLAG_WINK | CAPFLAG_CBOR;
 
             ctap_resp->cid = ctap_req->cid;
@@ -554,8 +556,12 @@ int driver_process_usb_packet_hid(uint16_t read) {
                     if (current_app && current_app->unload) {
                         current_app->unload();
                     }
-                    current_app = &apps[a];
-                    current_app->select_aid(current_app);
+                    for (int a = 0; a < num_apps; a++) {
+                        if (!memcmp(apps[a].aid + 1, fido_aid + 1, MIN(fido_aid[0], apps[a].aid[0]))) {
+                            current_app = &apps[a];
+                            current_app->select_aid(current_app);
+                        }
+                    }
             }
             //if (thread_type != 1)
 #ifndef ENABLE_EMULATION

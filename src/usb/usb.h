@@ -53,7 +53,7 @@ enum {
 };
 
 enum {
-    REPORT_ID_KEYBOARD = 1,
+    REPORT_ID_KEYBOARD = 0,
     REPORT_ID_COUNT
 };
 

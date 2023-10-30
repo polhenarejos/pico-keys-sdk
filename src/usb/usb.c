@@ -280,7 +280,6 @@ void usb_task() {
                 //    printf("\r\n ------ M = %lu\r\n",m);
                 if (has_m) {
                     if (m == EV_EXEC_FINISHED) {
-                        timeout_stop();
 #ifdef USB_ITF_HID
                         if (itf == ITF_HID) {
                             driver_exec_finished_hid(finished_data_size);
@@ -293,6 +292,7 @@ void usb_task() {
 #endif
                         led_set_blink(BLINK_MOUNTED);
                         card_locked_itf = ITF_TOTAL;
+                        timeout_stop();
                     }
                     else if (m == EV_PRESS_BUTTON) {
                         uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;

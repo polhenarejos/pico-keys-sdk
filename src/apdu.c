@@ -204,7 +204,7 @@ done:   ;
 void apdu_finish() {
     apdu.rdata[apdu.rlen] = apdu.sw >> 8;
     apdu.rdata[apdu.rlen + 1] = apdu.sw & 0xff;
-    timeout_stop();
+    //timeout_stop();
 #ifndef ENABLE_EMULATION
     if ((apdu.rlen + 2 + 10) % 64 == 0) {     // FIX for strange behaviour with PSCS and multiple of 64
         apdu.ne = apdu.rlen - 2;

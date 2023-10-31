@@ -293,9 +293,9 @@ void tud_hid_set_report_cb(uint8_t itf,
     (void) report_id;
     (void) report_type;
     printf("set_report %d %d %d\n", itf, report_id, report_type);
-    if (itf == ITF_KEYBOARD && report_type == 3) {
+    if (report_type == 3) {
         DEBUG_PAYLOAD(buffer, bufsize);
-        if (buffer[7] == 0xFF) { // reset
+        if (itf == ITF_KEYBOARD && buffer[7] == 0xFF) { // reset
             send_buffer_size[ITF_KEYBOARD] = 0;
             otp_curr_seq = otp_exp_seq = 0;
             memset(otp_frame_tx, 0, sizeof(otp_frame_tx));

@@ -189,11 +189,11 @@ static int usb_event_handle(uint8_t itf) {
 #endif
     if (proc_packet > 0) {
         card_locked_itf = itf;
+        timeout_start();
 #ifndef ENABLE_EMULATION
         uint32_t flag = EV_CMD_AVAILABLE;
         queue_add_blocking(&usb_to_card_q, &flag);
 #endif
-        timeout_start();
     }
     else {
 #ifdef USB_ITF_HID
@@ -280,6 +280,7 @@ void usb_task() {
                 //    printf("\r\n ------ M = %lu\r\n",m);
                 if (has_m) {
                     if (m == EV_EXEC_FINISHED) {
+                        timeout_stop();
 #ifdef USB_ITF_HID
                         if (itf == ITF_HID) {
                             driver_exec_finished_hid(finished_data_size);
@@ -292,7 +293,6 @@ void usb_task() {
 #endif
                         led_set_blink(BLINK_MOUNTED);
                         card_locked_itf = ITF_TOTAL;
-                        timeout_stop();
                     }
                     else if (m == EV_PRESS_BUTTON) {
                         uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;

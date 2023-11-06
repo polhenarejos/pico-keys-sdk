@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@
 #define FLASH_SECTOR_SIZE       4096
 #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
 #endif
-#include "hsm.h"
+#include "pico_keys.h"
 #include "file.h"
 #include <stdio.h>
 

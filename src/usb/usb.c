@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 #include "tusb.h"
 #include "bsp/board.h"
 #endif
-#include "hsm.h"
+#include "pico_keys.h"
 #include "usb.h"
 #include "apdu.h"
 

@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -131,7 +131,7 @@ int sm_unwrap() {
         return CCID_WRONG_PADDING;
     }
     sm_update_iv();
-    aes_decrypt(sm_kenc, sm_iv, 128, HSM_AES_MODE_CBC, body, body_size);
+    aes_decrypt(sm_kenc, sm_iv, 128, PICO_KEYS_AES_MODE_CBC, body, body_size);
     memmove(apdu.data, body, body_size);
     apdu.nc = sm_remove_padding(apdu.data, body_size);
     DEBUG_PAYLOAD(apdu.data, (int) apdu.nc);
@@ -162,7 +162,7 @@ int sm_wrap() {
         res_APDU_size += (sm_blocksize - (res_APDU_size % sm_blocksize));
         DEBUG_PAYLOAD(res_APDU, res_APDU_size);
         sm_update_iv();
-        aes_encrypt(sm_kenc, sm_iv, 128, HSM_AES_MODE_CBC, res_APDU, res_APDU_size);
+        aes_encrypt(sm_kenc, sm_iv, 128, PICO_KEYS_AES_MODE_CBC, res_APDU, res_APDU_size);
         memmove(res_APDU + 1, res_APDU, res_APDU_size);
         res_APDU[0] = 0x1;
         res_APDU_size++;
@@ -224,7 +224,7 @@ void sm_update_iv() {
     uint8_t tmp_iv[16], sc_counter[16];
     memset(tmp_iv, 0, sizeof(tmp_iv)); //IV is always 0 for encryption of IV based on counter
     mbedtls_mpi_write_binary(&sm_mSSC, sc_counter, sizeof(sc_counter));
-    aes_encrypt(sm_kenc, tmp_iv, 128, HSM_AES_MODE_CBC, sc_counter, sizeof(sc_counter));
+    aes_encrypt(sm_kenc, tmp_iv, 128, PICO_KEYS_AES_MODE_CBC, sc_counter, sizeof(sc_counter));
     memcpy(sm_iv, sc_counter, sizeof(sc_counter));
 }
 

@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,8 +20,8 @@
 #include "bsp/board.h"
 #endif
 #include "ctap_hid.h"
-#include "hsm.h"
-#include "hsm_version.h"
+#include "pico_keys.h"
+#include "pico_keys_version.h"
 #include "apdu.h"
 #include "usb.h"
 
@@ -362,8 +362,8 @@ int driver_process_usb_packet_hid(uint16_t read) {
             memcpy(resp->nonce, req->nonce, sizeof(resp->nonce));
             resp->cid = 0x01000000;
             resp->versionInterface = CTAPHID_IF_VERSION;
-            resp->versionMajor = get_version_major ? get_version_major() : HSM_SDK_VERSION_MAJOR;
-            resp->versionMinor = get_version_minor ? get_version_minor() : HSM_SDK_VERSION_MINOR;
+            resp->versionMajor = get_version_major ? get_version_major() : PICO_KEYS_SDK_VERSION_MAJOR;
+            resp->versionMinor = get_version_minor ? get_version_minor() : PICO_KEYS_SDK_VERSION_MINOR;
             resp->capFlags = CAPFLAG_WINK | CAPFLAG_CBOR;
 
             ctap_resp->cid = ctap_req->cid;
@@ -446,8 +446,8 @@ int driver_process_usb_packet_hid(uint16_t read) {
             memset(ctap_resp, 0, 64);
             ctap_resp->cid = ctap_req->cid;
             ctap_resp->init.cmd = ctap_req->init.cmd;
-            ctap_resp->init.data[0] = HSM_SDK_VERSION_MAJOR;
-            ctap_resp->init.data[1] = HSM_SDK_VERSION_MINOR;
+            ctap_resp->init.data[0] = PICO_KEYS_SDK_VERSION_MAJOR;
+            ctap_resp->init.data[1] = PICO_KEYS_SDK_VERSION_MINOR;
             ctap_resp->init.bcntl = 4;
             hid_write(64);
             msg_packet.len = msg_packet.current_len = 0;

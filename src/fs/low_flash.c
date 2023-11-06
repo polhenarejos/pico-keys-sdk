@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -36,7 +36,7 @@
 int fd_map = 0;
 uint8_t *map = NULL;
 #endif
-#include "hsm.h"
+#include "pico_keys.h"
 #include <string.h>
 
 #define TOTAL_FLASH_PAGES 4

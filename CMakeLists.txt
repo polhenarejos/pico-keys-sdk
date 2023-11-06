@@ -1,5 +1,5 @@
  #
- # This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ # This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  # Copyright (c) 2022 Pol Henarejos.
  #
  # This program is free software: you can redistribute it and/or modify
@@ -22,7 +22,7 @@
  include(pico_sdk_import.cmake)
  endif()
 
- project(pico_hsm C CXX ASM)
+ project(pico_keys C CXX ASM)
 
  set(CMAKE_C_STANDARD 11)
  set(CMAKE_CXX_STANDARD 17)
@@ -41,32 +41,32 @@
 
 set(USB_ITF_CCID 1)
 set(USB_ITF_HID 1)
-include(pico_hsm_sdk_import.cmake)
+include(pico_keys_sdk_import.cmake)
 
-add_executable(pico_hsm_sdk_exe)
+add_executable(pico_keys_sdk_exe)
 
-target_compile_options(pico_hsm_sdk_exe PUBLIC
+target_compile_options(pico_keys_sdk_exe PUBLIC
     -Wall
     -Werror
 )
 
 if(ENABLE_EMULATION)
-target_compile_options(pico_hsm_sdk_exe PUBLIC
+target_compile_options(pico_keys_sdk_exe PUBLIC
         -fdata-sections
         -ffunction-sections
         )
 if(APPLE)
-target_link_options(pico_hsm_sdk_exe PUBLIC
+target_link_options(pico_keys_sdk_exe PUBLIC
         -Wl,-dead_strip
         )
 else()
-target_link_options(pico_hsm_sdk_exe PUBLIC
+target_link_options(pico_keys_sdk_exe PUBLIC
         -Wl,--gc-sections
         )
 endif (APPLE)
 else()
-pico_add_extra_outputs(pico_hsm_sdk_exe)
+pico_add_extra_outputs(pico_keys_sdk_exe)
 
-target_link_libraries(pico_hsm_sdk_exe PRIVATE pico_hsm_sdk pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)
+target_link_libraries(pico_keys_sdk_exe PRIVATE pico_keys_sdk pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)
 endif()
 

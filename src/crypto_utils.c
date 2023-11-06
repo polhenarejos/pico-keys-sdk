@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -22,7 +22,7 @@
 #include "mbedtls/sha256.h"
 #include "mbedtls/aes.h"
 #include "crypto_utils.h"
-#include "hsm.h"
+#include "pico_keys.h"
 
 void double_hash_pin(const uint8_t *pin, size_t len, uint8_t output[32]) {
     uint8_t o1[32];
@@ -91,7 +91,7 @@ int aes_encrypt(const uint8_t *key,
     if (r != 0) {
         return CCID_EXEC_ERROR;
     }
-    if (mode == HSM_AES_MODE_CBC) {
+    if (mode == PICO_KEYS_AES_MODE_CBC) {
         return mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, len, tmp_iv, data, data);
     }
     return mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, len, &iv_offset, tmp_iv, data, data);
@@ -115,7 +115,7 @@ int aes_decrypt(const uint8_t *key,
     if (r != 0) {
         return CCID_EXEC_ERROR;
     }
-    if (mode == HSM_AES_MODE_CBC) {
+    if (mode == PICO_KEYS_AES_MODE_CBC) {
         return mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, len, tmp_iv, data, data);
     }
     r = mbedtls_aes_setkey_enc(&aes, key, key_size); //CFB requires set_enc instead set_dec
@@ -123,10 +123,10 @@ int aes_decrypt(const uint8_t *key,
 }
 
 int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, int len) {
-    return aes_encrypt(key, iv, 256, HSM_AES_MODE_CFB, data, len);
+    return aes_encrypt(key, iv, 256, PICO_KEYS_AES_MODE_CFB, data, len);
 }
 int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, int len) {
-    return aes_decrypt(key, iv, 256, HSM_AES_MODE_CFB, data, len);
+    return aes_decrypt(key, iv, 256, PICO_KEYS_AES_MODE_CFB, data, len);
 }
 
 struct lv_data {

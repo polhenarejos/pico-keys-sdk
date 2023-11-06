@@ -1,5 +1,5 @@
  #
- # This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ # This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  # Copyright (c) 2022 Pol Henarejos.
  #
  # This program is free software: you can redistribute it and/or modify
@@ -167,12 +167,12 @@ if (ENABLE_EMULATION)
     set(INCLUDES ${INCLUDES}
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
     )
-    if (NOT TARGET pico_hsm_sdk)
-        add_impl_library(pico_hsm_sdk)
-        target_sources(pico_hsm_sdk INTERFACE
+    if (NOT TARGET pico_keys_sdk)
+        add_impl_library(pico_keys_sdk)
+        target_sources(pico_keys_sdk INTERFACE
         ${SOURCES}
         )
-        target_include_directories(pico_hsm_sdk INTERFACE
+        target_include_directories(pico_keys_sdk INTERFACE
         ${INCLUDES}
         )
     endif()
@@ -190,18 +190,18 @@ else()
     set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )
-    if (NOT TARGET pico_hsm_sdk)
-        pico_add_library(pico_hsm_sdk)
+    if (NOT TARGET pico_keys_sdk)
+        pico_add_library(pico_keys_sdk)
 
-        target_sources(pico_hsm_sdk INTERFACE
+        target_sources(pico_keys_sdk INTERFACE
                 ${SOURCES}
                 )
 
-        target_include_directories(pico_hsm_sdk INTERFACE
+        target_include_directories(pico_keys_sdk INTERFACE
                 ${INCLUDES}
                 )
 
-        target_link_libraries(pico_hsm_sdk INTERFACE ${LIBRARIES})
+        target_link_libraries(pico_keys_sdk INTERFACE ${LIBRARIES})
     endif()
 endif()
 

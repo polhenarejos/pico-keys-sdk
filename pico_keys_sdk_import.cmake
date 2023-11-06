@@ -78,7 +78,6 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecdh.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp_curves.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/gcm.c
-${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/hash_info.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/hkdf.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md5.c
@@ -94,6 +93,12 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chachapoly.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chacha20.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
+)
+## mbedTLS reports an stringop overflow for cmac.c
+set_source_files_properties(
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
+    PROPERTIES
+    COMPILE_FLAGS "-Wno-error=stringop-overflow= -Wno-stringop-overflow"
 )
 set(INCLUDES ${INCLUDES}
 ${CMAKE_CURRENT_LIST_DIR}/src

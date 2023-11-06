@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -159,8 +159,6 @@ typedef struct {
 
 extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
 extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
-
-extern uint16_t calculate_crc(const uint8_t *data, size_t data_len);
 
 extern bool is_nitrokey;
 

@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -44,8 +44,11 @@
 #endif
 
 #include "random.h"
-#include "hsm.h"
+#include "pico_keys.h"
 #include "apdu.h"
+#ifdef CYW43_WL_GPIO_LED_PIN
+#include "pico/cyw43_arch.h"
+#endif
 #ifdef PICO_DEFAULT_WS2812_PIN
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
@@ -110,9 +113,10 @@ app_t *current_app = NULL;
 
 const uint8_t *ccid_atr = NULL;
 
-int register_app(app_t *(*select_aid)(app_t *, const uint8_t *, uint8_t)) {
+int register_app(int (*select_aid)(app_t *), const uint8_t *aid) {
     if (num_apps < sizeof(apps) / sizeof(app_t)) {
         apps[num_apps].select_aid = select_aid;
+        apps[num_apps].aid = aid;
         num_apps++;
         return 1;
     }
@@ -205,7 +209,8 @@ void led_blinking_task() {
 #ifdef PICO_DEFAULT_LED_PIN
     static uint8_t led_color = PICO_DEFAULT_LED_PIN;
 #elif defined(PICO_DEFAULT_WS2812_PIN)
-
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    static uint8_t led_color = CYW43_WL_GPIO_LED_PIN;
 #endif
 
     // Blink every interval ms
@@ -223,6 +228,8 @@ void led_blinking_task() {
     else {
         pio_sm_put_blocking(pio0, 0, 0xff000000);
     }
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    cyw43_arch_gpio_put(led_color, led_state);
 #endif
     led_state ^= 1; // toggle
 }
@@ -234,6 +241,8 @@ void led_off_all() {
     gpio_put(TINY2040_LED_B_PIN, 1);
 #elif defined(PICO_DEFAULT_LED_PIN)
     gpio_put(PICO_DEFAULT_LED_PIN, 0);
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
 #endif
 #if (PICO_DEFAULT_WS2812_PIN)
     PIO pio = pio0;
@@ -285,11 +294,11 @@ int main(void) {
     gpio_set_dir(TINY2040_LED_G_PIN, GPIO_OUT);
     gpio_init(TINY2040_LED_B_PIN);
     gpio_set_dir(TINY2040_LED_B_PIN, GPIO_OUT);
-#else
-#ifdef PICO_DEFAULT_LED_PIN
+#elif defined(PICO_DEFAULT_LED_PIN)
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-#endif
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    cyw43_arch_init();
 #endif
 
     led_off_all();

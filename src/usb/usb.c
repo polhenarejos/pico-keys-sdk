@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 #include "tusb.h"
 #include "bsp/board.h"
 #endif
-#include "hsm.h"
+#include "pico_keys.h"
 #include "usb.h"
 #include "apdu.h"
 
@@ -189,11 +189,11 @@ static int usb_event_handle(uint8_t itf) {
 #endif
     if (proc_packet > 0) {
         card_locked_itf = itf;
+        timeout_start();
 #ifndef ENABLE_EMULATION
         uint32_t flag = EV_CMD_AVAILABLE;
         queue_add_blocking(&usb_to_card_q, &flag);
 #endif
-        timeout_start();
     }
     else {
 #ifdef USB_ITF_HID
@@ -233,7 +233,9 @@ void card_start(void (*func)(void)) {
         }
     }
     multicore_reset_core1();
-    multicore_launch_core1(func);
+    if (func) {
+        multicore_launch_core1(func);
+    }
     led_set_blink(BLINK_MOUNTED);
 #endif
 }

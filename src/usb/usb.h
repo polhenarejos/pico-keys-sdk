@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM distribution (https://github.com/polhenarejos/pico-hsm).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -53,7 +53,7 @@ enum {
 };
 
 enum {
-    REPORT_ID_KEYBOARD = 1,
+    REPORT_ID_KEYBOARD = 0,
     REPORT_ID_COUNT
 };
 

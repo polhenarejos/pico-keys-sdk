@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,7 +18,7 @@
 #include "tusb.h"
 #include "usb_descriptors.h"
 #include "pico/unique_id.h"
-#include "hsm_version.h"
+#include "pico_keys_version.h"
 #include "usb.h"
 
 #ifndef USB_VID
@@ -50,7 +50,7 @@ tusb_desc_device_t const desc_device = {
 
     .idVendor           = (USB_VID),
     .idProduct          = (USB_PID),
-    .bcdDevice          = HSM_SDK_VERSION,
+    .bcdDevice          = PICO_KEYS_SDK_VERSION,
 
     .iManufacturer      = 1,
     .iProduct           = 2,
@@ -171,7 +171,7 @@ uint8_t const desc_hid_report[] = {
     TUD_HID_REPORT_DESC_FIDO_U2F(CFG_TUD_HID_EP_BUFSIZE)
 };
 uint8_t const desc_hid_report_kb[] = {
-    TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD))
+    TUD_HID_REPORT_DESC_KEYBOARD(HID_USAGE(HID_USAGE_DESKTOP_GAMEPAD), HID_LOGICAL_MIN(0), HID_LOGICAL_MAX_N(255, 2), HID_REPORT_COUNT(8), HID_REPORT_SIZE(8), HID_FEATURE( HID_DATA | HID_VARIABLE | HID_ABSOLUTE), )
 };
 #define EPNUM_HID   0x03
 

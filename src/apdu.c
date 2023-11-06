@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
  */
 
 #include "apdu.h"
-#include "hsm.h"
+#include "pico_keys.h"
 #include "usb.h"
 #include <stdio.h>
 
@@ -27,12 +27,21 @@ extern uint32_t timeout;
 int process_apdu() {
     led_set_blink(BLINK_PROCESSING);
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
-        if (current_app && current_app->unload) {
-            current_app->unload();
-        }
         for (int a = 0; a < num_apps; a++) {
-            if ((current_app = apps[a].select_aid(&apps[a], apdu.data, apdu.nc))) {
-                return set_res_sw(0x90, 0x00);
+            if (!memcmp(apps[a].aid + 1, apdu.data, MIN(apdu.nc, apps[a].aid[0]))) {
+                if (current_app) {
+                    if (current_app->aid && !memcmp(current_app->aid + 1, apdu.data, apdu.nc)) {
+                        current_app->select_aid(current_app);
+                        return set_res_sw(0x90, 0x00);
+                    }
+                    if (current_app->unload) {
+                        current_app->unload();
+                    }
+                }
+                current_app = &apps[a];
+                if (current_app->select_aid(current_app) == CCID_OK) {
+                    return set_res_sw(0x90, 0x00);
+                }
             }
         }
         return set_res_sw(0x6a, 0x82);
@@ -195,7 +204,7 @@ done:   ;
 void apdu_finish() {
     apdu.rdata[apdu.rlen] = apdu.sw >> 8;
     apdu.rdata[apdu.rlen + 1] = apdu.sw & 0xff;
-    timeout_stop();
+    //timeout_stop();
 #ifndef ENABLE_EMULATION
     if ((apdu.rlen + 2 + 10) % 64 == 0) {     // FIX for strange behaviour with PSCS and multiple of 64
         apdu.ne = apdu.rlen - 2;

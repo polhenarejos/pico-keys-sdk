@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@
 #include <time.h>
 #include <poll.h>
 
-#include "hsm.h"
+#include "pico_keys.h"
 #include "apdu.h"
 #include "usb.h"
 #include "ccid/ccid.h"
@@ -231,14 +231,17 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
                 }
             }
             else {
+                size_t sent = 0;
                 DEBUG_PAYLOAD(data, len);
-                if (apdu_process(itf, data, len) > 0) {
+                if ((sent = apdu_process(itf, data, len)) > 0) {
                     process_apdu();
                 }
                 apdu_finish();
-                size_t ret = apdu_next();
-                DEBUG_PAYLOAD(rdata, ret);
-                emul_write(itf, ret);
+                if (sent > 0) {
+                    size_t ret = apdu_next();
+                    DEBUG_PAYLOAD(rdata, ret);
+                    emul_write(itf, ret);
+                }
             }
         }
     #endif

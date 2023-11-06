@@ -1,5 +1,5 @@
  #
- # This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ # This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  # Copyright (c) 2022 Pol Henarejos.
  #
  # This program is free software: you can redistribute it and/or modify
@@ -96,6 +96,12 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chacha20.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
 )
+## mbedTLS reports an stringop overflow for cmac.c
+set_source_files_properties(
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
+    PROPERTIES
+    COMPILE_FLAGS "-Wno-error=stringop-overflow= -Wno-stringop-overflow"
+)
 set(INCLUDES ${INCLUDES}
 ${CMAKE_CURRENT_LIST_DIR}/src
 ${CMAKE_CURRENT_LIST_DIR}/src/usb
@@ -121,6 +127,23 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
 set(INCLUDES ${INCLUDES}
 ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
 )
+endif()
+
+set(LIBRARIES
+pico_stdlib
+pico_multicore
+hardware_flash
+hardware_sync
+hardware_adc
+pico_unique_id
+hardware_rtc
+tinyusb_device
+tinyusb_board
+hardware_pio
+)
+
+if(PICO_BOARD STREQUAL "pico_w")
+    set(LIBRARIES ${LIBRARIES} pico_cyw43_arch_none)
 endif()
 
 function(add_impl_library target)
@@ -151,12 +174,12 @@ if (ENABLE_EMULATION)
     set(INCLUDES ${INCLUDES}
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
     )
-    if (NOT TARGET pico_hsm_sdk)
-        add_impl_library(pico_hsm_sdk)
-        target_sources(pico_hsm_sdk INTERFACE
+    if (NOT TARGET pico_keys_sdk)
+        add_impl_library(pico_keys_sdk)
+        target_sources(pico_keys_sdk INTERFACE
         ${SOURCES}
         )
-        target_include_directories(pico_hsm_sdk INTERFACE
+        target_include_directories(pico_keys_sdk INTERFACE
         ${INCLUDES}
         )
     endif()
@@ -174,25 +197,18 @@ else()
     set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )
-    if (NOT TARGET pico_hsm_sdk)
-        pico_add_library(pico_hsm_sdk)
-        if (CMAKE_COMPILER_IS_GNUCC)
-            set_source_files_properties(
-                ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
-                PROPERTIES
-                COMPILE_OPTIONS "-Wno-stringop-overflow"
-            )
-        endif()
+    if (NOT TARGET pico_keys_sdk)
+        pico_add_library(pico_keys_sdk)
 
-        target_sources(pico_hsm_sdk INTERFACE
+        target_sources(pico_keys_sdk INTERFACE
                 ${SOURCES}
                 )
 
-        target_include_directories(pico_hsm_sdk INTERFACE
+        target_include_directories(pico_keys_sdk INTERFACE
                 ${INCLUDES}
                 )
 
-        target_link_libraries(pico_hsm_sdk INTERFACE pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board hardware_pio)
+        target_link_libraries(pico_keys_sdk INTERFACE ${LIBRARIES})
     endif()
 endif()
 

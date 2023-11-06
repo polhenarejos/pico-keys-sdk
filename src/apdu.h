@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,11 +28,11 @@
 typedef struct app {
     const uint8_t *aid;
     int (*process_apdu)();
-    struct app * (*select_aid)(struct app *, const uint8_t *, uint8_t);
+    int (*select_aid)(struct app *);
     int (*unload)();
 } app_t;
 
-extern int register_app(app_t *(*)(app_t *, const uint8_t *, uint8_t));
+extern int register_app(int (*)(app_t *), const uint8_t *);
 
 typedef struct cmd {
     uint8_t ins;
@@ -50,6 +50,11 @@ typedef struct cmd {
                 else printf("   "); \
                 if (_j == 7) printf(" "); \
             } printf(":  "); \
+            for (int _j = 0; _j < 16; _j++) { \
+                if (_j < _s - _i && (_p)[_i + _j] > 32 && (_p)[_i + _j] != 127 && (_p)[_i + _j] < 176) printf("%c", (_p)[_i + _j]); \
+                else printf(" "); \
+                if (_j == 7) printf(" "); \
+            } \
             printf("\r\n"); \
         } printf("\r\n"); \
 }

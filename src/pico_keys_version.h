@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,9 +18,9 @@
 #ifndef __VERSION_H_
 #define __VERSION_H_
 
-#define HSM_SDK_VERSION 0x0400
+#define PICO_KEYS_SDK_VERSION 0x0500
 
-#define HSM_SDK_VERSION_MAJOR ((HSM_SDK_VERSION >> 8) & 0xff)
-#define HSM_SDK_VERSION_MINOR (HSM_SDK_VERSION & 0xff)
+#define PICO_KEYS_SDK_VERSION_MAJOR ((PICO_KEYS_SDK_VERSION >> 8) & 0xff)
+#define PICO_KEYS_SDK_VERSION_MINOR (PICO_KEYS_SDK_VERSION & 0xff)
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * This file is part of the Pico HSM SDK distribution (https://github.com/polhenarejos/pico-hsm-sdk).
+ * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
  * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -25,20 +25,20 @@
 #include "mbedtls/ecp.h"
 #include "mbedtls/md.h"
 
-#define HSM_KEY_RSA                 0x000f // It is a mask
-#define HSM_KEY_RSA_1K              0x0001
-#define HSM_KEY_RSA_2K              0x0002
-#define HSM_KEY_RSA_3K              0x0004
-#define HSM_KEY_RSA_4k              0x0008
-#define HSM_KEY_EC                  0x0010
-#define HSM_KEY_AES                 0x0f00 // It is a mask
-#define HSM_KEY_AES_128             0x0100
-#define HSM_KEY_AES_192             0x0200
-#define HSM_KEY_AES_256             0x0400
-#define HSM_KEY_AES_512             0x0800 /* For AES XTS */
+#define PICO_KEYS_KEY_RSA                 0x000f // It is a mask
+#define PICO_KEYS_KEY_RSA_1K              0x0001
+#define PICO_KEYS_KEY_RSA_2K              0x0002
+#define PICO_KEYS_KEY_RSA_3K              0x0004
+#define PICO_KEYS_KEY_RSA_4k              0x0008
+#define PICO_KEYS_KEY_EC                  0x0010
+#define PICO_KEYS_KEY_AES                 0x0f00 // It is a mask
+#define PICO_KEYS_KEY_AES_128             0x0100
+#define PICO_KEYS_KEY_AES_192             0x0200
+#define PICO_KEYS_KEY_AES_256             0x0400
+#define PICO_KEYS_KEY_AES_512             0x0800 /* For AES XTS */
 
-#define HSM_AES_MODE_CBC            1
-#define HSM_AES_MODE_CFB            2
+#define PICO_KEYS_AES_MODE_CBC            1
+#define PICO_KEYS_AES_MODE_CFB            2
 
 #define IV_SIZE 16
 

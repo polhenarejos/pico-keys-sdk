@@ -233,7 +233,9 @@ void card_start(void (*func)(void)) {
         }
     }
     multicore_reset_core1();
-    multicore_launch_core1(func);
+    if (func) {
+        multicore_launch_core1(func);
+    }
     led_set_blink(BLINK_MOUNTED);
 #endif
 }

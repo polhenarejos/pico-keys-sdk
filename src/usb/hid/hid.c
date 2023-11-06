@@ -26,11 +26,11 @@
 #include "usb.h"
 
 static bool mounted = false;
-extern int cbor_process(uint8_t, const uint8_t *, size_t);
-extern void init_fido();
+void (*init_fido_cb)() = NULL;
 bool is_nitrokey = false;
 uint8_t (*get_version_major)() = NULL;
 uint8_t (*get_version_minor)() = NULL;
+int (*cbor_process_cb)(uint8_t, const uint8_t *, size_t) = NULL;
 
 typedef struct msg_packet {
     uint16_t len;
@@ -276,7 +276,7 @@ CTAPHID_FRAME last_req = { 0 };
 uint32_t lock = 0;
 
 uint8_t thread_type = 0; //1 is APDU, 2 is CBOR
-extern void cbor_thread();
+void (*cbor_thread_func)() = NULL;
 extern bool cancel_button;
 
 int driver_process_usb_nopacket_hid() {
@@ -288,7 +288,7 @@ int driver_process_usb_nopacket_hid() {
     return 0;
 }
 
-extern const uint8_t fido_aid[];
+const uint8_t *fido_aid = NULL;
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
@@ -352,7 +352,9 @@ int driver_process_usb_packet_hid(uint16_t read) {
         }
 
         if (ctap_req->init.cmd == CTAPHID_INIT) {
-            init_fido();
+            if (init_fido_cb) {
+                init_fido_cb();
+            }
             ctap_resp = (CTAPHID_FRAME *) usb_get_tx(ITF_HID);
             memset(ctap_resp, 0, 64);
             CTAPHID_INIT_REQ *req = (CTAPHID_INIT_REQ *) ctap_req->init.data;
@@ -506,14 +508,16 @@ int driver_process_usb_packet_hid(uint16_t read) {
 
             //if (thread_type != 2)
 #ifndef ENABLE_EMULATION
-            card_start(cbor_thread);
+            card_start(cbor_thread_func);
 #endif
             thread_type = 2;
-            if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
-                apdu_sent = cbor_process(last_cmd, msg_packet.data, msg_packet.len);
-            }
-            else {
-                apdu_sent = cbor_process(last_cmd, ctap_req->init.data, MSG_LEN(ctap_req));
+            if (cbor_process_cb) {
+                if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
+                    apdu_sent = cbor_process_cb(last_cmd, msg_packet.data, msg_packet.len);
+                }
+                else {
+                    apdu_sent = cbor_process_cb(last_cmd, ctap_req->init.data, MSG_LEN(ctap_req));
+                }
             }
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;

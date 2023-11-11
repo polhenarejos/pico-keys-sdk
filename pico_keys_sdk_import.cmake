@@ -95,11 +95,13 @@ ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
 ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
 )
 ## mbedTLS reports an stringop overflow for cmac.c
-set_source_files_properties(
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
-    PROPERTIES
-    COMPILE_FLAGS "-Wno-error=stringop-overflow= -Wno-stringop-overflow"
-)
+if (NOT ENABLE_EMULATION OR NOT APPLE)
+    set_source_files_properties(
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
+        PROPERTIES
+        COMPILE_FLAGS "-Wno-error=stringop-overflow= -Wno-stringop-overflow"
+    )
+endif()
 set(INCLUDES ${INCLUDES}
 ${CMAKE_CURRENT_LIST_DIR}/src
 ${CMAKE_CURRENT_LIST_DIR}/src/usb

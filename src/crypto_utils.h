@@ -42,8 +42,8 @@
 
 #define IV_SIZE 16
 
-extern void double_hash_pin(const uint8_t *pin, size_t len, uint8_t output[32]);
-extern void hash_multi(const uint8_t *input, size_t len, uint8_t output[32]);
+extern void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]);
+extern void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]);
 extern void hash256(const uint8_t *input, size_t len, uint8_t output[32]);
 extern void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output);
 extern int aes_encrypt(const uint8_t *key,

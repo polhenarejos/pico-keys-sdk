@@ -25,9 +25,10 @@
 #else
 #include <stdbool.h>
 #include <stdint.h>
+#include "compat.h"
 #endif
 
-#define FILE_TYPE_UNKNOWN       0x00
+#define FILE_TYPE_NOT_KNOWN     0x00
 #define FILE_TYPE_DF            0x04
 #define FILE_TYPE_INTERNAL_EF   0x03
 #define FILE_TYPE_WORKING_EF    0x01
@@ -68,7 +69,7 @@
 
 #define MAX_DEPTH 4
 
-typedef struct file {
+PACK(typedef struct file {
     const uint16_t fid;
     const uint8_t parent; //entry number in the whole table!!
     const uint8_t *name;
@@ -76,7 +77,7 @@ typedef struct file {
     const uint8_t ef_structure;
     uint8_t *data; //should include 2 bytes len at begining
     const uint8_t acl[7];
-} __attribute__((packed)) file_t;
+}) file_t;
 
 extern bool file_has_data(file_t *);
 
@@ -119,7 +120,7 @@ extern int delete_dynamic_file(file_t *f);
 
 extern bool isUserAuthenticated;
 
-extern int meta_find(uint16_t, uint8_t **out);
+extern uint16_t meta_find(uint16_t, uint8_t **out);
 extern int meta_delete(uint16_t fid);
 extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
 extern int delete_file(file_t *ef);

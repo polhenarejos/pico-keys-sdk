@@ -48,7 +48,7 @@ const uint8_t *random_bytes_get(size_t len) {
         return NULL;
     }
     static uint32_t return_word[MAX_RANDOM_BUFFER / sizeof(uint32_t)];
-    for (int ix = 0; ix < len; ix += RANDOM_BYTES_LENGTH) {
+    for (size_t ix = 0; ix < len; ix += RANDOM_BYTES_LENGTH) {
         neug_wait_full();
         memcpy(return_word + ix / sizeof(uint32_t), random_word, RANDOM_BYTES_LENGTH);
         random_bytes_free((const uint8_t *) random_word);
@@ -84,14 +84,14 @@ void random_get_salt(uint8_t *p) {
 int random_gen(void *arg, unsigned char *out, size_t out_len) {
     uint8_t *index_p = (uint8_t *) arg;
     uint8_t index = index_p ? *index_p : 0;
-    size_t n;
+    uint8_t n;
 
     while (out_len) {
         neug_wait_full();
 
         n = RANDOM_BYTES_LENGTH - index;
         if (n > out_len) {
-            n = out_len;
+            n = (uint8_t)out_len;
         }
 
         memcpy(out, ((unsigned char *) random_word) + index, n);

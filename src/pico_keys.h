@@ -24,14 +24,26 @@
 #else
 #include <stdint.h>
 extern uint32_t board_millis();
+#if !defined(MIN)
+#if defined(_MSC_VER)
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#else
 #define MIN(a, b) \
     ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
        _a < _b ? _a : _b; })
+#endif
+#endif
+#if !defined(MAX)
+#if defined(_MSC_VER)
+#define MAX(a,b) (((a)>(b))?(a):(b))
+#else
 #define MAX(a, b) \
     ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
        _a > _b ? _a : _b; })
+#endif
+#endif
 #endif
 #include <string.h>
 

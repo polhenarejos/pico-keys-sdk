@@ -22,14 +22,14 @@
 #include "asn1.h"
 #include "apdu.h"
 
-static uint8_t nonce[8];
+static uint8_t sm_nonce[8];
 static uint8_t sm_kmac[16];
 static uint8_t sm_kenc[16];
 static MSE_protocol sm_protocol = MSE_NONE;
 static mbedtls_mpi sm_mSSC;
 static uint8_t sm_blocksize = 0;
 static uint8_t sm_iv[16];
-size_t sm_session_pin_len = 0;
+uint16_t sm_session_pin_len = 0;
 uint8_t sm_session_pin[16];
 
 bool is_secured_apdu() {
@@ -57,9 +57,9 @@ void sm_derive_key(const uint8_t *input,
 }
 
 void sm_derive_all_keys(const uint8_t *derived, size_t derived_len) {
-    memcpy(nonce, random_bytes_get(8), 8);
-    sm_derive_key(derived, derived_len, 1, nonce, sizeof(nonce), sm_kenc);
-    sm_derive_key(derived, derived_len, 2, nonce, sizeof(nonce), sm_kmac);
+    memcpy(sm_nonce, random_bytes_get(8), 8);
+    sm_derive_key(derived, derived_len, 1, sm_nonce, sizeof(sm_nonce), sm_kenc);
+    sm_derive_key(derived, derived_len, 2, sm_nonce, sizeof(sm_nonce), sm_kmac);
     mbedtls_mpi_init(&sm_mSSC);
     mbedtls_mpi_grow(&sm_mSSC, sm_blocksize);
     mbedtls_mpi_lset(&sm_mSSC, 0);
@@ -82,7 +82,7 @@ MSE_protocol sm_get_protocol() {
 }
 
 uint8_t *sm_get_nonce() {
-    return nonce;
+    return sm_nonce;
 }
 
 int sm_sign(uint8_t *in, size_t in_len, uint8_t *out) {
@@ -103,16 +103,16 @@ int sm_unwrap() {
     if (r != CCID_OK) {
         return r;
     }
-    int le = sm_get_le();
+    uint16_t le = sm_get_le();
     if (le >= 0) {
         apdu.ne = le;
     }
     uint8_t *body = NULL;
-    size_t body_size = 0;
+    uint16_t body_size = 0;
     bool is87 = false;
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
-    size_t tag_len = 0;
+    uint16_t tag_len = 0;
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x87 || tag == 0x85) {
             body = tag_data;
@@ -168,20 +168,20 @@ int sm_wrap() {
         res_APDU_size++;
         if (res_APDU_size < 128) {
             memmove(res_APDU + 2, res_APDU, res_APDU_size);
-            res_APDU[1] = res_APDU_size;
+            res_APDU[1] = (uint8_t)res_APDU_size;
             res_APDU_size += 2;
         }
         else if (res_APDU_size < 256) {
             memmove(res_APDU + 3, res_APDU, res_APDU_size);
             res_APDU[1] = 0x81;
-            res_APDU[2] = res_APDU_size;
+            res_APDU[2] = (uint8_t)res_APDU_size;
             res_APDU_size += 3;
         }
         else {
             memmove(res_APDU + 4, res_APDU, res_APDU_size);
             res_APDU[1] = 0x82;
-            res_APDU[2] = res_APDU_size >> 8;
-            res_APDU[3] = res_APDU_size & 0xff;
+            res_APDU[2] = (uint8_t)(res_APDU_size >> 8);
+            res_APDU[3] = (uint8_t)(res_APDU_size & 0xff);
             res_APDU_size += 4;
         }
         res_APDU[0] = 0x87;
@@ -204,20 +204,20 @@ int sm_wrap() {
     return CCID_OK;
 }
 
-int sm_get_le() {
+uint16_t sm_get_le() {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
-    size_t tag_len = 0;
+    uint16_t tag_len = 0;
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x97) {
-            uint32_t le = 0;
-            for (int t = 1; t <= tag_len; t++) {
+            uint16_t le = 0;
+            for (uint16_t t = 1; t <= tag_len; t++) {
                 le |= (*tag_data++) << (tag_len - t);
             }
             return le;
         }
     }
-    return -1;
+    return 0;
 }
 
 void sm_update_iv() {
@@ -231,7 +231,8 @@ void sm_update_iv() {
 int sm_verify() {
     uint8_t input[1024];
     memset(input, 0, sizeof(input));
-    int input_len = 0, r = 0;
+    uint16_t input_len = 0;
+    int r = 0;
     bool add_header = (CLA(apdu) & 0xC) == 0xC;
     int data_len = (int) (apdu.nc / sm_blocksize) * sm_blocksize;
     if (data_len % sm_blocksize) {
@@ -260,14 +261,14 @@ int sm_verify() {
     }
     bool some_added = false;
     const uint8_t *mac = NULL;
-    size_t mac_len = 0;
+    uint16_t mac_len = 0;
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
-    size_t tag_len = 0;
+    uint16_t tag_len = 0;
     while (walk_tlv(apdu.data, apdu.nc, &p, &tag, &tag_len, &tag_data)) {
         if (tag & 0x1) {
-            input[input_len++] = tag;
-            int tlen = format_tlv_len(tag_len, input + input_len);
+            input[input_len++] = (uint8_t)tag;
+            uint8_t tlen = format_tlv_len(tag_len, input + input_len);
             input_len += tlen;
             memcpy(input + input_len, tag_data, tag_len);
             input_len += tag_len;
@@ -296,13 +297,13 @@ int sm_verify() {
     return CCID_VERIFICATION_FAILED;
 }
 
-int sm_remove_padding(const uint8_t *data, size_t data_len) {
-    int i = data_len - 1;
+uint16_t sm_remove_padding(const uint8_t *data, uint16_t data_len) {
+    uint16_t i = data_len - 1;
     for (; i >= 0 && data[i] == 0; i--) {
         ;
     }
     if (i < 0 || data[i] != 0x80) {
-        return -1;
+        return 0;
     }
     return i;
 }

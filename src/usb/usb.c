@@ -47,7 +47,7 @@ uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset) {
 #ifndef ENABLE_EMULATION
     uint8_t pkt_max = 64;
 #endif
-    int w = 0;
+    uint16_t w = 0;
     if (len > sizeof(tx_buffer[itf])) {
         len = sizeof(tx_buffer[itf]);
     }
@@ -72,8 +72,9 @@ uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset) {
     return w;
 }
 
-size_t usb_rx(uint8_t itf, const uint8_t *buffer, size_t len) {
-    uint16_t size = MIN(sizeof(rx_buffer[itf]) - w_offset[itf], len);
+#ifndef ENABLE_EMULATION
+uint16_t usb_rx(uint8_t itf, const uint8_t *buffer, uint16_t len) {
+    uint16_t size = MIN((uint16_t)sizeof(rx_buffer[itf]) - w_offset[itf], (uint16_t)len);
     if (size > 0) {
         if (buffer == NULL) {
 #ifdef USB_ITF_HID
@@ -83,7 +84,7 @@ size_t usb_rx(uint8_t itf, const uint8_t *buffer, size_t len) {
 #endif
 #ifdef USB_ITF_CCID
             if (itf == ITF_CCID) {
-                size = driver_read_ccid(rx_buffer[itf] + w_offset[itf], size);
+                size = (uint16_t)driver_read_ccid(rx_buffer[itf] + w_offset[itf], size);
             }
 #endif
         }
@@ -94,9 +95,10 @@ size_t usb_rx(uint8_t itf, const uint8_t *buffer, size_t len) {
     }
     return size;
 }
+#endif
 
 uint32_t usb_write_flush(uint8_t itf) {
-    int w = 0;
+    uint16_t w = 0;
     if (w_len[itf] > 0) {
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
@@ -217,7 +219,7 @@ void card_init_core1() {
 #endif
 }
 
-size_t finished_data_size = 0;
+uint16_t finished_data_size = 0;
 
 void card_start(void (*func)(void)) {
 #ifndef ENABLE_EMULATION
@@ -237,6 +239,8 @@ void card_start(void (*func)(void)) {
         multicore_launch_core1(func);
     }
     led_set_blink(BLINK_MOUNTED);
+#else
+    (void)func;
 #endif
 }
 

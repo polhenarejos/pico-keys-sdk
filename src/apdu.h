@@ -21,6 +21,8 @@
 #include <stdlib.h>
 #ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
+#else
+#include "compat.h"
 #endif
 #include <stdio.h>
 #include <inttypes.h>
@@ -79,15 +81,16 @@ extern uint8_t num_apps;
 extern app_t apps[4];
 extern app_t *current_app;
 
-struct apdu {
+PACK(struct apdu {
     uint8_t *header;
-    uint32_t nc;
-    uint32_t ne;
+    uint16_t nc;
+    uint16_t ne;
     uint8_t *data;
     uint16_t sw;
     uint8_t *rdata;
     uint16_t rlen;
-} __attribute__((__packed__));
+
+});
 
 #define CLA(a) a.header[0]
 #define INS(a) a.header[1]
@@ -101,9 +104,9 @@ extern struct apdu apdu;
 
 extern uint16_t set_res_sw(uint8_t sw1, uint8_t sw2);
 extern int process_apdu();
-extern size_t apdu_process(uint8_t, const uint8_t *buffer, size_t buffer_size);
+extern uint16_t apdu_process(uint8_t, const uint8_t *buffer, uint16_t buffer_size);
 extern void apdu_finish();
-extern size_t apdu_next();
+extern uint16_t apdu_next();
 extern void apdu_thread();
 
 #endif

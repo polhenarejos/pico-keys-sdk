@@ -24,7 +24,7 @@
 #include "crypto_utils.h"
 #include "pico_keys.h"
 
-void double_hash_pin(const uint8_t *pin, size_t len, uint8_t output[32]) {
+void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
     uint8_t o1[32];
     hash_multi(pin, len, o1);
     for (int i = 0; i < sizeof(o1); i++) {
@@ -33,10 +33,10 @@ void double_hash_pin(const uint8_t *pin, size_t len, uint8_t output[32]) {
     hash_multi(o1, sizeof(o1), output);
 }
 
-void hash_multi(const uint8_t *input, size_t len, uint8_t output[32]) {
+void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
-    int iters = 256;
+    uint16_t iters = 256;
 #ifndef ENABLE_EMULATION
     pico_unique_board_id_t unique_id;
 

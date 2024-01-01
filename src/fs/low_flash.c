@@ -28,8 +28,19 @@
 #include "pico/sem.h"
 #include "pico/multicore.h"
 #else
+#ifdef _MSC_VER
+#include <windows.h>
+#include <io.h>
+#define O_RDWR _O_RDWR
+#define open _open
+#define write _write
+#define mode_t unsigned short
+#define lseek _lseek
+#include "mman.h"
+#else
 #include <unistd.h>
 #include <sys/mman.h>
+#endif
 #include <fcntl.h>
 #define FLASH_SECTOR_SIZE       4096
 #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)

@@ -248,7 +248,9 @@
  *
  * Uncomment to get warnings on using deprecated functions and features.
  */
+#if (defined(__GNUC__) || defined(__clang__))
 #define MBEDTLS_DEPRECATED_WARNING
+#endif
 
 /**
  * \def MBEDTLS_DEPRECATED_REMOVED

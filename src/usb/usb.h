@@ -66,42 +66,42 @@ extern uint8_t card_locked_itf;
 
 #ifdef USB_ITF_HID
 extern int driver_process_usb_packet_hid(uint16_t rx_read);
-extern void driver_exec_finished_hid(size_t size_next);
-extern void driver_exec_finished_cont_hid(size_t size_next, size_t offset);
+extern void driver_exec_finished_hid(uint16_t size_next);
+extern void driver_exec_finished_cont_hid(uint16_t size_next, uint16_t offset);
 extern void driver_exec_timeout_hid();
 extern bool driver_mounted_hid();
 extern uint8_t *driver_prepare_response_hid();
-extern int driver_write_hid(uint8_t, const uint8_t *, size_t);
-extern size_t driver_read_hid(uint8_t *, size_t);
+extern int driver_write_hid(uint8_t, const uint8_t *, uint16_t);
+extern uint16_t driver_read_hid(uint8_t *, uint16_t);
 extern int driver_process_usb_nopacket_hid();
 #endif
 
 #ifdef USB_ITF_CCID
 extern int driver_process_usb_packet_ccid(uint16_t rx_read);
-extern void driver_exec_finished_ccid(size_t size_next);
-extern void driver_exec_finished_cont_ccid(size_t size_next, size_t offset);
+extern void driver_exec_finished_ccid(uint16_t size_next);
+extern void driver_exec_finished_cont_ccid(uint16_t size_next, uint16_t offset);
 extern void driver_exec_timeout_ccid();
 extern bool driver_mounted_ccid();
 extern uint8_t *driver_prepare_response_ccid();
-extern int driver_write_ccid(const uint8_t *, size_t);
-extern size_t driver_read_ccid(uint8_t *, size_t);
+extern int driver_write_ccid(const uint8_t *, uint16_t);
+extern uint16_t driver_read_ccid(uint8_t *, uint16_t);
 extern int driver_process_usb_nopacket_ccid();
 #endif
 
 #ifdef ENABLE_EMULATION
 extern int driver_process_usb_packet_emul(uint8_t, uint16_t rx_read);
-extern void driver_exec_finished_emul(uint8_t, size_t size_next);
-extern void driver_exec_finished_cont_emul(uint8_t, size_t size_next, size_t offset);
+extern void driver_exec_finished_emul(uint8_t, uint16_t size_next);
+extern void driver_exec_finished_cont_emul(uint8_t, uint16_t size_next, uint16_t offset);
 extern void driver_exec_timeout_emul(uint8_t);
 extern bool driver_mounted_emul(uint8_t);
 extern uint8_t *driver_prepare_response_emul(uint8_t);
-extern int driver_write_emul(uint8_t, const uint8_t *, size_t);
-extern size_t driver_read_emul(uint8_t, uint8_t *, size_t);
+extern uint16_t driver_write_emul(uint8_t, const uint8_t *, uint16_t);
+extern uint16_t driver_read_emul(uint8_t, uint8_t *, uint16_t);
 extern int driver_process_usb_nopacket_emul(uint8_t);
 extern uint16_t emul_read(uint8_t);
+#else
+extern uint16_t usb_rx(uint8_t itf, const uint8_t *buffer, uint16_t len);
 #endif
-
-extern size_t usb_rx(uint8_t itf, const uint8_t *buffer, size_t len);
 
 extern void card_start(void (*func)(void));
 extern void card_exit();
@@ -111,7 +111,7 @@ extern uint8_t *usb_get_rx(uint8_t itf);
 extern uint8_t *usb_get_tx(uint8_t itf);
 extern uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset);
 extern void usb_clear_rx(uint8_t itf);
-extern size_t finished_data_size;
+extern uint16_t finished_data_size;
 extern void usb_set_timeout_counter(uint8_t itf, uint32_t v);
 extern void card_init_core1();
 extern uint32_t usb_write_flush(uint8_t itf);

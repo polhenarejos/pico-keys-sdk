@@ -37,12 +37,12 @@ extern uint8_t *sm_get_nonce();
 extern int sm_sign(uint8_t *in, size_t in_len, uint8_t *out);
 int sm_verify();
 void sm_update_iv();
-int sm_get_le();
+uint16_t sm_get_le();
 extern int sm_unwrap();
-int sm_remove_padding(const uint8_t *data, size_t data_len);
+uint16_t sm_remove_padding(const uint8_t *data, uint16_t data_len);
 extern int sm_wrap();
 extern bool is_secured_apdu();
 extern uint8_t sm_session_pin[16];
-extern size_t sm_session_pin_len;
+extern uint16_t sm_session_pin_len;
 
 #endif

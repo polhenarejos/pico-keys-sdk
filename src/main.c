@@ -21,7 +21,9 @@
 #ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
 #else
+#if !defined(_MSC_VER)
 #include <sys/time.h>
+#endif
 #include "emulation.h"
 #endif
 
@@ -156,6 +158,35 @@ uint32_t button_timeout = 15000;
 bool cancel_button = false;
 
 #ifdef ENABLE_EMULATION
+#ifdef _MSC_VER
+#include <windows.h>
+struct timezone
+{
+    __int32  tz_minuteswest; /* minutes W of Greenwich */
+    bool  tz_dsttime;     /* type of dst correction */
+};
+int gettimeofday(struct timeval* tp, struct timezone* tzp)
+{
+    (void)tzp;
+    // Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
+    // This magic number is the number of 100 nanosecond intervals since January 1, 1601 (UTC)
+    // until 00:00:00 January 1, 1970 
+    static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
+
+    SYSTEMTIME  system_time;
+    FILETIME    file_time;
+    uint64_t    time;
+
+    GetSystemTime(&system_time);
+    SystemTimeToFileTime(&system_time, &file_time);
+    time = ((uint64_t)file_time.dwLowDateTime);
+    time += ((uint64_t)file_time.dwHighDateTime) << 32;
+
+    tp->tv_sec = (long)((time - EPOCH) / 10000000L);
+    tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
+    return 0;
+}
+#endif
 uint32_t board_millis() {
     struct timeval start;
     gettimeofday(&start, NULL);
@@ -235,6 +266,7 @@ void led_blinking_task() {
 }
 
 void led_off_all() {
+#ifndef ENABLE_EMULATION
 #ifdef PIMORONI_TINY2040
     gpio_put(TINY2040_LED_R_PIN, 1);
     gpio_put(TINY2040_LED_G_PIN, 1);
@@ -250,6 +282,7 @@ void led_off_all() {
     uint offset = pio_add_program(pio, &ws2812_program);
 
     ws2812_program_init(pio, sm, offset, PICO_DEFAULT_WS2812_PIN, 800000, true);
+#endif
 #endif
 }
 

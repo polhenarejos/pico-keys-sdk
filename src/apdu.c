@@ -52,7 +52,7 @@ int process_apdu() {
     return set_res_sw(0x6a, 0x82);
 }
 
-size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
+uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
     apdu.header = (uint8_t *) buffer;
     apdu.nc = apdu.ne = 0;
     if (buffer_size == 4) {
@@ -72,7 +72,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
         if (buffer_size == 7) {
             apdu.ne = (apdu.header[5] << 8) | apdu.header[6];
             if (apdu.ne == 0) {
-                apdu.ne = 65536;
+                //apdu.ne = 65536; // All underlying architecture assumes payloads are 65535 as max
             }
         }
         else {
@@ -82,7 +82,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
             if (apdu.nc + 7 + 2 == buffer_size) {
                 apdu.ne = (apdu.header[buffer_size - 2] << 8) | apdu.header[buffer_size - 1];
                 if (apdu.ne == 0) {
-                    apdu.ne = 65536;
+                    //apdu.ne = 65536;
                 }
             }
         }
@@ -116,7 +116,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
             }
 #endif
 #else
-            driver_exec_finished_cont_emul(itf, apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
+            driver_exec_finished_cont_emul(itf, apdu.rlen + 2, (uint16_t)(rdata_gr - usb_get_tx(itf)));
 #endif
             //Prepare next RAPDU
             apdu.sw = 0;
@@ -131,7 +131,7 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
                 rdata_gr[1] = 0;
             }
             else {
-                rdata_gr[1] = apdu.rlen - apdu.ne;
+                rdata_gr[1] = (uint8_t)(apdu.rlen - apdu.ne);
             }
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
@@ -145,11 +145,10 @@ size_t apdu_process(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
             }
 #endif
 #else
-            driver_exec_finished_cont_emul(itf, apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
+            driver_exec_finished_cont_emul(itf, apdu.ne + 2, (uint16_t)(rdata_gr - apdu.ne - usb_get_tx(itf)));
 #endif
             apdu.rlen -= apdu.ne;
         }
-        return 0;
     }
     else {
         apdu.sw = 0;
@@ -212,7 +211,7 @@ void apdu_finish() {
 #endif
 }
 
-size_t apdu_next() {
+uint16_t apdu_next() {
     if (apdu.sw != 0) {
         if (apdu.rlen <= apdu.ne) {
             return apdu.rlen + 2;
@@ -225,7 +224,7 @@ size_t apdu_next() {
                 rdata_gr[1] = 0;
             }
             else {
-                rdata_gr[1] = apdu.rlen - apdu.ne;
+                rdata_gr[1] = (uint8_t)(apdu.rlen - apdu.ne);
             }
             apdu.rlen -= apdu.ne;
         }

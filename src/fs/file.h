@@ -69,7 +69,7 @@
 
 #define MAX_DEPTH 4
 
-PACK(typedef struct file {
+typedef PACK(struct file {
     const uint16_t fid;
     const uint8_t parent; //entry number in the whole table!!
     const uint8_t *name;

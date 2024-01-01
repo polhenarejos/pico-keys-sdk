@@ -83,8 +83,8 @@ extern app_t *current_app;
 
 PACK(struct apdu {
     uint8_t *header;
-    uint16_t nc;
-    uint16_t ne;
+    uint32_t nc;
+    uint32_t ne;
     uint8_t *data;
     uint16_t sw;
     uint8_t *rdata;

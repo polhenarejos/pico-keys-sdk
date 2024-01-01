@@ -264,7 +264,7 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
                 apdu_finish();
                 if (sent > 0) {
                     uint16_t ret = apdu_next();
-                    DEBUG_PAYLOAD(rdata, ret);
+                    DEBUG_PAYLOAD(apdu.rdata, ret);
                     emul_write(itf, ret);
                 }
             }

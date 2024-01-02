@@ -213,7 +213,7 @@ uint16_t sm_get_le() {
         if (tag == 0x97) {
             uint16_t le = 0;
             for (uint16_t t = 1; t <= tag_len; t++) {
-                le |= (*tag_data++) << (tag_len - t);
+                le |= (*tag_data++) << (tag_len - t) * 8;
             }
             return le;
         }

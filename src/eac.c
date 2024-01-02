@@ -229,7 +229,7 @@ void sm_update_iv() {
 }
 
 int sm_verify() {
-    uint8_t input[1024];
+    uint8_t input[4096];
     memset(input, 0, sizeof(input));
     uint16_t input_len = 0;
     int r = 0;
@@ -238,7 +238,7 @@ int sm_verify() {
     if (data_len % sm_blocksize) {
         data_len += sm_blocksize;
     }
-    if (data_len + (add_header ? sm_blocksize : 0) > 1024) {
+    if (data_len + (add_header ? sm_blocksize : 0) > 4096) {
         return CCID_WRONG_LENGTH;
     }
     mbedtls_mpi ssc;

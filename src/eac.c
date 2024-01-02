@@ -143,7 +143,7 @@ int sm_wrap() {
     if (sm_indicator == 0) {
         return CCID_OK;
     }
-    uint8_t input[1024];
+    uint8_t input[4096];
     size_t input_len = 0;
     memset(input, 0, sizeof(input));
     mbedtls_mpi ssc;

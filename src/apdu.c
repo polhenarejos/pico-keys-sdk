@@ -125,7 +125,7 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
         }
         else {
             rdata_gr += apdu.ne;
-            rdata_bk = *rdata_gr;
+            rdata_bk = *(uint16_t *) rdata_gr;
             rdata_gr[0] = 0x61;
             if (apdu.rlen - apdu.ne >= 256) {
                 rdata_gr[1] = 0;

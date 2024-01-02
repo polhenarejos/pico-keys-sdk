@@ -173,6 +173,7 @@ void apdu_thread() {
     card_init_core1();
     while (1) {
         uint32_t m = 0;
+        int proc = 0;
         queue_remove_blocking(&usb_to_card_q, &m);
 
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE) {
@@ -183,11 +184,12 @@ void apdu_thread() {
             break;
         }
 
-        process_apdu();
+        proc = process_apdu();
 
 done:   ;
-
-        apdu_finish();
+        if (proc == 1) {
+            apdu_finish();
+        }
         finished_data_size = apdu_next();
         uint32_t flag = EV_EXEC_FINISHED;
         queue_add_blocking(&card_to_usb_q, &flag);

@@ -201,6 +201,7 @@ int sm_wrap() {
     if (apdu.ne > 0) {
         apdu.ne = res_APDU_size;
     }
+    set_res_sw(0x90, 0x00);
     return CCID_OK;
 }
 

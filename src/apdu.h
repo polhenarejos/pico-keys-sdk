@@ -21,9 +21,8 @@
 #include <stdlib.h>
 #ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
-#else
-#include "compat.h"
 #endif
+#include "compat.h"
 #include <stdio.h>
 #include <inttypes.h>
 

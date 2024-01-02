@@ -25,8 +25,8 @@
 #else
 #include <stdbool.h>
 #include <stdint.h>
-#include "compat.h"
 #endif
+#include "compat.h"
 
 #define FILE_TYPE_NOT_KNOWN     0x00
 #define FILE_TYPE_DF            0x04

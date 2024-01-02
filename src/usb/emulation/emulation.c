@@ -260,8 +260,8 @@ int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
                 DEBUG_PAYLOAD(data, len);
                 if ((sent = apdu_process(itf, data, len)) > 0) {
                     process_apdu();
+                    apdu_finish();
                 }
-                apdu_finish();
                 if (sent > 0) {
                     uint16_t ret = apdu_next();
                     DEBUG_PAYLOAD(apdu.rdata, ret);

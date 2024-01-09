@@ -244,6 +244,7 @@ if (MSVC)
         -wd5045
         -wd4706
         -wd4061
+        -wd5105
     )
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS 
         __STDC_WANT_SECURE_LIB__=0 

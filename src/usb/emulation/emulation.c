@@ -334,7 +334,14 @@ uint16_t emul_read(uint8_t itf) {
     uint16_t len = 0;
     fd_set input;
     FD_ZERO(&input);
+#ifdef _WIN32
+    __pragma(warning(push))
+    __pragma(warning(disable:4548))
+#endif
     FD_SET(sock, &input);
+#ifdef _WIN32
+    __pragma(warning(pop))
+#endif
     struct timeval timeout;
     timeout.tv_sec  = 0;
     timeout.tv_usec = 0 * 1000;

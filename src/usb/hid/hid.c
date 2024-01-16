@@ -219,7 +219,7 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_
 }
 
 #ifndef ENABLE_EMULATION
-int driver_write_hid(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
+int driver_write_hid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
     last_write_result[itf] = tud_hid_n_report(itf, 0, buffer, buffer_size);
     printf("result %d\n", last_write_result[itf]);
     if (last_write_result[itf] == false) {
@@ -229,7 +229,7 @@ int driver_write_hid(uint8_t itf, const uint8_t *buffer, size_t buffer_size) {
 }
 #endif
 
-size_t driver_read_hid(uint8_t *buffer, size_t buffer_size) {
+uint16_t driver_read_hid(uint8_t *buffer, uint16_t buffer_size) {
     return 0;
 }
 
@@ -570,7 +570,7 @@ uint8_t *driver_prepare_response_hid() {
     return ctap_resp->init.data;
 }
 
-void driver_exec_finished_hid(size_t size_next) {
+void driver_exec_finished_hid(uint16_t size_next) {
     if (size_next > 0) {
         if (thread_type == 2 && apdu.sw != 0) {
             ctap_error(apdu.sw & 0xff);
@@ -587,7 +587,7 @@ void driver_exec_finished_hid(size_t size_next) {
     apdu.sw = 0;
 }
 
-void driver_exec_finished_cont_hid(size_t size_next, size_t offset) {
+void driver_exec_finished_cont_hid(uint16_t size_next, uint16_t offset) {
     offset -= 7;
     ctap_resp = (CTAPHID_FRAME *) (usb_get_tx(ITF_HID) + offset);
     ctap_resp->cid = ctap_req->cid;

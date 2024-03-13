@@ -358,9 +358,11 @@ uint16_t meta_find(uint16_t fid, uint8_t **out) {
         return 0;
     }
     uint16_t tag = 0x0;
-    uint8_t *tag_data = NULL, *p = NULL, *data = file_get_data(ef);
-    uint16_t tag_len = 0, data_len = file_get_size(ef);
-    while (walk_tlv(data, data_len, &p, &tag, &tag_len, &tag_data)) {
+    uint8_t *tag_data = NULL, *p = NULL;
+    uint16_t tag_len = 0;
+    asn1_ctx_t ctxi;
+    asn1_ctx_init(file_get_data(ef), file_get_size(ef), &ctxi);
+    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag_len < 2) {
             continue;
         }
@@ -380,27 +382,29 @@ int meta_delete(uint16_t fid) {
         return CCID_ERR_FILE_NOT_FOUND;
     }
     uint16_t tag = 0x0;
-    uint8_t *tag_data = NULL, *p = NULL, *data = file_get_data(ef);
-    uint16_t tag_len = 0, data_len = file_get_size(ef);
+    uint8_t *tag_data = NULL, *p = NULL;
+    uint16_t tag_len = 0;
     uint8_t *fdata = NULL;
-    while (walk_tlv(data, data_len, &p, &tag, &tag_len, &tag_data)) {
+    asn1_ctx_t ctxi;
+    asn1_ctx_init(file_get_data(ef), file_get_size(ef), &ctxi);
+    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         uint8_t *tpos = p - tag_len - format_tlv_len(tag_len, NULL) - 1;
         if (tag_len < 2) {
             continue;
         }
         uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
         if (cfid == fid) {
-            uint16_t new_len = data_len - 1 - tag_len - format_tlv_len(tag_len, NULL);
+            uint16_t new_len = ctxi.len - 1 - tag_len - format_tlv_len(tag_len, NULL);
             if (new_len == 0) {
                 flash_clear_file(ef);
             }
             else {
                 fdata = (uint8_t *) calloc(1, new_len);
-                if (tpos > data) {
-                    memcpy(fdata, data, tpos - data);
+                if (tpos > ctxi.data) {
+                    memcpy(fdata, ctxi.data, tpos - ctxi.data);
                 }
-                if (data + data_len > p) {
-                    memcpy(fdata + (tpos - data), p, data + data_len - p);
+                if (ctxi.data + ctxi.len > p) {
+                    memcpy(fdata + (tpos - ctxi.data), p, ctxi.data + ctxi.len - p);
                 }
                 int r = flash_write_data_to_file(ef, fdata, new_len);
                 free(fdata);
@@ -426,7 +430,9 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    while (walk_tlv(fdata, ef_size, &p, &tag, &tag_len, &tag_data)) {
+    asn1_ctx_t ctxi;
+    asn1_ctx_init(fdata, ef_size, &ctxi);
+    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag_len < 2) {
             continue;
         }

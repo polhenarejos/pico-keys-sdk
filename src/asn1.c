@@ -15,7 +15,39 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "pico_keys.h"
 #include "asn1.h"
+
+int asn1_ctx_init(uint8_t *data, uint16_t len, asn1_ctx_t *ctx) {
+    if (!ctx) {
+        return CCID_ERR_NULL_PARAM;
+    }
+    ctx->data = data;
+    ctx->len = 0;
+    return CCID_OK;
+}
+
+int asn1_ctx_clear(asn1_ctx_t *ctx) {
+    ctx->data = NULL;
+    ctx->len = 0;
+    return CCID_OK;
+}
+
+uint16_t asn1_len(asn1_ctx_t *ctx) {
+    if (ctx->data && ctx->len > 0) {
+        return ctx->len;
+    }
+    return 0;
+}
+
+uint32_t asn1_get_uint(asn1_ctx_t *ctx) {
+    uint32_t d = ctx->data[0];
+    for (uint8_t lt = 1; lt < ctx->len; lt++) {
+        d <<= 8;
+        d |= ctx->data[lt];
+    }
+    return d;
+}
 
 uint16_t asn1_len_tag(uint16_t tag, uint16_t len) {
     uint16_t ret = 1 + format_tlv_len(len, NULL) + len;
@@ -47,8 +79,7 @@ uint8_t format_tlv_len(uint16_t len, uint8_t *out) {
     return 3;
 }
 
-int walk_tlv(const uint8_t *cdata,
-             uint16_t cdata_len,
+int walk_tlv(const asn1_ctx_t *ctxi,
              uint8_t **p,
              uint16_t *tag,
              uint16_t *tag_len,
@@ -57,9 +88,9 @@ int walk_tlv(const uint8_t *cdata,
         return 0;
     }
     if (!*p) {
-        *p = (uint8_t *) cdata;
+        *p = (uint8_t *) ctxi->data;
     }
-    if (*p - cdata >= cdata_len) {
+    if (*p - ctxi->data >= ctxi->len) {
         return 0;
     }
     uint16_t tg = 0x0;
@@ -90,22 +121,18 @@ int walk_tlv(const uint8_t *cdata,
     return 1;
 }
 
-bool asn1_find_tag(const uint8_t *data,
-                   uint16_t data_len,
+bool asn1_find_tag(const asn1_ctx_t *ctxi,
                    uint16_t itag,
-                   uint16_t *tag_len,
-                   uint8_t **tag_data) {
+                   asn1_ctx_t *ctxo) {
     uint16_t tag = 0x0;
     uint8_t *p = NULL;
     uint8_t *tdata = NULL;
     uint16_t tlen = 0;
-    while (walk_tlv(data, data_len, &p, &tag, &tlen, &tdata)) {
+    while (walk_tlv(ctxi, &p, &tag, &tlen, &tdata)) {
         if (itag == tag) {
-            if (tag_data != NULL) {
-                *tag_data = tdata;
-            }
-            if (tag_len != NULL) {
-                *tag_len = tlen;
+            if (ctxo != NULL) {
+                ctxo->data = tdata;
+                ctxo->len = tlen;
             }
             return true;
         }

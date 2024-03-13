@@ -113,7 +113,10 @@ int sm_unwrap() {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    while (walk_tlv(apdu.data, (uint16_t)apdu.nc, &p, &tag, &tag_len, &tag_data)) {
+    asn1_ctx_t ctxi;
+    asn1_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
+    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data))
+    {
         if (tag == 0x87 || tag == 0x85) {
             body = tag_data;
             body_size = tag_len;
@@ -209,7 +212,9 @@ uint16_t sm_get_le() {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    while (walk_tlv(apdu.data, (uint16_t)apdu.nc, &p, &tag, &tag_len, &tag_data)) {
+    asn1_ctx_t ctxi;
+    asn1_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
+    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x97) {
             uint16_t le = 0;
             for (uint16_t t = 1; t <= tag_len; t++) {
@@ -266,7 +271,9 @@ int sm_verify() {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    while (walk_tlv(apdu.data, (uint16_t)apdu.nc, &p, &tag, &tag_len, &tag_data)) {
+    asn1_ctx_t ctxi;
+    asn1_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
+    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag & 0x1) {
             input[input_len++] = (uint8_t)tag;
             uint8_t tlen = format_tlv_len(tag_len, input + input_len);

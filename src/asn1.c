@@ -23,7 +23,7 @@ int asn1_ctx_init(uint8_t *data, uint16_t len, asn1_ctx_t *ctx) {
         return CCID_ERR_NULL_PARAM;
     }
     ctx->data = data;
-    ctx->len = 0;
+    ctx->len = len;
     return CCID_OK;
 }
 

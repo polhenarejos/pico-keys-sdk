@@ -48,6 +48,7 @@ enum {
 #endif
 #ifdef USB_ITF_CCID
     ITF_CCID,
+    ITF_WCID,
 #endif
     ITF_TOTAL
 };
@@ -77,14 +78,14 @@ extern int driver_process_usb_nopacket_hid();
 #endif
 
 #ifdef USB_ITF_CCID
-extern int driver_process_usb_packet_ccid(uint16_t rx_read);
-extern void driver_exec_finished_ccid(uint16_t size_next);
-extern void driver_exec_finished_cont_ccid(uint16_t size_next, uint16_t offset);
-extern void driver_exec_timeout_ccid();
-extern bool driver_mounted_ccid();
-extern uint8_t *driver_prepare_response_ccid();
-extern int driver_write_ccid(const uint8_t *, uint16_t);
-extern uint16_t driver_read_ccid(uint8_t *, uint16_t);
+extern int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read);
+extern void driver_exec_finished_ccid(uint8_t itf, uint16_t size_next);
+extern void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t offset);
+extern void driver_exec_timeout_ccid(uint8_t itf);
+extern bool driver_mounted_ccid(uint8_t itf);
+extern uint8_t *driver_prepare_response_ccid(uint8_t itf);
+extern int driver_write_ccid(uint8_t, const uint8_t *, uint16_t);
+extern uint16_t driver_read_ccid(uint8_t, uint8_t *, uint16_t);
 extern int driver_process_usb_nopacket_ccid();
 #endif
 

@@ -60,8 +60,8 @@ uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset) {
     }
 #endif
 #ifdef USB_ITF_CCID
-    if (itf == ITF_CCID) {
-        w = driver_write_ccid(tx_buffer[itf] + offset, MIN(len, pkt_max));
+    if (itf == ITF_CCID || itf == ITF_WCID) {
+        w = driver_write_ccid(itf, tx_buffer[itf] + offset, MIN(len, pkt_max));
     }
 #endif
 #else
@@ -83,8 +83,8 @@ uint16_t usb_rx(uint8_t itf, const uint8_t *buffer, uint16_t len) {
             }
 #endif
 #ifdef USB_ITF_CCID
-            if (itf == ITF_CCID) {
-                size = (uint16_t)driver_read_ccid(rx_buffer[itf] + w_offset[itf], size);
+            if (itf == ITF_CCID || itf == ITF_WCID) {
+                size = (uint16_t)driver_read_ccid(itf, rx_buffer[itf] + w_offset[itf], size);
             }
 #endif
         }
@@ -107,8 +107,8 @@ uint32_t usb_write_flush(uint8_t itf) {
         }
 #endif
 #ifdef USB_ITF_CCID
-        if (itf == ITF_CCID) {
-            w = driver_write_ccid(tx_buffer[itf] + tx_r_offset[itf], MIN(w_len[itf], 64));
+        if (itf == ITF_CCID || itf == ITF_WCID) {
+            w = driver_write_ccid(itf, tx_buffer[itf] + tx_r_offset[itf], MIN(w_len[itf], 64));
         }
 #endif
 #else
@@ -182,8 +182,8 @@ static int usb_event_handle(uint8_t itf) {
     }
 #endif
 #ifdef USB_ITF_CCID
-    if (itf == ITF_CCID) {
-        proc_packet = driver_process_usb_packet_ccid(rx_read);
+    if (itf == ITF_CCID || itf == ITF_WCID) {
+        proc_packet = driver_process_usb_packet_ccid(itf, rx_read);
     }
 #endif
 #else
@@ -267,8 +267,8 @@ void usb_task() {
         }
 #endif
 #ifdef USB_ITF_CCID
-        if (itf == ITF_CCID) {
-            mounted = driver_mounted_ccid();
+        if (itf == ITF_CCID || itf == ITF_WCID) {
+            mounted = driver_mounted_ccid(itf);
         }
 #endif
 #endif
@@ -293,8 +293,8 @@ void usb_task() {
                         }
 #endif
 #ifdef USB_ITF_CCID
-                        if (itf == ITF_CCID) {
-                            driver_exec_finished_ccid(finished_data_size);
+                        if (itf == ITF_CCID || itf == ITF_WCID) {
+                            driver_exec_finished_ccid(itf, finished_data_size);
                         }
 #endif
                         led_set_blink(BLINK_MOUNTED);
@@ -314,8 +314,8 @@ void usb_task() {
                             }
 #endif
 #ifdef USB_ITF_CCID
-                            if (itf == ITF_CCID) {
-                                driver_exec_timeout_ccid();
+                            if (itf == ITF_CCID || itf == ITF_WCID) {
+                                driver_exec_timeout_ccid(itf);
                             }
 #endif
                             timeout = board_millis();
@@ -342,8 +342,8 @@ uint8_t *usb_prepare_response(uint8_t itf) {
     }
 #endif
 #ifdef USB_ITF_CCID
-    if (itf == ITF_CCID) {
-        return driver_prepare_response_ccid();
+    if (itf == ITF_CCID || itf == ITF_WCID) {
+        return driver_prepare_response_ccid(itf);
     }
 #endif
     return NULL;

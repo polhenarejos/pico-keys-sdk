@@ -113,7 +113,7 @@ extern "C" {
 #endif
 #define CFG_TUD_MIDI              0
 #ifdef USB_ITF_CCID
-#define CFG_TUD_VENDOR            1
+#define CFG_TUD_VENDOR            2
 #else
 #define CFG_TUD_VENDOR            0
 #endif

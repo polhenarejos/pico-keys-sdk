@@ -28,7 +28,7 @@
 #define USB_PID   0xFCFD
 #endif
 
-#define USB_BCD   0x0200
+#define USB_BCD   0x0210
 
 #define USB_CONFIG_ATT_ONE TU_BIT(7)
 
@@ -73,8 +73,10 @@ tusb_desc_configuration_t const desc_config  = {
     .bDescriptorType     = TUSB_DESC_CONFIGURATION,
     .wTotalLength        = (sizeof(tusb_desc_configuration_t)
 #ifdef USB_ITF_CCID
-                            + sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +
-                            3 * sizeof(tusb_desc_endpoint_t)
+                            + (sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +
+                            3 * sizeof(tusb_desc_endpoint_t))
+                            + (sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +
+                            2 * sizeof(tusb_desc_endpoint_t))
 #endif
 #ifdef USB_ITF_HID
                             + TUD_HID_INOUT_DESC_LEN + TUD_HID_DESC_LEN
@@ -127,6 +129,18 @@ tusb_desc_interface_t const desc_interface = {
     .iInterface         = ITF_CCID + 5,
 };
 
+tusb_desc_interface_t const desc_interface_wcid = {
+    .bLength            = sizeof(tusb_desc_interface_t),
+    .bDescriptorType    = TUSB_DESC_INTERFACE,
+    .bInterfaceNumber   = ITF_WCID,
+    .bAlternateSetting  = 0,
+    .bNumEndpoints      = 2,
+    .bInterfaceClass    = 0xFF,
+    .bInterfaceSubClass = 0,
+    .bInterfaceProtocol = 0,
+    .iInterface         = ITF_WCID + 5,
+};
+
 tusb_desc_endpoint_t const desc_ep1 = {
     .bLength             = sizeof(tusb_desc_endpoint_t),
     .bDescriptorType     = TUSB_DESC_ENDPOINT,
@@ -153,13 +167,33 @@ tusb_desc_endpoint_t const desc_ep3 = {
     .wMaxPacketSize = (64),
     .bInterval           = 0
 };
+
+tusb_desc_endpoint_t const desc_ep1_wcid = {
+    .bLength             = sizeof(tusb_desc_endpoint_t),
+    .bDescriptorType     = TUSB_DESC_ENDPOINT,
+    .bEndpointAddress    = (TUSB_DIR_IN_MASK | 1) + 3,
+    .bmAttributes.xfer   = TUSB_XFER_BULK,
+    .wMaxPacketSize = (64),
+    .bInterval           = 0
+};
+
+tusb_desc_endpoint_t const desc_ep2_wcid = {
+    .bLength             = sizeof(tusb_desc_endpoint_t),
+    .bDescriptorType     = TUSB_DESC_ENDPOINT,
+    .bEndpointAddress    = 1 + 3,
+    .bmAttributes.xfer   = TUSB_XFER_BULK,
+    .wMaxPacketSize = (64),
+    .bInterval           = 0
+};
 #endif
 
 static uint8_t desc_config_extended[sizeof(tusb_desc_configuration_t)
 #ifdef USB_ITF_CCID
-                                    + sizeof(tusb_desc_interface_t) +
+                                    + (sizeof(tusb_desc_interface_t) +
                                     sizeof(struct ccid_class_descriptor) + 3 *
-                                    sizeof(tusb_desc_endpoint_t)
+                                    sizeof(tusb_desc_endpoint_t))
+                                    + (sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +
+                                    2 * sizeof(tusb_desc_endpoint_t))
 #endif
 #ifdef USB_ITF_HID
                                     + TUD_HID_INOUT_DESC_LEN + TUD_HID_DESC_LEN
@@ -224,22 +258,120 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
         memcpy(p, &desc_ep1, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
         memcpy(p, &desc_ep2, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
         memcpy(p, &desc_ep3, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
+
+        memcpy(p, &desc_interface_wcid, sizeof(tusb_desc_interface_t));
+        p += sizeof(tusb_desc_interface_t);
+        memcpy(p, &desc_ccid, sizeof(struct ccid_class_descriptor));
+        p += sizeof(struct ccid_class_descriptor);
+        memcpy(p, &desc_ep1_wcid, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
+        memcpy(p, &desc_ep2_wcid, sizeof(tusb_desc_endpoint_t)); p += sizeof(tusb_desc_endpoint_t);
 #endif
         initd = 1;
     }
     return (const uint8_t *) desc_config_extended;
 }
 
-#define BOS_TOTAL_LEN      (TUD_BOS_DESC_LEN)
+#define BOS_TOTAL_LEN     (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
+#define MS_OS_20_DESC_LEN  0xB2
+
+
+enum
+{
+  VENDOR_REQUEST_WEBUSB = 1,
+  VENDOR_REQUEST_MICROSOFT = 2
+};
+#define URL  "picokeys.com/pki/"
+static bool web_serial_connected = false;
+
+const tusb_desc_webusb_url_t desc_url =
+{
+  .bLength         = 3 + sizeof(URL) - 1,
+  .bDescriptorType = 3, // WEBUSB URL type
+  .bScheme         = 1, // 0: http, 1: https
+  .url             = URL
+};
+#define BOS_TOTAL_LEN      (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
 
 #define MS_OS_20_DESC_LEN  0xB2
+uint8_t const desc_ms_os_20[] = {
+  // Set header: length, type, windows version, total length
+  U16_TO_U8S_LE(0x000A), U16_TO_U8S_LE(MS_OS_20_SET_HEADER_DESCRIPTOR), U32_TO_U8S_LE(0x06030000), U16_TO_U8S_LE(MS_OS_20_DESC_LEN),
+
+  // Configuration subset header: length, type, configuration index, reserved, configuration total length
+  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_CONFIGURATION), 0, 0, U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A),
+
+  // Function Subset header: length, type, first interface, reserved, subset length
+  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), ITF_WCID, 0, U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A-0x08),
+
+  // MS OS 2.0 Compatible ID descriptor: length, type, compatible ID, sub compatible ID
+  U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID), 'W', 'I', 'N', 'U', 'S', 'B', 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // sub-compatible
+
+  // MS OS 2.0 Registry property descriptor: length, type
+  U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A-0x08-0x08-0x14), U16_TO_U8S_LE(MS_OS_20_FEATURE_REG_PROPERTY),
+  U16_TO_U8S_LE(0x0007), U16_TO_U8S_LE(0x002A), // wPropertyDataType, wPropertyNameLength and PropertyName "DeviceInterfaceGUIDs\0" in UTF-16
+  'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00, 'e', 0x00, 'I', 0x00, 'n', 0x00, 't', 0x00, 'e', 0x00,
+  'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00, 'e', 0x00, 'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 's', 0x00, 0x00, 0x00,
+  U16_TO_U8S_LE(0x0050), // wPropertyDataLength
+	//bPropertyData: “{975F44D9-0D08-43FD-8B3E-127CA8AFFF9D}”.
+  '{', 0x00, '9', 0x00, '7', 0x00, '5', 0x00, 'F', 0x00, '4', 0x00, '4', 0x00, 'D', 0x00, '9', 0x00, '-', 0x00,
+  '0', 0x00, 'D', 0x00, '0', 0x00, '8', 0x00, '-', 0x00, '4', 0x00, '3', 0x00, 'F', 0x00, 'D', 0x00, '-', 0x00,
+  '8', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, '-', 0x00, '1', 0x00, '2', 0x00, '7', 0x00, 'C', 0x00, 'A', 0x00,
+  '8', 0x00, 'A', 0x00, 'F', 0x00, 'F', 0x00, 'F', 0x00, '9', 0x00, 'D', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00
+};
+bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request) {
+    // nothing to with DATA & ACK stage
+    if (stage != CONTROL_STAGE_SETUP)
+        return true;
+
+    switch (request->bmRequestType_bit.type) {
+        case TUSB_REQ_TYPE_VENDOR:
+            switch (request->bRequest) {
+                case VENDOR_REQUEST_WEBUSB:
+                    return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength);
+
+                case VENDOR_REQUEST_MICROSOFT:
+                    if (request->wIndex == 7) {
+                        // Get Microsoft OS 2.0 compatible descriptor
+                        uint16_t total_len;
+                        memcpy(&total_len, desc_ms_os_20+8, 2);
+                        return tud_control_xfer(rhport, request, (void*)(uintptr_t) desc_ms_os_20, total_len);
+                    }
+                    else {
+                        return false;
+                    }
+                default:
+                    break;
+            }
+            break;
+
+        case TUSB_REQ_TYPE_CLASS:
+            if (request->bRequest == 0x22) {
+                web_serial_connected = (request->wValue != 0);
+                if (web_serial_connected) {
+                    printf("\r\nWebUSB interface connected\r\n");
+                }
+                return tud_control_status(rhport, request);
+            }
+            break;
+        default:
+            break;
+  }
+  // stall unknown request
+  return false;
+}
 
 uint8_t const desc_bos[] = {
     // total length, number of device caps
-    TUD_BOS_DESCRIPTOR(BOS_TOTAL_LEN, 2)
+    TUD_BOS_DESCRIPTOR(BOS_TOTAL_LEN, 2),
+    // Vendor Code, iLandingPage
+    TUD_BOS_WEBUSB_DESCRIPTOR(VENDOR_REQUEST_WEBUSB, 1),
+    // Microsoft OS 2.0 descriptor
+    TUD_BOS_MS_OS_20_DESCRIPTOR(MS_OS_20_DESC_LEN, VENDOR_REQUEST_MICROSOFT)
 };
 
 uint8_t const *tud_descriptor_bos_cb(void) {
+    printf("!!!!!!!!!!!! tud_descriptor_bos_cb\n");
     return desc_bos;
 }
 
@@ -260,6 +392,7 @@ char const *string_desc_arr [] = {
 #endif
 #ifdef USB_ITF_CCID
     , "Pico Key CCID Interface"
+    , "Pico Key WebCCID Interface"
 #endif
 };
 

@@ -111,8 +111,8 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
             }
 #endif
 #ifdef USB_ITF_CCID
-            if (itf == ITF_CCID) {
-                driver_exec_finished_cont_ccid(apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
+            if (itf == ITF_CCID || itf == ITF_WCID) {
+                driver_exec_finished_cont_ccid(itf, apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
             }
 #endif
 #else
@@ -140,8 +140,8 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
             }
 #endif
 #ifdef USB_ITF_CCID
-            if (itf == ITF_CCID) {
-                driver_exec_finished_cont_ccid(apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
+            if (itf == ITF_CCID || itf == ITF_WCID) {
+                driver_exec_finished_cont_ccid(itf, apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
             }
 #endif
 #else
@@ -173,7 +173,6 @@ void apdu_thread() {
     card_init_core1();
     while (1) {
         uint32_t m = 0;
-        int proc = 0;
         queue_remove_blocking(&usb_to_card_q, &m);
 
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE) {
@@ -184,12 +183,11 @@ void apdu_thread() {
             break;
         }
 
-        proc = process_apdu();
+        process_apdu();
 
 done:   ;
-        if (proc == 1) {
-            apdu_finish();
-        }
+        apdu_finish();
+
         finished_data_size = apdu_next();
         uint32_t flag = EV_EXEC_FINISHED;
         queue_add_blocking(&card_to_usb_q, &flag);
@@ -205,7 +203,7 @@ done:   ;
 void apdu_finish() {
     apdu.rdata[apdu.rlen] = apdu.sw >> 8;
     apdu.rdata[apdu.rlen + 1] = apdu.sw & 0xff;
-    //timeout_stop();
+    // timeout_stop();
 #ifndef ENABLE_EMULATION
     if ((apdu.rlen + 2 + 10) % 64 == 0) {     // FIX for strange behaviour with PSCS and multiple of 64
         apdu.ne = apdu.rlen - 2;

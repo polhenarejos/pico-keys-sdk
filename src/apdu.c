@@ -47,7 +47,6 @@ int process_apdu() {
             memcpy(apdu.data, chain_buf, chain_ptr - chain_buf);
             apdu.nc += chain_ptr - chain_buf;
             is_chaining = false;
-            DEBUG_DATA(apdu.data, apdu.nc);
         }
     }
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
@@ -131,16 +130,16 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
             if (itf == ITF_HID) {
-                driver_exec_finished_cont_hid(apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
+                driver_exec_finished_cont_hid(apdu.rlen + 2, rdata_gr - (usb_get_tx(itf) + 34));
             }
 #endif
 #ifdef USB_ITF_CCID
             if (itf == ITF_CCID || itf == ITF_WCID) {
-                driver_exec_finished_cont_ccid(itf, apdu.rlen + 2, rdata_gr - usb_get_tx(itf));
+                driver_exec_finished_cont_ccid(itf, apdu.rlen + 2, rdata_gr - (usb_get_tx(itf) + 34));
             }
 #endif
 #else
-            driver_exec_finished_cont_emul(itf, apdu.rlen + 2, (uint16_t)(rdata_gr - usb_get_tx(itf)));
+            driver_exec_finished_cont_emul(itf, apdu.rlen + 2, (uint16_t)(rdata_gr - (usb_get_tx(itf)) + 34));
 #endif
             //Prepare next RAPDU
             apdu.sw = 0;
@@ -160,16 +159,16 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
             if (itf == ITF_HID) {
-                driver_exec_finished_cont_hid(apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
+                driver_exec_finished_cont_hid(apdu.ne + 2, rdata_gr - apdu.ne - (usb_get_tx(itf) + 34));
             }
 #endif
 #ifdef USB_ITF_CCID
             if (itf == ITF_CCID || itf == ITF_WCID) {
-                driver_exec_finished_cont_ccid(itf, apdu.ne + 2, rdata_gr - apdu.ne - usb_get_tx(itf));
+                driver_exec_finished_cont_ccid(itf, apdu.ne + 2, rdata_gr - apdu.ne - (usb_get_tx(itf) + 34));
             }
 #endif
 #else
-            driver_exec_finished_cont_emul(itf, (uint16_t)(apdu.ne + 2), (uint16_t)(rdata_gr - apdu.ne - usb_get_tx(itf)));
+            driver_exec_finished_cont_emul(itf, (uint16_t)(apdu.ne + 2), (uint16_t)(rdata_gr - apdu.ne - (usb_get_tx(itf) + 34)));
 #endif
             apdu.rlen -= (uint16_t)apdu.ne;
         }

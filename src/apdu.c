@@ -23,16 +23,40 @@
 uint8_t *rdata_gr = NULL;
 uint16_t rdata_bk = 0x0;
 extern uint32_t timeout;
+bool is_chaining = false;
+uint8_t chain_buf[4096];
+uint8_t *chain_ptr = NULL;
 
 int process_apdu() {
     led_set_blink(BLINK_PROCESSING);
+    if (CLA(apdu) & 0x10) {
+        if (!is_chaining) {
+            chain_ptr = chain_buf;
+        }
+        if (chain_ptr - chain_buf + apdu.nc >= sizeof(chain_buf)) {
+            return SW_CLA_NOT_SUPPORTED();
+        }
+        memcpy(chain_ptr, apdu.data, apdu.nc);
+        chain_ptr += apdu.nc;
+        is_chaining = true;
+        return SW_OK();
+    }
+    else {
+        if (is_chaining) {
+            memmove(apdu.data + (chain_ptr - chain_buf), apdu.data, apdu.nc);
+            memcpy(apdu.data, chain_buf, chain_ptr - chain_buf);
+            apdu.nc += chain_ptr - chain_buf;
+            is_chaining = false;
+            DEBUG_DATA(apdu.data, apdu.nc);
+        }
+    }
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
         for (int a = 0; a < num_apps; a++) {
             if (!memcmp(apps[a].aid + 1, apdu.data, MIN(apdu.nc, apps[a].aid[0]))) {
                 if (current_app) {
                     if (current_app->aid && !memcmp(current_app->aid + 1, apdu.data, apdu.nc)) {
                         current_app->select_aid(current_app);
-                        return set_res_sw(0x90, 0x00);
+                        return SW_OK();
                     }
                     if (current_app->unload) {
                         current_app->unload();
@@ -40,16 +64,16 @@ int process_apdu() {
                 }
                 current_app = &apps[a];
                 if (current_app->select_aid(current_app) == CCID_OK) {
-                    return set_res_sw(0x90, 0x00);
+                    return SW_OK();
                 }
             }
         }
-        return set_res_sw(0x6a, 0x82);
+        return SW_FILE_NOT_FOUND();
     }
     if (current_app && current_app->process_apdu) {
         return current_app->process_apdu();
     }
-    return set_res_sw(0x6a, 0x82);
+    return SW_FILE_NOT_FOUND();
 }
 
 uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {

@@ -240,7 +240,6 @@ bool driver_mounted_ccid(uint8_t itf) {
 void driver_exec_timeout_ccid(uint8_t itf) {
     ccid_header[itf] = (struct ccid_header *) usb_get_rx(itf);
     ccid_response[itf] = (struct ccid_header *) (usb_get_tx(itf));
-    printf("CCUD_RESPONSE [itf=%d] %p %p\n", itf, ccid_response[itf], usb_get_tx(itf));
     ccid_response[itf]->bMessageType = CCID_DATA_BLOCK_RET;
     ccid_response[itf]->dwLength = 0;
     ccid_response[itf]->bSlot = 0;

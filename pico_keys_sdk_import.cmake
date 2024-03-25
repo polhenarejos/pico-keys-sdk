@@ -119,6 +119,7 @@ set(EXTERNAL_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chacha20.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/des.c
 )
 
 set(SOURCES ${SOURCES}
@@ -208,7 +209,7 @@ if (ENABLE_EMULATION)
         )
     endif()
     add_definitions(-DENABLE_EMULATION)
-    set(SOURCES ${SOURCES} 
+    set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
     )
     set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES}
@@ -238,7 +239,7 @@ else()
     )
 endif()
 if (MSVC)
-    target_compile_options(pico_hsm PUBLIC 
+    target_compile_options(pico_hsm PUBLIC
         -wd4820
         -wd4255
         -wd5045
@@ -246,14 +247,14 @@ if (MSVC)
         -wd4061
         -wd5105
     )
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS 
-        __STDC_WANT_SECURE_LIB__=0 
-        _WIN32_WINNT_WIN10_TH2=0 
-        _WIN32_WINNT_WIN10_RS1=0 
-        _WIN32_WINNT_WIN10_RS2=0 
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS
+        __STDC_WANT_SECURE_LIB__=0
+        _WIN32_WINNT_WIN10_TH2=0
+        _WIN32_WINNT_WIN10_RS1=0
+        _WIN32_WINNT_WIN10_RS2=0
         _WIN32_WINNT_WIN10_RS3=0
         _WIN32_WINNT_WIN10_RS4=0
-        _WIN32_WINNT_WIN10_RS5=0 
+        _WIN32_WINNT_WIN10_RS5=0
         _STRALIGN_USE_SECURE_CRT=0
         NTDDI_WIN10_CU=0)
     set_source_files_properties(

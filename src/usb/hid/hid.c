@@ -17,7 +17,9 @@
 
 #ifndef ENABLE_EMULATION
 #include "tusb.h"
+#ifndef ESP_PLATFORM
 #include "bsp/board.h"
+#endif
 #endif
 #include "ctap_hid.h"
 #include "pico_keys.h"

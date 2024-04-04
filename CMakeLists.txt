@@ -15,7 +15,16 @@
  # along with this program. If not, see <http://www.gnu.org/licenses/>.
  #
 
- cmake_minimum_required(VERSION 3.13)
+ cmake_minimum_required(VERSION 3.16)
+
+if(ESP_PLATFORM)
+set(EXTRA_COMPONENT_DIRS src)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+set(USB_ITF_CCID 1)
+set(USB_ITF_HID 1)
+include(pico_keys_sdk_import.cmake)
+project(pico_keys_sdk)
+else()
 
  if(ENABLE_EMULATION)
  else()
@@ -28,7 +37,7 @@
  set(CMAKE_CXX_STANDARD 17)
 
  if(ENABLE_EMULATION)
- else()
+  else()
  pico_sdk_init()
  endif()
 
@@ -70,3 +79,4 @@ pico_add_extra_outputs(pico_keys_sdk_exe)
 target_link_libraries(pico_keys_sdk_exe PRIVATE pico_keys_sdk pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)
 endif()
 
+endif()

@@ -19,7 +19,7 @@
 #define _PICO_KEYS_H_
 
 #include "file.h"
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #include "pico/unique_id.h"
 #else
 #include <stdint.h>
@@ -46,6 +46,14 @@ extern uint32_t board_millis();
 #endif
 #endif
 #include <string.h>
+
+#if defined(ENABLE_EMULATION)
+#include <stdbool.h>
+#elif defined(ESP_PLATFORM)
+#include "esp_compat.h"
+#else
+#include "pico/util/queue.h"
+#endif
 
 extern bool wait_button();
 

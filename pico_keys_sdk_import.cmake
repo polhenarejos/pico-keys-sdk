@@ -84,7 +84,9 @@ if(USB_ITF_CCID)
     message(STATUS "USB CCID Interface:\t\t enabled")
 endif(USB_ITF_CCID)
 add_definitions(-DDEBUG_APDU=${DEBUG_APDU})
+if (NOT ESP_PLATFORM)
 add_definitions(-DMBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
+endif()
 
 message(STATUS "USB VID/PID: ${USB_VID}:${USB_PID}")
 
@@ -263,13 +265,16 @@ if (MSVC)
         COMPILE_FLAGS " -W3 -wd4242 -wd4065"
     )
 endif()
+set(INTERNAL_SOURCES ${SOURCES})
+set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
 if (NOT TARGET pico_keys_sdk)
     if (ENABLE_EMULATION)
+        add_impl_library(pico_keys_sdk)
+    elseif(ESP_PLATFORM)
         add_impl_library(pico_keys_sdk)
     else()
         pico_add_library(pico_keys_sdk)
     endif()
-    set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
     target_sources(pico_keys_sdk INTERFACE
         ${SOURCES}
     )

@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
@@ -38,14 +38,18 @@
 #define lseek _lseek
 #include "mman.h"
 #else
+#ifdef ESP_PLATFORM
+#else
 #include <unistd.h>
 #include <sys/mman.h>
 #endif
 #include <fcntl.h>
 #define FLASH_SECTOR_SIZE       4096
 #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
+#define XIP_BASE 0
 int fd_map = 0;
 uint8_t *map = NULL;
+#endif
 #endif
 #include "pico_keys.h"
 #include <string.h>

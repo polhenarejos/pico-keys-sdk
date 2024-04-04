@@ -17,7 +17,9 @@
 
 #include "tusb.h"
 #include "usb_descriptors.h"
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #include "pico/unique_id.h"
+#endif
 #include "pico_keys_version.h"
 #include "usb.h"
 

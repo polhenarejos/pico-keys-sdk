@@ -32,9 +32,6 @@ void random_fini(void);
 const uint8_t *random_bytes_get(size_t);
 void random_bytes_free(const uint8_t *p);
 
-/* 8-byte salt */
-void random_get_salt(uint8_t *p);
-
 /* iterator returning a byta at a time */
 extern int random_gen(void *arg, unsigned char *output, size_t output_len);
 

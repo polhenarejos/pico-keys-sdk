@@ -19,13 +19,13 @@
 #include <stdint.h>
 #include <string.h>
 
-#ifndef ENABLE_EMULATION
-#include "pico/stdlib.h"
-#include "hardware/flash.h"
-#else
+#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 #define XIP_BASE                0
 #define FLASH_SECTOR_SIZE       4096
 #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
+#else
+#include "pico/stdlib.h"
+#include "hardware/flash.h"
 #endif
 #include "pico_keys.h"
 #include "file.h"

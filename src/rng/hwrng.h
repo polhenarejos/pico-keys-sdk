@@ -21,7 +21,7 @@
 #define NEUG_PRE_LOOP 32
 
 #include <stdlib.h>
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #include "pico/stdlib.h"
 #endif
 

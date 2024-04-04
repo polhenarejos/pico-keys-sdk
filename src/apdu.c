@@ -196,7 +196,10 @@ void apdu_thread() {
     card_init_core1();
     while (1) {
         uint32_t m = 0;
+#if defined(ESP_PLATFORM)
+#else
         queue_remove_blocking(&usb_to_card_q, &m);
+#endif
 
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE) {
             set_res_sw(0x6f, 0x00);
@@ -213,7 +216,10 @@ done:   ;
 
         finished_data_size = apdu_next();
         uint32_t flag = EV_EXEC_FINISHED;
+#if defined(ESP_PLATFORM)
+#else
         queue_add_blocking(&card_to_usb_q, &flag);
+#endif
     }
     //printf("EXIT !!!!!!\r\n");
     if (current_app && current_app->unload) {

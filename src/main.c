@@ -18,13 +18,15 @@
 #include <stdio.h>
 
 // Pico
-#ifndef ENABLE_EMULATION
-#include "pico/stdlib.h"
-#else
+
+#if defined(ENABLE_EMULATION)
 #if !defined(_MSC_VER)
 #include <sys/time.h>
 #endif
 #include "emulation.h"
+#elif defined(ESP_PLATFORM)
+#else
+#include "pico/stdlib.h"
 #endif
 
 // For memcpy
@@ -170,7 +172,7 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
     (void)tzp;
     // Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
     // This magic number is the number of 100 nanosecond intervals since January 1, 1601 (UTC)
-    // until 00:00:00 January 1, 1970 
+    // until 00:00:00 January 1, 1970
     static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
 
     SYSTEMTIME  system_time;
@@ -313,7 +315,40 @@ void execute_tasks() {
     led_blinking_task();
 }
 
+void core0_loop() {
+    while (1) {
+        execute_tasks();
+        neug_task();
+        do_flash();
+#ifndef ENABLE_EMULATION
+        if (board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up
+            bool current_button_state = board_button_read();
+            if (current_button_state != button_pressed_state) {
+                if (current_button_state == false) { // unpressed
+                    if (button_pressed_time == 0 || button_pressed_time + 1000 > board_millis()) {
+                        button_press++;
+                    }
+                    button_pressed_time = board_millis();
+                }
+                button_pressed_state = current_button_state;
+            }
+            if (button_pressed_time > 0 && button_press > 0 && button_pressed_time + 1000 < board_millis() && button_pressed_state == false) {
+                if (button_pressed_cb != NULL) {
+                    (*button_pressed_cb)(button_press);
+                }
+                button_pressed_time = button_press = 0;
+            }
+        }
+#endif
+    }
+}
+
+#ifdef ESP_PLATFORM
+TaskHandle_t hcore0 = NULL, hcore1 = NULL;
+void app_main(void) {
+#else
 int main(void) {
+#endif
 #ifndef ENABLE_EMULATION
     usb_init();
 
@@ -351,31 +386,12 @@ int main(void) {
 
     //ccid_prepare_receive(&ccid);
 
-    while (1) {
-        execute_tasks();
-        neug_task();
-        do_flash();
-#ifndef ENABLE_EMULATION
-        if (board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up
-            bool current_button_state = board_button_read();
-            if (current_button_state != button_pressed_state) {
-                if (current_button_state == false) { // unpressed
-                    if (button_pressed_time == 0 || button_pressed_time + 1000 > board_millis()) {
-                        button_press++;
-                    }
-                    button_pressed_time = board_millis();
-                }
-                button_pressed_state = current_button_state;
-            }
-            if (button_pressed_time > 0 && button_press > 0 && button_pressed_time + 1000 < board_millis() && button_pressed_state == false) {
-                if (button_pressed_cb != NULL) {
-                    (*button_pressed_cb)(button_press);
-                }
-                button_pressed_time = button_press = 0;
-            }
-        }
+#ifdef ESP_PLATFORM
+    xTaskCreate(core0_loop, "core0", 512, NULL, tskIDLE_PRIORITY, &hcore0);
+    vTaskStartScheduler();
+#else
+    core0_loop();
 #endif
-    }
 
     return 0;
 }

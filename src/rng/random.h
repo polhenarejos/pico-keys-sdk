@@ -21,9 +21,6 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#ifndef ENABLE_EMULATION
-#include "pico/stdlib.h"
-#endif
 
 void random_init(void);
 void random_fini(void);

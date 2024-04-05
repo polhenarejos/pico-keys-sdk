@@ -153,7 +153,7 @@ void usb_clear_rx(uint8_t itf) {
 
 #define USB_BCD   0x0200
 
-#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
+#if !defined(ENABLE_EMULATION)
 queue_t usb_to_card_q;
 queue_t card_to_usb_q;
 #endif

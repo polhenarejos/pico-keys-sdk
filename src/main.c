@@ -25,26 +25,9 @@
 #endif
 #include "emulation.h"
 #elif defined(ESP_PLATFORM)
+#include "tusb.h"
 #else
 #include "pico/stdlib.h"
-#endif
-
-// For memcpy
-#include <string.h>
-
-#ifndef ENABLE_EMULATION
-// Include descriptor struct definitions
-//#include "usb_common.h"
-// USB register definitions from pico-sdk
-#include "hardware/regs/usb.h"
-// USB hardware struct definitions from pico-sdk
-#include "hardware/structs/usb.h"
-// For interrupt enable and numbers
-#include "hardware/irq.h"
-// For resetting the USB controller
-#include "hardware/resets.h"
-
-#include "pico/multicore.h"
 #endif
 
 #include "random.h"
@@ -101,10 +84,13 @@ static inline void ws2812_program_init(PIO pio,
 }
 #endif
 
-#ifndef ENABLE_EMULATION
+#if defined(ENABLE_EMULATION)
+#else
 #include "usb.h"
+#ifndef ESP_PLATFORM
 #include "hardware/rtc.h"
 #include "bsp/board.h"
+#endif
 #endif
 
 extern void do_flash();
@@ -196,6 +182,11 @@ uint32_t board_millis() {
 }
 
 #else
+#ifdef ESP_PLATFORM
+bool board_button_read() {
+    return true;
+}
+#endif
 bool button_pressed_state = false;
 uint32_t button_pressed_time = 0;
 uint8_t button_press = 0;
@@ -289,7 +280,9 @@ void led_off_all() {
 }
 
 void init_rtc() {
-#ifndef ENABLE_EMULATION
+#if defined(ENABLE_EMULATION)
+#elif defined(ESP_PLATFORM)
+#else
     rtc_init();
     datetime_t dt = {
         .year  = 2020,
@@ -345,15 +338,16 @@ void core0_loop() {
 
 #ifdef ESP_PLATFORM
 TaskHandle_t hcore0 = NULL, hcore1 = NULL;
-void app_main(void) {
+int app_main() {
 #else
 int main(void) {
 #endif
 #ifndef ENABLE_EMULATION
     usb_init();
-
+#ifndef ESP_PLATFORM
     board_init();
     stdio_init_all();
+#endif
 
 #ifdef PIMORONI_TINY2040
     gpio_init(TINY2040_LED_R_PIN);

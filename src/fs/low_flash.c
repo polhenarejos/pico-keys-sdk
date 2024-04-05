@@ -39,6 +39,8 @@
 #include "mman.h"
 #else
 #ifdef ESP_PLATFORM
+#include "esp_compat.h"
+esp_partition_t part0;
 #else
 #include <unistd.h>
 #include <sys/mman.h>

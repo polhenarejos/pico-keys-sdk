@@ -18,10 +18,6 @@
 #ifndef _CRYPTO_UTILS_H_
 #define _CRYPTO_UTILS_H_
 
-#include "stdlib.h"
-#ifndef ENABLE_EMULATION
-#include "pico/stdlib.h"
-#endif
 #include "mbedtls/ecp.h"
 #include "mbedtls/md.h"
 

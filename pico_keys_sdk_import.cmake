@@ -86,6 +86,8 @@ endif(USB_ITF_CCID)
 add_definitions(-DDEBUG_APDU=${DEBUG_APDU})
 if (NOT ESP_PLATFORM)
 add_definitions(-DMBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
+else()
+add_definitions(-DCFG_TUSB_CONFIG_FILE="../../src/usb/tusb_config.h")
 endif()
 
 message(STATUS "USB VID/PID: ${USB_VID}:${USB_PID}")

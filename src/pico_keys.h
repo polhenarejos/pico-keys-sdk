@@ -19,11 +19,11 @@
 #define _PICO_KEYS_H_
 
 #include "file.h"
-#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
-#include "pico/unique_id.h"
-#else
+#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 #include <stdint.h>
+#ifdef ENABLE_EMULATION
 extern uint32_t board_millis();
+#endif
 #if !defined(MIN)
 #if defined(_MSC_VER)
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -44,6 +44,8 @@ extern uint32_t board_millis();
        _a > _b ? _a : _b; })
 #endif
 #endif
+#else
+#include "pico/unique_id.h"
 #endif
 #include <string.h>
 
@@ -59,10 +61,10 @@ extern bool wait_button();
 
 extern void low_flash_init_core1();
 
-static inline const uint16_t make_uint16_t(uint8_t b1, uint8_t b2) {
+static inline uint16_t make_uint16_t(uint8_t b1, uint8_t b2) {
     return (b1 << 8) | b2;
 }
-static inline const uint16_t get_uint16_t(const uint8_t *b, uint16_t offset) {
+static inline uint16_t get_uint16_t(const uint8_t *b, uint16_t offset) {
     return make_uint16_t(b[offset], b[offset + 1]);
 }
 static inline void put_uint16_t(uint16_t n, uint8_t *b) {

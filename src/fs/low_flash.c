@@ -40,7 +40,8 @@
 #else
 #ifdef ESP_PLATFORM
 #include "esp_compat.h"
-esp_partition_t part0;
+#include "esp_partition.h"
+const esp_partition_t *part0;
 #else
 #include <unistd.h>
 #include <sys/mman.h>
@@ -156,14 +157,17 @@ sem_release(&sem_wait);
 //this function has to be called from the core 0
 void low_flash_init() {
     memset(flash_pages, 0, sizeof(page_flash_t) * TOTAL_FLASH_PAGES);
-#ifndef ENABLE_EMULATION
-    mutex_init(&mtx_flash);
-    sem_init(&sem_wait, 0, 1);
-#else
+#if defined(ENABLE_EMULATION)
     fd_map = open("memory.flash", O_RDWR | O_CREAT, (mode_t) 0600);
     lseek(fd_map, PICO_FLASH_SIZE_BYTES - 1, SEEK_SET);
     write(fd_map, "", 1);
     map = mmap(0, PICO_FLASH_SIZE_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fd_map, 0);
+#else
+    mutex_init(&mtx_flash);
+    sem_init(&sem_wait, 0, 1);
+#if defined(ESP_PLATFORM)
+    part0 = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, "part0");
+#endif
 #endif
 }
 

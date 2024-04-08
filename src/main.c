@@ -16,6 +16,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 // Pico
 
@@ -222,6 +223,22 @@ bool wait_button() {
 
 struct apdu apdu;
 
+#ifdef ESP_PLATFORM
+#include "driver/gpio.h"
+#include "neopixel.h"
+tNeopixelContext neopixel = NULL;
+tNeopixel pixel[] =
+   {
+       { 0, NP_RGB(0,  0,  0) }, /* off */
+       { 0, NP_RGB(255,  0, 255) }, /* magenta */
+       { 0, NP_RGB(255,  0, 0) }, /* green */
+       { 0, NP_RGB(0, 255,  0) }, /* red */
+       { 0, NP_RGB(0, 0,  255) }, /* red */
+       { 0, NP_RGB(255,  255, 0) }, /* yellow */
+       { 0, NP_RGB(0, 255,  255) }, /* cyan */
+       { 0, NP_RGB(255, 255,  255) }, /* white */
+   };
+#endif
 void led_blinking_task() {
     static uint32_t start_ms = 0;
     static uint8_t led_state = false;
@@ -254,6 +271,8 @@ void led_blinking_task() {
     }
 #elif defined(CYW43_WL_GPIO_LED_PIN)
     cyw43_arch_gpio_put(led_color, led_state);
+#elif ESP_PLATFORM
+    neopixel_SetPixel(neopixel, &pixel[led_state], 1);
 #endif
     led_state ^= 1; // toggle
 }
@@ -299,10 +318,10 @@ void init_rtc() {
 
 extern void neug_task();
 extern void usb_task();
-
-void execute_tasks() {
+void execute_tasks()
+{
     usb_task();
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
     tud_task(); // tinyusb device task
 #endif
     led_blinking_task();
@@ -333,22 +352,30 @@ void core0_loop() {
             }
         }
 #endif
+#ifdef ESP_PLATFORM
+    vTaskDelay(pdMS_TO_TICKS(10));
+#endif
     }
 }
 
 #ifdef ESP_PLATFORM
+#include "tinyusb.h"
+extern const tinyusb_config_t tusb_cfg;
 TaskHandle_t hcore0 = NULL, hcore1 = NULL;
 int app_main() {
 #else
 int main(void) {
 #endif
+
 #ifndef ENABLE_EMULATION
+#ifdef ESP_PLATFORM
+    tinyusb_driver_install(&tusb_cfg);
+#endif
     usb_init();
 #ifndef ESP_PLATFORM
     board_init();
     stdio_init_all();
 #endif
-
 #ifdef PIMORONI_TINY2040
     gpio_init(TINY2040_LED_R_PIN);
     gpio_set_dir(TINY2040_LED_R_PIN, GPIO_OUT);
@@ -365,7 +392,6 @@ int main(void) {
 
     led_off_all();
 
-    tusb_init();
 
     //prepare_ccid();
 #else
@@ -379,10 +405,12 @@ int main(void) {
     init_rtc();
 
     //ccid_prepare_receive(&ccid);
+#ifdef ESP_PLATFORM
+    neopixel = neopixel_Init(1, GPIO_NUM_48);
+#endif
 
 #ifdef ESP_PLATFORM
-    xTaskCreate(core0_loop, "core0", 512, NULL, tskIDLE_PRIORITY, &hcore0);
-    vTaskStartScheduler();
+    xTaskCreate(core0_loop, "core0", 4096, NULL, CONFIG_TINYUSB_TASK_PRIORITY + 1, &hcore0);
 #else
     core0_loop();
 #endif

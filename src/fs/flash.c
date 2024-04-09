@@ -22,7 +22,11 @@
 #if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 #define XIP_BASE                0
 #define FLASH_SECTOR_SIZE       4096
+#ifdef ESP_PLATFORM
+#define PICO_FLASH_SIZE_BYTES   (1 * 1024 * 1024)
+#else
 #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
+#endif
 #else
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
@@ -38,7 +42,11 @@
  * |                                                    |
  * ------------------------------------------------------
  */
+#ifdef ESP_PLATFORM
+#define FLASH_TARGET_OFFSET 0
+#else
 #define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES >> 1) // DATA starts at the mid of flash
+#endif
 #define FLASH_DATA_HEADER_SIZE (sizeof(uintptr_t) + sizeof(uint32_t))
 #define FLASH_PERMANENT_REGION (4 * FLASH_SECTOR_SIZE) // 4 sectors (16kb) of permanent memory
 

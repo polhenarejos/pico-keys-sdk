@@ -166,7 +166,8 @@ void low_flash_init() {
     mutex_init(&mtx_flash);
     sem_init(&sem_wait, 0, 1);
 #if defined(ESP_PLATFORM)
-    part0 = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, "part0");
+    part0 = esp_partition_find_first(0x40, 0x1, "part0");
+    esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
 #endif
 #endif
 }
@@ -208,12 +209,12 @@ page_flash_t *find_free_page(uintptr_t addr) {
             flash_pages[r].address == addr_alg) {                                                   //first available
             p = &flash_pages[r];
             if (!flash_pages[r].ready && !flash_pages[r].erase) {
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
                 memcpy(p->page, (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
 #else
                 memcpy(p->page,
                        (addr >= start_data_pool &&
-                        addr <= end_rom_pool) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg,
+                        addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg,
                        FLASH_SECTOR_SIZE);
 #endif
                 ready_pages++;
@@ -289,8 +290,9 @@ uint8_t *flash_read(uintptr_t addr) {
     uint8_t *v = (uint8_t *) addr;
 #ifndef ENABLE_EMULATION
     mutex_exit(&mtx_flash);
-#else
-    if (addr >= start_data_pool && addr <= end_rom_pool) {
+#endif
+#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
+    if (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) {
         v += (uintptr_t) map;
     }
 #endif

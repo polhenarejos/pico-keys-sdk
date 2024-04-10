@@ -42,6 +42,10 @@
 #include "esp_compat.h"
 #include "esp_partition.h"
 const esp_partition_t *part0;
+#define save_and_disable_interrupts() 1
+#define flash_range_erase(a,b) esp_partition_erase_range(part0, a, b)
+#define flash_range_program(a,b,c) esp_partition_write(part0, a, b, c);
+#define restore_interrupts(a) (void)a
 #else
 #include <unistd.h>
 #include <sys/mman.h>
@@ -94,15 +98,15 @@ void do_flash() {
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
 #endif
     if (locked_out == true && flash_available == true && ready_pages > 0) {
-        //printf(" DO_FLASH AVAILABLE\r\n");
+        //printf(" DO_FLASH AVAILABLE\n");
         for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
             if (flash_pages[r].ready == true) {
 #ifndef ENABLE_EMULATION
-                //printf("WRITTING %X\r\n",flash_pages[r].address-XIP_BASE);
+                //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
                 while (multicore_lockout_start_timeout_us(1000) == false) {
                     ;
                 }
-                //printf("WRITTING %X\r\n",flash_pages[r].address-XIP_BASE);
+                //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
                 uint32_t ints = save_and_disable_interrupts();
                 flash_range_erase(flash_pages[r].address - XIP_BASE, FLASH_SECTOR_SIZE);
                 flash_range_program(flash_pages[r].address - XIP_BASE,
@@ -112,7 +116,7 @@ void do_flash() {
                 while (multicore_lockout_end_timeout_us(1000) == false) {
                     ;
                 }
-                //printf("WRITEN %X !\r\n",flash_pages[r].address);
+                //printf("WRITEN %X !\n",flash_pages[r].address);
 #else
                 memcpy(map + flash_pages[r].address, flash_pages[r].page, FLASH_SECTOR_SIZE);
 #endif
@@ -124,7 +128,7 @@ void do_flash() {
                 while (multicore_lockout_start_timeout_us(1000) == false) {
                     ;
                 }
-                //printf("WRITTING\r\n");
+                //printf("WRITTING\n");
                 flash_range_erase(flash_pages[r].address - XIP_BASE,
                                   flash_pages[r].page_size ? ((int) (flash_pages[r].page_size /
                                                                      FLASH_SECTOR_SIZE)) *
@@ -147,6 +151,10 @@ void do_flash() {
         }
     }
     flash_available = false;
+#ifdef ESP_PLATFORM
+    esp_partition_munmap(fd_map);
+    esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
+#endif
 #ifndef ENABLE_EMULATION
     mutex_exit(&mtx_flash);
 }
@@ -241,18 +249,18 @@ int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
 #endif
-        printf("ERROR: ALL FLASH PAGES CACHED\r\n");
+        printf("ERROR: ALL FLASH PAGES CACHED\n");
         return CCID_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
 #endif
-        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\r\n");
+        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
         return CCID_ERR_MEMORY_FATAL;
     }
     memcpy(&p->page[addr & (FLASH_SECTOR_SIZE - 1)], data, len);
-    //printf("Flash: modified page %X with data %x at [%x] (top page %X)\r\n",addr_alg,data,addr&(FLASH_SECTOR_SIZE-1),addr);
+    //printf("Flash: modified page %X with data %x at [%x]\n",(uintptr_t)addr,(uintptr_t)data,addr&(FLASH_SECTOR_SIZE-1));
 #ifndef ENABLE_EMULATION
     mutex_exit(&mtx_flash);
 #endif
@@ -329,11 +337,11 @@ int flash_erase_page(uintptr_t addr, size_t page_size) {
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
 #endif
-        printf("ERROR: ALL FLASH PAGES CACHED\r\n");
+        printf("ERROR: ALL FLASH PAGES CACHED\n");
         return CCID_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
-        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\r\n");
+        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
 #endif

@@ -124,9 +124,9 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
             }
         }
     }
-    //printf("apdu.nc %ld, apdu.ne %ld\r\n",apdu.nc,apdu.ne);
+    //printf("apdu.nc %ld, apdu.ne %ld\n",apdu.nc,apdu.ne);
     if (apdu.header[1] == 0xc0) {
-        //printf("apdu.ne %u, apdu.rlen %d, bk %x\r\n",apdu.ne,apdu.rlen,rdata_bk);
+        //printf("apdu.ne %u, apdu.rlen %d, bk %x\n",apdu.ne,apdu.rlen,rdata_bk);
         timeout_stop();
         *(uint16_t *) rdata_gr = rdata_bk;
         if (apdu.rlen <= apdu.ne) {
@@ -225,7 +225,7 @@ done:   ;
         vTaskDelay(pdMS_TO_TICKS(10));
 #endif
     }
-    //printf("EXIT !!!!!!\r\n");
+    //printf("EXIT !!!!!!\n");
     if (current_app && current_app->unload) {
         current_app->unload();
         current_app = NULL;

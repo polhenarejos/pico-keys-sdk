@@ -140,7 +140,7 @@ int driver_process_usb_nopacket_ccid() {
 int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
     if (rx_read >= 10) {
         driver_init_ccid(itf);
-        //printf("%ld %d %x %x\r\n",ccid_header->dwLength,rx_read-10,ccid_header->bMessageType,ccid_header->bSeq);
+        //printf("%ld %d %x %x\n",ccid_header->dwLength,rx_read-10,ccid_header->bMessageType,ccid_header->bSeq);
         if (ccid_header[itf]->dwLength <= rx_read - 10) {
             size_t apdu_sent = 0;
             if (ccid_header[itf]->bMessageType != CCID_SLOT_STATUS) {
@@ -163,7 +163,7 @@ int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
                 ccid_response[itf]->bSeq = ccid_header[itf]->bSeq;
                 ccid_response[itf]->abRFU0 = 0;
                 ccid_response[itf]->abRFU1 = 0;
-                //printf("1 %x %x %x || %x %x %x\r\n",ccid_response->apdu,apdu.rdata,ccid_response,ccid_header,ccid_header->apdu,apdu.data);
+                //printf("1 %x %x %x || %x %x %x\n",ccid_response->apdu,apdu.rdata,ccid_response,ccid_header,ccid_header->apdu,apdu.data);
                 memcpy(&ccid_response[itf]->apdu, ccid_atr + 1, size_atr);
                 if (ccid_status == 1) {
                     card_start(apdu_thread);
@@ -267,19 +267,19 @@ uint8_t *driver_prepare_response_ccid(uint8_t itf) {
 #define MAX_USB_POWER       1
 
 static void ccid_init_cb(void) {
-    TU_LOG1("-------- CCID INIT\r\n");
+    TU_LOG1("-------- CCID INIT\n");
     vendord_init();
 }
 
 static void ccid_reset_cb(uint8_t rhport) {
-    TU_LOG1("-------- CCID RESET\r\n");
+    TU_LOG1("-------- CCID RESET\n");
     itf_num = 0;
     vendord_reset(rhport);
 }
 
 static uint16_t ccid_open(uint8_t rhport, tusb_desc_interface_t const *itf_desc, uint16_t max_len) {
     uint8_t *itf_vendor = (uint8_t *) malloc(sizeof(uint8_t) * max_len);
-    //TU_LOG1("-------- CCID OPEN\r\n");
+    //TU_LOG1("-------- CCID OPEN\n");
     TU_VERIFY(
         itf_desc->bInterfaceClass == TUSB_CLASS_SMART_CARD && itf_desc->bInterfaceSubClass == 0 && itf_desc->bInterfaceProtocol == 0,
         0);
@@ -310,13 +310,13 @@ static bool ccid_control_xfer_cb(uint8_t __unused rhport,
                                  uint8_t stage,
                                  tusb_control_request_t const *request) {
     // nothing to do with DATA & ACK stage
-    TU_LOG2("-------- CCID CTRL XFER\r\n");
+    TU_LOG2("-------- CCID CTRL XFER\n");
     if (stage != CONTROL_STAGE_SETUP) {
         return true;
     }
 
     if (request->wIndex == itf_num) {
-        TU_LOG2("-------- bmRequestType %x, bRequest %x, wValue %x, wLength %x\r\n",
+        TU_LOG2("-------- bmRequestType %x, bRequest %x, wValue %x, wLength %x\n",
                 request->bmRequestType,
                 request->bRequest,
                 request->wValue,
@@ -354,7 +354,7 @@ static bool ccid_xfer_cb(uint8_t rhport,
                          uint8_t ep_addr,
                          xfer_result_t result,
                          uint32_t xferred_bytes) {
-    //printf("------ CALLED XFER_CB\r\n");
+    //printf("------ CALLED XFER_CB\n");
     return vendord_xfer_cb(rhport, ep_addr, result, xferred_bytes);
     //return true;
 }

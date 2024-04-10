@@ -58,11 +58,7 @@ static inline bool multicore_lockout_start_timeout_us(int a) {
     vTaskSuspend(hcore1); return true; }
 static inline bool multicore_lockout_end_timeout_us(int a) {
     vTaskResume(hcore1); return true; }
-#define save_and_disable_interrupts() 1
 
-#define flash_range_erase(a,b) esp_partition_erase_range(part0, a, b)
-#define flash_range_program(a,b,c) esp_partition_write(part0, a, b, c)
-#define restore_interrupts(a) (void)a
 #endif
 
 #endif

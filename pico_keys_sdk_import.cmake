@@ -92,7 +92,7 @@ endif()
 
 message(STATUS "USB VID/PID: ${USB_VID}:${USB_PID}")
 
-set(EXTERNAL_SOURCES
+set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1write.c
@@ -157,13 +157,15 @@ set(INCLUDES ${INCLUDES}
 )
 
 if(USB_ITF_HID OR ENABLE_EMULATION)
-    set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES}
+    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_csr.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
+    )
+    set(CBOR_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser.c
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c
@@ -216,7 +218,7 @@ if (ENABLE_EMULATION)
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
     )
-    set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES}
+    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ctr_drbg.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/entropy.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/entropy_poll.c
@@ -241,6 +243,10 @@ else()
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )
+endif()
+set(EXTERNAL_SOURCES ${CBOR_SOURCES})
+if(NOT ESP_PLATFORM)
+    set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES} ${MBEDTLS_SOURCES})
 endif()
 if (MSVC)
     target_compile_options(pico_hsm PUBLIC
@@ -270,9 +276,7 @@ endif()
 set(INTERNAL_SOURCES ${SOURCES})
 set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
 if (NOT TARGET pico_keys_sdk)
-    if (ENABLE_EMULATION)
-        add_impl_library(pico_keys_sdk)
-    elseif(ESP_PLATFORM)
+    if (ENABLE_EMULATION OR ESP_PLATFORM)
         add_impl_library(pico_keys_sdk)
     else()
         pico_add_library(pico_keys_sdk)

@@ -358,16 +358,19 @@ void core0_loop() {
     }
 }
 
+char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+pico_unique_board_id_t pico_serial;
 #ifdef ESP_PLATFORM
 #include "tinyusb.h"
 #include "esp_efuse.h"
 #define pico_get_unique_board_id(a) do { uint32_t value; esp_efuse_read_block(EFUSE_BLK1, &value, 0, 32); memcpy((uint8_t *)(a), &value, sizeof(uint32_t)); esp_efuse_read_block(EFUSE_BLK1, &value, 32, 32); memcpy((uint8_t *)(a)+4, &value, sizeof(uint32_t)); } while(0)
 extern const tinyusb_config_t tusb_cfg;
 TaskHandle_t hcore0 = NULL, hcore1 = NULL;
-char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
-pico_unique_board_id_t pico_serial;
 int app_main() {
 #else
+#ifdef ENABLE_EMULATION
+#define pico_get_unique_board_id(a) memset(a, 0, sizeof(*(a)))
+#endif
 int main(void) {
 #endif
     pico_get_unique_board_id(&pico_serial);

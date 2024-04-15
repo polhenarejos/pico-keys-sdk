@@ -36,8 +36,6 @@ extern TaskHandle_t hcore0, hcore1;
 static inline uint32_t board_millis(void) {
     return ( ( ((uint64_t) xTaskGetTickCount()) * 1000) / configTICK_RATE_HZ );
 }
-#define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8
-typedef struct { uint8_t id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES]; } pico_unique_board_id_t;
 typedef SemaphoreHandle_t mutex_t;
 typedef SemaphoreHandle_t semaphore_t;
 #define mutex_init(a) do { *(a) = xSemaphoreCreateMutex();} while(0)

@@ -26,7 +26,9 @@
 #include "pico_keys.h"
 #include "usb.h"
 #include "apdu.h"
+#ifndef ENABLE_EMULATION
 #include "tusb.h"
+#endif
 
 // For memcpy
 #include <string.h>
@@ -158,8 +160,10 @@ queue_t usb_to_card_q;
 queue_t card_to_usb_q;
 #endif
 
+#ifndef ENABLE_EMULATION
 extern uint16_t usb_vid, usb_pid;
 extern tusb_desc_device_t desc_device;
+#endif
 void usb_init()
 {
 #ifndef ENABLE_EMULATION

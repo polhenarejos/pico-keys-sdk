@@ -283,8 +283,10 @@ void scan_flash() {
     scan_region(false);
 #ifndef ENABLE_EMULATION
     file_t *ef_vp = search_dynamic_file(EF_VP);
-    if (file_has_data(ef_vp)) {
-
+    if (file_has_data(ef_vp) && file_get_size(ef_vp) >= 4) {
+        uint8_t *data = file_get_data(ef_vp);
+        usb_vid = (data[0] << 8) | data[1];
+        usb_pid = (data[2] << 8) | data[3];
     }
 #endif
 }

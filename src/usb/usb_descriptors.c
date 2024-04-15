@@ -25,6 +25,7 @@
 #endif
 #include "pico_keys_version.h"
 #include "usb.h"
+#include "pico_keys.h"
 
 #ifndef USB_VID
 #define USB_VID   0xFEFF
@@ -39,11 +40,14 @@
 
 #define MAX_USB_POWER       1
 
+uint16_t usb_vid = USB_VID;
+uint16_t usb_pid = USB_PID;
+
 
 //--------------------------------------------------------------------+
 // Device Descriptors
 //--------------------------------------------------------------------+
-tusb_desc_device_t const desc_device = {
+tusb_desc_device_t desc_device = {
     .bLength            = sizeof(tusb_desc_device_t),
     .bDescriptorType    = TUSB_DESC_DEVICE,
     .bcdUSB             = (USB_BCD),

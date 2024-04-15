@@ -76,7 +76,8 @@ uint8_t const *tud_descriptor_device_cb(void) {
 #define TUD_INTERFACE_DESC_LEN 9
 #define TUD_ENDPOINT_DESC_LEN 7
 #define TUSB_SMARTCARD_LEN 54
-#define TUD_SMARTCARD_DESC_LEN ((TUD_INTERFACE_DESC_LEN + TUSB_SMARTCARD_LEN + 3 * TUD_ENDPOINT_DESC_LEN) + (TUD_INTERFACE_DESC_LEN + TUSB_SMARTCARD_LEN + 2 * TUD_ENDPOINT_DESC_LEN))
+#define TUSB_SMARTCARD_CCID_DESC_LEN (TUD_INTERFACE_DESC_LEN + TUSB_SMARTCARD_LEN + 3 * TUD_ENDPOINT_DESC_LEN)
+#define TUSB_SMARTCARD_WCID_DESC_LEN (TUD_INTERFACE_DESC_LEN + TUSB_SMARTCARD_LEN + 2 * TUD_ENDPOINT_DESC_LEN)
 
 enum {
  TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN
@@ -84,10 +85,12 @@ enum {
         + TUD_HID_INOUT_DESC_LEN + TUD_HID_DESC_LEN
 #endif
 #ifdef USB_ITF_CCID
-        + TUD_SMARTCARD_DESC_LEN
+        + TUSB_SMARTCARD_CCID_DESC_LEN
+#ifdef USB_ITF_WCID
+        + TUSB_SMARTCARD_WCID_DESC_LEN
+#endif
 #endif
 };
-
 
 #ifdef USB_ITF_HID
 uint8_t const desc_hid_report[] = {
@@ -100,11 +103,13 @@ uint8_t const desc_hid_report_kb[] = {
 #endif
 
 #ifdef USB_ITF_CCID
+#ifdef USB_ITF_WCID
 #define TUD_SMARTCARD_DESCRIPTOR_WEB(_itf, _strix, _epout, _epin, _epsize) \
     9, TUSB_DESC_INTERFACE, _itf, 0, 2, 0xFF, 0, 0, _strix, \
     54, 0x21, U16_TO_U8S_LE(0x0110), 0, 0x1, U32_TO_U8S_LE(0x1 | 0x2), U32_TO_U8S_LE(0xDFC), U32_TO_U8S_LE(0xDFC), 0, U32_TO_U8S_LE(0x2580), U32_TO_U8S_LE(0x2580), 0, U32_TO_U8S_LE(0xFE), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0x40840), U32_TO_U8S_LE(65544+10), 0xFF, 0xFF, U16_TO_U8S_LE(0x0), 0, 0x1, \
     7, TUSB_DESC_ENDPOINT, _epout, TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0, \
     7, TUSB_DESC_ENDPOINT, _epin,  TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0
+#endif
 #define TUD_SMARTCARD_DESCRIPTOR(_itf, _strix, _epout, _epin, _epint, _epsize) \
     9, TUSB_DESC_INTERFACE, _itf, 0, 3, TUSB_CLASS_SMART_CARD, 0, 0, _strix, \
     54, 0x21, U16_TO_U8S_LE(0x0110), 0, 0x1, U32_TO_U8S_LE(0x1 | 0x2), U32_TO_U8S_LE(0xDFC), U32_TO_U8S_LE(0xDFC), 0, U32_TO_U8S_LE(0x2580), U32_TO_U8S_LE(0x2580), 0, U32_TO_U8S_LE(0xFE), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0x40840), U32_TO_U8S_LE(65544+10), 0xFF, 0xFF, U16_TO_U8S_LE(0x0), 0, 0x1, \
@@ -121,61 +126,13 @@ const uint8_t desc_config[] = {
 #endif
 #ifdef USB_ITF_CCID
     TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID+5, 1, TUSB_DIR_IN_MASK | 1, TUSB_DIR_IN_MASK | 2, 64),
+#ifdef USB_ITF_WCID
     TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID+5, 3, TUSB_DIR_IN_MASK | 3, 64),
+#endif
 #endif
 };
 
-/*
-tusb_desc_configuration_t const desc_config = {
-    .bLength = sizeof(tusb_desc_configuration_t),
-    .bDescriptorType = TUSB_DESC_CONFIGURATION,
-    .wTotalLength = (sizeof(tusb_desc_configuration_t)
 #ifdef USB_ITF_CCID
-                     + (sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +
-                        3 * sizeof(tusb_desc_endpoint_t)) +
-                     (sizeof(tusb_desc_interface_t) + sizeof(struct ccid_class_descriptor) +
-                      2 * sizeof(tusb_desc_endpoint_t))
-#endif
-#ifdef USB_ITF_HID
-                     + TUD_HID_INOUT_DESC_LEN + TUD_HID_DESC_LEN
-#endif
-                     ),
-    .bNumInterfaces = ITF_TOTAL,
-    .bConfigurationValue = 1,
-    .iConfiguration = 4,
-    .bmAttributes = USB_CONFIG_ATT_ONE | TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP,
-    .bMaxPower = TUSB_DESC_CONFIG_POWER_MA(MAX_USB_POWER + 1),
-};
-*/
-#ifdef USB_ITF_CCID
-/*
-static const struct ccid_class_descriptor desc_ccid = {
-    .bLength                = sizeof(struct ccid_class_descriptor),
-    .bDescriptorType        = 0x21,
-    .bcdCCID                = (0x0110),
-    .bMaxSlotIndex          = 0,
-    .bVoltageSupport        = 0x01,  // 5.0V
-    .dwProtocols            = (
-        0x01 |                        // T=0
-        0x02),                       // T=1
-    .dwDefaultClock         = (0xDFC),
-    .dwMaximumClock         = (0xDFC),
-    .bNumClockSupport       = 0,
-    .dwDataRate             = (0x2580),
-    .dwMaxDataRate          = (0x2580),
-    .bNumDataRatesSupported = 0,
-    .dwMaxIFSD              = (0xFE), // IFSD is handled by the real reader driver
-    .dwSynchProtocols       = (0),
-    .dwMechanical           = (0),
-    .dwFeatures             = 0x40840, //USB-ICC, short & extended APDU
-    .dwMaxCCIDMessageLength = 65544 + 10,
-    .bClassGetResponse      = 0xFF,
-    .bclassEnvelope         = 0xFF,
-    .wLcdLayout             = 0x0,
-    .bPINSupport            = 0x0,
-    .bMaxCCIDBusySlots      = 0x01,
-};
-*/
 tusb_desc_interface_t const desc_interface = {
     .bLength            = sizeof(tusb_desc_interface_t),
     .bDescriptorType    = TUSB_DESC_INTERFACE,
@@ -188,6 +145,7 @@ tusb_desc_interface_t const desc_interface = {
     .iInterface         = ITF_CCID + 5,
 };
 
+#ifdef USB_ITF_WCID
 tusb_desc_interface_t const desc_interface_wcid = {
     .bLength            = sizeof(tusb_desc_interface_t),
     .bDescriptorType    = TUSB_DESC_INTERFACE,
@@ -199,34 +157,7 @@ tusb_desc_interface_t const desc_interface_wcid = {
     .bInterfaceProtocol = 0,
     .iInterface         = ITF_WCID + 5,
 };
-
-tusb_desc_endpoint_t const desc_ep1 = {
-    .bLength             = sizeof(tusb_desc_endpoint_t),
-    .bDescriptorType     = TUSB_DESC_ENDPOINT,
-    .bEndpointAddress    = TUSB_DIR_IN_MASK | 1,
-    .bmAttributes.xfer   = TUSB_XFER_BULK,
-    .wMaxPacketSize = (64),
-    .bInterval           = 0
-};
-
-tusb_desc_endpoint_t const desc_ep2 = {
-    .bLength             = sizeof(tusb_desc_endpoint_t),
-    .bDescriptorType     = TUSB_DESC_ENDPOINT,
-    .bEndpointAddress    = 1,
-    .bmAttributes.xfer   = TUSB_XFER_BULK,
-    .wMaxPacketSize = (64),
-    .bInterval           = 0
-};
-
-tusb_desc_endpoint_t const desc_ep3 = {
-    .bLength             = sizeof(tusb_desc_endpoint_t),
-    .bDescriptorType     = TUSB_DESC_ENDPOINT,
-    .bEndpointAddress    = TUSB_DIR_IN_MASK | 2,
-    .bmAttributes.xfer   = TUSB_XFER_INTERRUPT,
-    .wMaxPacketSize = (64),
-    .bInterval           = 0
-};
-
+#endif
 #endif
 
 #ifdef USB_ITF_HID
@@ -251,18 +182,16 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
 }
 #endif
 
-#ifdef USB_ITF_CCID
-
+#ifdef USB_ITF_WCID
 #define BOS_TOTAL_LEN     (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
 #define MS_OS_20_DESC_LEN  0xB2
-
 
 enum
 {
   VENDOR_REQUEST_WEBUSB = 1,
   VENDOR_REQUEST_MICROSOFT = 2
 };
-#define URL  "picokeys.com/pki/"
+#define URL  "www.picokeys.com/pki/"
 static bool web_serial_connected = false;
 
 const tusb_desc_webusb_url_t desc_url =
@@ -353,7 +282,6 @@ uint8_t const desc_bos[] = {
 };
 
 uint8_t const *tud_descriptor_bos_cb(void) {
-    printf("!!!!!!!!!!!! tud_descriptor_bos_cb\n");
     return desc_bos;
 }
 #endif
@@ -374,9 +302,12 @@ char const *string_desc_arr [] = {
 #endif
 #ifdef USB_ITF_CCID
     , "Pico Key CCID Interface"
+#ifdef USB_ITF_WCID
     , "Pico Key WebCCID Interface"
 #endif
+#endif
 };
+
 #ifdef ESP_PLATFORM
 const tinyusb_config_t tusb_cfg = {
     .device_descriptor = &desc_device,
@@ -385,8 +316,7 @@ const tinyusb_config_t tusb_cfg = {
     .external_phy = false,
     .configuration_descriptor = desc_config,
 };
-#endif
-#ifndef ESP_PLATFORM
+#else
 static uint16_t _desc_str[32];
 
 uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
@@ -407,12 +337,8 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
         }
 
         const char *str = string_desc_arr[index];
-        char unique_id_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
         if (index == 3) {
-            pico_unique_board_id_t unique_id;
-            pico_get_unique_board_id(&unique_id);
-            pico_get_unique_board_id_string(unique_id_str, 2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1);
-            str = unique_id_str;
+            str = pico_serial_str;
         }
 
         chr_count = strlen(str);

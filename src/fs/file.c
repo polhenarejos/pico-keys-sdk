@@ -263,6 +263,9 @@ void scan_region(bool persistent) {
     }
 }
 void wait_flash_finish();
+#ifndef ENABLE_EMULATION
+extern uint16_t usb_vid, usb_pid;
+#endif
 void scan_flash() {
     initialize_flash(false); //soft initialization
     if (*(uintptr_t *) flash_read(end_rom_pool) == 0xffffffff &&
@@ -278,6 +281,12 @@ void scan_flash() {
     printf("SCAN\n");
     scan_region(true);
     scan_region(false);
+#ifndef ENABLE_EMULATION
+    file_t *ef_vp = search_dynamic_file(EF_VP);
+    if (file_has_data(ef_vp)) {
+
+    }
+#endif
 }
 
 uint8_t *file_read(const uint8_t *addr) {

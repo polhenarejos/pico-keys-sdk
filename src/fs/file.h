@@ -67,6 +67,10 @@
 #define EF_SKDFS    0x6045
 #define EF_META     0xE010
 
+#ifndef ENABLE_EMULATION
+#define EF_VP       0xE020
+#endif
+
 #define MAX_DEPTH 4
 
 typedef PACK(struct file {

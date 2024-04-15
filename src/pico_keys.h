@@ -166,4 +166,7 @@ extern uint32_t button_timeout;
 #define CCID_WRONG_PADDING                   -1011
 #define CCID_VERIFICATION_FAILED             -1012
 
+extern pico_unique_board_id_t pico_serial;
+extern char pico_serial_str[];
+
 #endif

@@ -40,14 +40,9 @@ void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
     uint16_t iters = 256;
-#ifndef ENABLE_EMULATION
-    pico_unique_board_id_t unique_id;
-
-    pico_get_unique_board_id(&unique_id);
-#endif
     mbedtls_sha256_starts(&ctx, 0);
 #ifndef ENABLE_EMULATION
-    mbedtls_sha256_update(&ctx, unique_id.id, sizeof(unique_id.id));
+    mbedtls_sha256_update(&ctx, pico_serial.id, sizeof(pico_serial.id));
 #endif
 
     while (iters > len) {

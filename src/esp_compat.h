@@ -38,12 +38,6 @@ static inline uint32_t board_millis(void) {
 }
 #define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8
 typedef struct { uint8_t id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES]; } pico_unique_board_id_t;
-#define pico_get_unique_board_id(a) memset(a, 0, sizeof(pico_unique_board_id_t))
-#define pico_get_unique_board_id_string(a, b) \
-    do {                                      \
-        pico_unique_board_id_t t;             \
-        pico_get_unique_board_id(&t);          \
-        snprintf(a, b, "%02X%02X%02X%02X%02X%02X%02X%02X", t.id[0], t.id[1], t.id[2], t.id[3], t.id[4], t.id[5], t.id[6], t.id[7]); } while(0)
 typedef SemaphoreHandle_t mutex_t;
 typedef SemaphoreHandle_t semaphore_t;
 #define mutex_init(a) do { *(a) = xSemaphoreCreateMutex();} while(0)

@@ -21,12 +21,12 @@
 #if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
-#include "tusb.h"
 #include "bsp/board.h"
 #endif
 #include "pico_keys.h"
 #include "usb.h"
 #include "apdu.h"
+#include "tusb.h"
 
 // For memcpy
 #include <string.h>
@@ -158,10 +158,15 @@ queue_t usb_to_card_q;
 queue_t card_to_usb_q;
 #endif
 
-void usb_init() {
+extern uint16_t usb_vid, usb_pid;
+extern tusb_desc_device_t desc_device;
+void usb_init()
+{
 #ifndef ENABLE_EMULATION
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
+    desc_device.idVendor = usb_vid;
+    desc_device.idProduct = usb_pid;
 #endif
 }
 

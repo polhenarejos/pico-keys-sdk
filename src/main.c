@@ -360,18 +360,23 @@ void core0_loop() {
 
 #ifdef ESP_PLATFORM
 #include "tinyusb.h"
+#include "esp_efuse.h"
+#define pico_get_unique_board_id(a) do { uint32_t value; esp_efuse_read_block(EFUSE_BLK1, &value, 0, 32); memcpy((uint8_t *)(a), &value, sizeof(uint32_t)); esp_efuse_read_block(EFUSE_BLK1, &value, 32, 32); memcpy((uint8_t *)(a)+4, &value, sizeof(uint32_t)); } while(0)
 extern const tinyusb_config_t tusb_cfg;
 TaskHandle_t hcore0 = NULL, hcore1 = NULL;
+char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+pico_unique_board_id_t pico_serial;
 int app_main() {
 #else
 int main(void) {
 #endif
+    pico_get_unique_board_id(&pico_serial);
+    memset(pico_serial_str, 0, sizeof(pico_serial_str));
+    for (int i = 0; i < sizeof(pico_serial); i++) {
+        snprintf(&pico_serial_str[2 * i], 3, "%02X", pico_serial.id[i]);
+    }
 
 #ifndef ENABLE_EMULATION
-#ifdef ESP_PLATFORM
-    tinyusb_driver_install(&tusb_cfg);
-#endif
-    usb_init();
 #ifndef ESP_PLATFORM
     board_init();
     stdio_init_all();
@@ -392,7 +397,6 @@ int main(void) {
 
     led_off_all();
 
-
     //prepare_ccid();
 #else
     emul_init("127.0.0.1", 35963);
@@ -402,7 +406,17 @@ int main(void) {
 
     low_flash_init();
 
+    scan_flash();
+
     init_rtc();
+
+#ifndef ENABLE_EMULATION
+    usb_init();
+#ifdef ESP_PLATFORM
+    tusb_cfg.string_descriptor[3] = pico_serial_str;
+    tinyusb_driver_install(&tusb_cfg);
+#endif
+#endif
 
     //ccid_prepare_receive(&ccid);
 #ifdef ESP_PLATFORM

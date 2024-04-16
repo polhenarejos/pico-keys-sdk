@@ -72,6 +72,9 @@
 #define PHY_VID         0x0
 #define PHY_PID         0x2
 #define PHY_LED_GPIO    0x4
+#define PHY_LED_MODE    0x5
+
+#define PHY_MAX_SIZE    6
 
 #define MAX_DEPTH 4
 

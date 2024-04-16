@@ -423,7 +423,11 @@ int main(void) {
 
     //ccid_prepare_receive(&ccid);
 #ifdef ESP_PLATFORM
-    neopixel = neopixel_Init(1, GPIO_NUM_48);
+    uint8_t gpio = GPIO_NUM_48;
+    if (file_has_data(ef_phy)) {
+        gpio = file_get_data(ef_phy)[PHY_LED_GPIO];
+    }
+    neopixel = neopixel_Init(1, gpio);
 #endif
 
 #ifdef ESP_PLATFORM

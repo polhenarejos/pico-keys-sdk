@@ -129,4 +129,8 @@ extern int meta_delete(uint16_t fid);
 extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
 extern int delete_file(file_t *ef);
 
+#ifndef ENABLE_EMULATION
+extern file_t *ef_vp;
 #endif
+
+#endif // _FILE_H_

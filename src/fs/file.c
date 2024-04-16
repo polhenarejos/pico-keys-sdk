@@ -265,6 +265,8 @@ void scan_region(bool persistent) {
 void wait_flash_finish();
 #ifndef ENABLE_EMULATION
 extern uint16_t usb_vid, usb_pid;
+file_t sef_vp = {.fid = EF_VP, .parent = 5, .name = NULL, .type = FILE_TYPE_INTERNAL_EF | FILE_DATA_FLASH | FILE_PERSISTENT, .data = NULL, .ef_structure = FILE_EF_TRANSPARENT, .acl = {0xff}};
+file_t *ef_vp = &sef_vp;
 #endif
 void scan_flash() {
     initialize_flash(false); //soft initialization
@@ -282,7 +284,6 @@ void scan_flash() {
     scan_region(true);
     scan_region(false);
 #ifndef ENABLE_EMULATION
-    file_t *ef_vp = search_dynamic_file(EF_VP);
     if (file_has_data(ef_vp) && file_get_size(ef_vp) >= 4) {
         uint8_t *data = file_get_data(ef_vp);
         usb_vid = (data[0] << 8) | data[1];

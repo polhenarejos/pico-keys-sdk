@@ -67,9 +67,11 @@
 #define EF_SKDFS    0x6045
 #define EF_META     0xE010
 
-#ifndef ENABLE_EMULATION
-#define EF_VP       0xE020
-#endif
+#define EF_PHY       0xE020
+
+#define PHY_VID         0x0
+#define PHY_PID         0x2
+#define PHY_LED_GPIO    0x4
 
 #define MAX_DEPTH 4
 
@@ -130,7 +132,7 @@ extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
 extern int delete_file(file_t *ef);
 
 #ifndef ENABLE_EMULATION
-extern file_t *ef_vp;
+extern file_t *ef_phy;
 #endif
 
 #endif // _FILE_H_

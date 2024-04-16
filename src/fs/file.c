@@ -41,6 +41,9 @@ extern uint8_t flash_read_uint8(uintptr_t addr);
 extern uint8_t *flash_read(uintptr_t addr);
 extern void low_flash_available();
 
+file_t sef_phy = {.fid = EF_PHY, .parent = 5, .name = NULL, .type = FILE_TYPE_INTERNAL_EF | FILE_DATA_FLASH | FILE_PERSISTENT, .data = NULL, .ef_structure = FILE_EF_TRANSPARENT, .acl = {0xff}};
+file_t *ef_phy = &sef_phy;
+
 //puts FCI in the RAPDU
 void process_fci(const file_t *pe, int fmd) {
     res_APDU_size = 0;
@@ -265,8 +268,6 @@ void scan_region(bool persistent) {
 void wait_flash_finish();
 #ifndef ENABLE_EMULATION
 extern uint16_t usb_vid, usb_pid;
-file_t sef_vp = {.fid = EF_VP, .parent = 5, .name = NULL, .type = FILE_TYPE_INTERNAL_EF | FILE_DATA_FLASH | FILE_PERSISTENT, .data = NULL, .ef_structure = FILE_EF_TRANSPARENT, .acl = {0xff}};
-file_t *ef_vp = &sef_vp;
 #endif
 void scan_flash() {
     initialize_flash(false); //soft initialization
@@ -284,10 +285,10 @@ void scan_flash() {
     scan_region(true);
     scan_region(false);
 #ifndef ENABLE_EMULATION
-    if (file_has_data(ef_vp) && file_get_size(ef_vp) >= 4) {
-        uint8_t *data = file_get_data(ef_vp);
-        usb_vid = (data[0] << 8) | data[1];
-        usb_pid = (data[2] << 8) | data[3];
+    if (file_has_data(ef_phy) && file_get_size(ef_phy) >= 4) {
+        uint8_t *data = file_get_data(ef_phy);
+        usb_vid = (data[PHY_VID] << 8) | data[PHY_VID+1];
+        usb_pid = (data[PHY_PID] << 8) | data[PHY_PID+1];
     }
 #endif
 }

@@ -43,7 +43,7 @@ typedef struct cmd {
 
 #if defined(DEBUG_APDU) && DEBUG_APDU == 1
 #define DEBUG_PAYLOAD(_p, _s) { \
-        printf("Payload %s (%d bytes):\r\n", #_p, (int) (_s)); \
+        printf("Payload %s (%d bytes):\n", #_p, (int) (_s)); \
         for (int _i = 0; _i < _s; _i += 16) { \
             printf("%" PRIxPTR "h : ", (uintptr_t) (_i + _p)); \
             for (int _j = 0; _j < 16; _j++) { \
@@ -56,12 +56,12 @@ typedef struct cmd {
                 else printf(" "); \
                 if (_j == 7) printf(" "); \
             } \
-            printf("\r\n"); \
-        } printf("\r\n"); \
+            printf("\n"); \
+        } printf("\n"); \
 }
 #define DEBUG_DATA(_p, _s)                               \
     {                                                    \
-        printf("Data %s (%d bytes):\r\n", #_p, (int) (_s));      \
+        printf("Data %s (%d bytes):\n", #_p, (int) (_s));      \
         char *tmp = (char *) calloc(1, 2 * _s + 1); \
         for (int _i = 0; _i < _s; _i++)                  \
         {                                                \

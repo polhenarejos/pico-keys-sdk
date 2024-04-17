@@ -247,7 +247,7 @@ void scan_region(bool persistent) {
         }
 
         uint16_t fid = flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t));
-        printf("[%x] scan fid %x, len %d\r\n", (unsigned int) base, fid,
+        printf("[%x] scan fid %x, len %d\n", (unsigned int) base, fid,
                flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t)));
         file_t *file = (file_t *) search_by_fid(fid, NULL, SPECIFY_EF);
         if (!file) {
@@ -267,7 +267,7 @@ void scan_flash() {
     initialize_flash(false); //soft initialization
     if (*(uintptr_t *) flash_read(end_rom_pool) == 0xffffffff &&
         *(uintptr_t *) flash_read(end_rom_pool + sizeof(uintptr_t)) == 0xffffffff) {
-        printf("First initialization (or corrupted!)\r\n");
+        printf("First initialization (or corrupted!)\n");
         uint8_t empty[sizeof(uintptr_t) * 2 + sizeof(uint32_t)];
         memset(empty, 0, sizeof(empty));
         flash_program_block(end_data_pool, empty, sizeof(empty));
@@ -275,7 +275,7 @@ void scan_flash() {
         //low_flash_available();
         //wait_flash_finish();
     }
-    printf("SCAN\r\n");
+    printf("SCAN\n");
     scan_region(true);
     scan_region(false);
 }

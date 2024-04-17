@@ -283,7 +283,7 @@ void usb_task() {
                 uint32_t m = 0x0;
                 bool has_m = queue_try_remove(&card_to_usb_q, &m);
                 //if (m != 0)
-                //    printf("\r\n ------ M = %lu\r\n",m);
+                //    printf("\n ------ M = %lu\n",m);
                 if (has_m) {
                     if (m == EV_EXEC_FINISHED) {
                         timeout_stop();

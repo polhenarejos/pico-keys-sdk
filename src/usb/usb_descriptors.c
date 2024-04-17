@@ -349,7 +349,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
             if (request->bRequest == 0x22) {
                 web_serial_connected = (request->wValue != 0);
                 if (web_serial_connected) {
-                    printf("\r\nWebUSB interface connected\r\n");
+                    printf("\nWebUSB interface connected\n");
                 }
                 return tud_control_status(rhport, request);
             }

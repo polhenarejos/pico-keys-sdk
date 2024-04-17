@@ -21,12 +21,15 @@
 #ifndef ENABLE_EMULATION
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
-#include "tusb.h"
 #include "bsp/board.h"
 #endif
 #include "pico_keys.h"
 #include "usb.h"
 #include "apdu.h"
+
+#ifndef ENABLE_EMULATION
+#include "tusb.h"
+#endif
 
 // For memcpy
 #include <string.h>
@@ -158,8 +161,20 @@ queue_t usb_to_card_q;
 queue_t card_to_usb_q;
 #endif
 
+#ifndef ENABLE_EMULATION
+extern tusb_desc_device_t desc_device;
+#endif
 void usb_init() {
 #ifndef ENABLE_EMULATION
+    uint16_t usb_vid = USB_VID, usb_pid = USB_PID;
+    if (file_has_data(ef_phy) && file_get_size(ef_phy) >= 4) {
+        uint8_t *data = file_get_data(ef_phy);
+        usb_vid = (data[PHY_VID] << 8) | data[PHY_VID+1];
+        usb_pid = (data[PHY_PID] << 8) | data[PHY_PID+1];
+    }
+    desc_device.idVendor = usb_vid;
+    desc_device.idProduct = usb_pid;
+
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
 #endif

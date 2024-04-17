@@ -149,9 +149,11 @@ file_t *search_by_name(uint8_t *name, uint16_t namelen) {
 }
 
 file_t *search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp) {
+#ifndef ENABLE_EMULATION
     if (fid == EF_PHY) {
         return ef_phy;
     }
+#endif
     for (file_t *p = file_entries; p != file_last; p++) {
         if (p->fid != 0x0000 && p->fid == fid) {
             if (!parent || (parent && is_parent(p, parent))) {

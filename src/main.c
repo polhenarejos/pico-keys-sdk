@@ -170,7 +170,7 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
     (void)tzp;
     // Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
     // This magic number is the number of 100 nanosecond intervals since January 1, 1601 (UTC)
-    // until 00:00:00 January 1, 1970 
+    // until 00:00:00 January 1, 1970
     static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
 
     SYSTEMTIME  system_time;
@@ -313,7 +313,18 @@ void execute_tasks() {
     led_blinking_task();
 }
 
+char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+pico_unique_board_id_t pico_serial;
+#ifdef ENABLE_EMULATION
+#define pico_get_unique_board_id(a) memset(a, 0, sizeof(*(a)))
+#endif
+
 int main(void) {
+	pico_get_unique_board_id(&pico_serial);
+    memset(pico_serial_str, 0, sizeof(pico_serial_str));
+    for (int i = 0; i < sizeof(pico_serial); i++) {
+        snprintf(&pico_serial_str[2 * i], 3, "%02X", pico_serial.id[i]);
+    }
 #ifndef ENABLE_EMULATION
     usb_init();
 

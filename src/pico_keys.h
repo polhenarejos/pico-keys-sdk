@@ -156,4 +156,12 @@ extern uint32_t button_timeout;
 #define CCID_WRONG_PADDING                   -1011
 #define CCID_VERIFICATION_FAILED             -1012
 
+#if defined(ENABLE_EMULATION)
+#define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8
+typedef struct { uint8_t id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES]; } pico_unique_board_id_t;
+#endif
+
+extern pico_unique_board_id_t pico_serial;
+extern char pico_serial_str[];
+
 #endif

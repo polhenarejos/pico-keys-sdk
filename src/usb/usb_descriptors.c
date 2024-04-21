@@ -96,9 +96,7 @@ static const struct ccid_class_descriptor desc_ccid = {
     .bcdCCID                = (0x0110),
     .bMaxSlotIndex          = 0,
     .bVoltageSupport        = 0x01,  // 5.0V
-    .dwProtocols            = (
-        0x01 |                        // T=0
-        0x02),                       // T=1
+    .dwProtocols            = (0x02), // T=1
     .dwDefaultClock         = (0xDFC),
     .dwMaximumClock         = (0xDFC),
     .bNumClockSupport       = 0,

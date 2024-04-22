@@ -132,34 +132,6 @@ const uint8_t desc_config[] = {
 #endif
 };
 
-#ifdef USB_ITF_CCID
-tusb_desc_interface_t const desc_interface = {
-    .bLength            = sizeof(tusb_desc_interface_t),
-    .bDescriptorType    = TUSB_DESC_INTERFACE,
-    .bInterfaceNumber   = ITF_CCID,
-    .bAlternateSetting  = 0,
-    .bNumEndpoints      = 3,
-    .bInterfaceClass    = TUSB_CLASS_SMART_CARD,
-    .bInterfaceSubClass = 0,
-    .bInterfaceProtocol = 0,
-    .iInterface         = ITF_CCID + 5,
-};
-
-#ifdef USB_ITF_WCID
-tusb_desc_interface_t const desc_interface_wcid = {
-    .bLength            = sizeof(tusb_desc_interface_t),
-    .bDescriptorType    = TUSB_DESC_INTERFACE,
-    .bInterfaceNumber   = ITF_WCID,
-    .bAlternateSetting  = 0,
-    .bNumEndpoints      = 2,
-    .bInterfaceClass    = 0xFF,
-    .bInterfaceSubClass = 0,
-    .bInterfaceProtocol = 0,
-    .iInterface         = ITF_WCID + 5,
-};
-#endif
-#endif
-
 #ifdef USB_ITF_HID
 #include "apdu.h"
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {

@@ -34,6 +34,10 @@
 #include "tusb.h"
 #endif
 
+#ifndef ENABLE_EMULATION
+#include "tusb.h"
+#endif
+
 // For memcpy
 #include <string.h>
 #include <stdlib.h>

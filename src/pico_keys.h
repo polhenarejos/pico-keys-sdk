@@ -72,9 +72,7 @@ static inline void put_uint16_t(uint16_t n, uint8_t *b) {
     *b = n & 0xff;
 }
 
-extern int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len);
 extern void low_flash_available();
-extern int flash_clear_file(file_t *file);
 
 extern void timeout_stop();
 extern void timeout_start();

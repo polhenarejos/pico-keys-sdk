@@ -105,6 +105,7 @@ extern file_t *file_sopin;
 extern file_t *file_retries_sopin;
 
 extern file_t *search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp);
+extern file_t *search_file(const uint16_t fid);
 extern file_t *search_by_name(uint8_t *name, uint16_t namelen);
 extern file_t *search_by_path(const uint8_t *pe_path, uint8_t pathlen, const file_t *parent);
 extern bool authenticate_action(const file_t *ef, uint8_t op);
@@ -116,9 +117,11 @@ extern file_t file_entries[];
 
 extern uint8_t *file_read(const uint8_t *addr);
 extern uint16_t file_read_uint16(const uint8_t *addr);
-extern uint8_t file_read_uint8(const uint8_t *addr);
+extern uint8_t file_read_uint8(const file_t *ef);
+extern uint8_t file_read_uint8_offset(const file_t *ef, const uint16_t offset);
 extern uint8_t *file_get_data(const file_t *tf);
 extern uint16_t file_get_size(const file_t *tf);
+extern int file_put_data(file_t *file, const uint8_t *data, uint16_t len);
 extern file_t *file_new(uint16_t);
 file_t *get_parent(file_t *f);
 

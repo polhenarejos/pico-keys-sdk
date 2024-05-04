@@ -427,11 +427,6 @@ int driver_process_usb_packet_hid(uint16_t read) {
             memset(ctap_resp, 0, 64);
             ctap_resp->cid = ctap_req->cid;
             ctap_resp->init.cmd = ctap_req->init.cmd;
-#ifdef ENABLE_EMULATION
-            struct {
-                uint8_t id[8];
-            } rpiid = { 0 };
-#endif
             memcpy(ctap_resp->init.data, pico_serial.id, sizeof(pico_serial.id));
             ctap_resp->init.bcntl = 16;
             hid_write(64);

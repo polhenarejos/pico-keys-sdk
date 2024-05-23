@@ -120,6 +120,12 @@ set(EXTERNAL_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/des.c
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_csr.c
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk.c
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
 )
 
 set(SOURCES ${SOURCES}
@@ -154,12 +160,6 @@ set(INCLUDES ${INCLUDES}
 
 if(USB_ITF_HID OR ENABLE_EMULATION)
     set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES}
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_csr.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser.c
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c

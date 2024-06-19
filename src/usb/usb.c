@@ -163,14 +163,23 @@ queue_t card_to_usb_q;
 
 #ifndef ENABLE_EMULATION
 extern tusb_desc_device_t desc_device;
+bool enable_wcid = false;
 #endif
 void usb_init() {
 #ifndef ENABLE_EMULATION
     uint16_t usb_vid = USB_VID, usb_pid = USB_PID;
-    if (file_has_data(ef_phy) && file_get_size(ef_phy) >= 4) {
+    if (file_has_data(ef_phy)) {
         uint8_t *data = file_get_data(ef_phy);
-        usb_vid = (data[PHY_VID] << 8) | data[PHY_VID+1];
-        usb_pid = (data[PHY_PID] << 8) | data[PHY_PID+1];
+        if (file_get_size(ef_phy) >= 4) {
+            usb_vid = (data[PHY_VID] << 8) | data[PHY_VID+1];
+            usb_pid = (data[PHY_PID] << 8) | data[PHY_PID+1];
+        }
+        if (file_get_size(ef_phy) >= 8) {
+            uint16_t opts = (data[PHY_OPTS] << 8) | data[PHY_OPTS+1];
+            if (opts & PHY_OPT_WCID) {
+                enable_wcid = true;
+            }
+        }
     }
     desc_device.idVendor = usb_vid;
     desc_device.idProduct = usb_pid;

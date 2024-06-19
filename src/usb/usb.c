@@ -162,7 +162,7 @@ queue_t card_to_usb_q;
 
 #ifndef ENABLE_EMULATION
 extern tusb_desc_device_t desc_device;
-bool enable_wcid = false;
+extern bool enable_wcid;
 #endif
 void usb_init() {
 #ifndef ENABLE_EMULATION

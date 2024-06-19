@@ -418,6 +418,8 @@ int main(void) {
 #ifdef ESP_PLATFORM
     tusb_cfg.string_descriptor[3] = pico_serial_str;
     tinyusb_driver_install(&tusb_cfg);
+#else
+    tusb_init();
 #endif
 #endif
 

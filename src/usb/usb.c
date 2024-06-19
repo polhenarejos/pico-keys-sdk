@@ -18,7 +18,7 @@
 #include <stdio.h>
 
 // Pico
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "bsp/board.h"
@@ -26,6 +26,13 @@
 #include "pico_keys.h"
 #include "usb.h"
 #include "apdu.h"
+#ifndef ENABLE_EMULATION
+#include "tusb.h"
+#endif
+
+#ifndef ENABLE_EMULATION
+#include "tusb.h"
+#endif
 
 #ifndef ENABLE_EMULATION
 #include "tusb.h"
@@ -156,7 +163,7 @@ void usb_clear_rx(uint8_t itf) {
 
 #define USB_BCD   0x0200
 
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION)
 queue_t usb_to_card_q;
 queue_t card_to_usb_q;
 #endif

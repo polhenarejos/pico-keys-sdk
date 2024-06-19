@@ -18,7 +18,17 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#ifndef ENABLE_EMULATION
+#if defined(ENABLE_EMULATION)
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
+
+mbedtls_ctr_drbg_context ctr_drbg;
+extern uint32_t board_millis();
+#elif (ESP_PLATFORM)
+#include "bootloader_random.h"
+#include "esp_random.h"
+#include "esp_compat.h"
+#else
 #include "pico/stdlib.h"
 
 #include "hwrng.h"
@@ -28,16 +38,13 @@
 #include "bsp/board.h"
 
 #include "pico/time.h"
-#else
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
-
-mbedtls_ctr_drbg_context ctr_drbg;
-extern uint32_t board_millis();
 #endif
 
 void adc_start() {
-#ifndef ENABLE_EMULATION
+#if defined(ENABLE_EMULATION)
+#elif defined(ESP_PLATFORM)
+    bootloader_random_enable();
+#else
     adc_init();
     adc_gpio_init(27);
     adc_select_input(1);
@@ -46,7 +53,7 @@ void adc_start() {
 
 void adc_stop() {
 }
-#ifdef ENABLE_EMULATION
+#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 uint32_t adc_read() {
     return 0;
 }
@@ -76,7 +83,12 @@ static int ep_process() {
         ep_init();
     }
     uint64_t word = 0x0;
-#ifndef ENABLE_EMULATION
+
+#if defined(ENABLE_EMULATION)
+    mbedtls_ctr_drbg_random(&ctr_drbg, (uint8_t *) &word, sizeof(word));
+#elif defined(ESP_PLATFORM)
+    esp_fill_random((uint8_t *)&word, sizeof(word));
+#else
     for (int n = 0; n < 64; n++) {
         uint8_t bit1, bit2;
         do {
@@ -86,8 +98,6 @@ static int ep_process() {
         } while (bit1 == bit2);
         word = (word << 1) | bit1;
     }
-#else
-    mbedtls_ctr_drbg_random(&ctr_drbg, (uint8_t *) &word, sizeof(word));
 #endif
     random_word ^= word ^ board_millis() ^ adc_read();
     random_word *= 0x00000100000001B3;
@@ -200,7 +210,11 @@ uint32_t neug_get() {
 void neug_wait_full() {
     struct rng_rb *rb = &the_ring_buffer;
 #ifndef ENABLE_EMULATION
+#ifdef ESP_PLATFORM
+    uint8_t core = xTaskGetCurrentTaskHandle() == hcore1 ? 1 : 0;
+#else
     uint core = get_core_num();
+#endif
 #endif
     while (!rb->full) {
 #ifndef ENABLE_EMULATION

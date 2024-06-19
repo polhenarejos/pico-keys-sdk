@@ -15,7 +15,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ENABLE_EMULATION
+#if defined(ENABLE_EMULATION)
+#elif defined(ESP_PLATFORM)
+#include "esp_compat.h"
+#else
 #include <pico/unique_id.h>
 #endif
 #include "mbedtls/md.h"

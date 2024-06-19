@@ -65,18 +65,6 @@ void random_bytes_free(const uint8_t *p) {
     neug_flush();
 }
 
-/*
- * Return 4-byte salt
- */
-void random_get_salt(uint8_t *p) {
-    uint32_t rnd;
-
-    rnd = neug_get();
-    memcpy(p, &rnd, sizeof(uint32_t));
-    rnd = neug_get();
-    memcpy(p + sizeof(uint32_t), &rnd, sizeof(uint32_t));
-}
-
 
 /*
  * Random byte iterator

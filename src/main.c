@@ -16,33 +16,19 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 // Pico
-#ifndef ENABLE_EMULATION
-#include "pico/stdlib.h"
-#else
+
+#if defined(ENABLE_EMULATION)
 #if !defined(_MSC_VER)
 #include <sys/time.h>
 #endif
 #include "emulation.h"
-#endif
-
-// For memcpy
-#include <string.h>
-
-#ifndef ENABLE_EMULATION
-// Include descriptor struct definitions
-//#include "usb_common.h"
-// USB register definitions from pico-sdk
-#include "hardware/regs/usb.h"
-// USB hardware struct definitions from pico-sdk
-#include "hardware/structs/usb.h"
-// For interrupt enable and numbers
-#include "hardware/irq.h"
-// For resetting the USB controller
-#include "hardware/resets.h"
-
-#include "pico/multicore.h"
+#elif defined(ESP_PLATFORM)
+#include "tusb.h"
+#else
+#include "pico/stdlib.h"
 #endif
 
 #include "random.h"
@@ -99,10 +85,13 @@ static inline void ws2812_program_init(PIO pio,
 }
 #endif
 
-#ifndef ENABLE_EMULATION
+#if defined(ENABLE_EMULATION)
+#else
 #include "usb.h"
+#ifndef ESP_PLATFORM
 #include "hardware/rtc.h"
 #include "bsp/board.h"
+#endif
 #endif
 
 extern void do_flash();
@@ -194,6 +183,11 @@ uint32_t board_millis() {
 }
 
 #else
+#ifdef ESP_PLATFORM
+bool board_button_read() {
+    return true;
+}
+#endif
 bool button_pressed_state = false;
 uint32_t button_pressed_time = 0;
 uint8_t button_press = 0;
@@ -229,6 +223,22 @@ bool wait_button() {
 
 struct apdu apdu;
 
+#ifdef ESP_PLATFORM
+#include "driver/gpio.h"
+#include "neopixel.h"
+tNeopixelContext neopixel = NULL;
+tNeopixel pixel[] =
+   {
+       { 0, NP_RGB(0,  0,  0) }, /* off */
+       { 0, NP_RGB(255,  0, 255) }, /* magenta */
+       { 0, NP_RGB(255,  0, 0) }, /* green */
+       { 0, NP_RGB(0, 255,  0) }, /* red */
+       { 0, NP_RGB(0, 0,  255) }, /* red */
+       { 0, NP_RGB(255,  255, 0) }, /* yellow */
+       { 0, NP_RGB(0, 255,  255) }, /* cyan */
+       { 0, NP_RGB(255, 255,  255) }, /* white */
+   };
+#endif
 void led_blinking_task() {
     static uint32_t start_ms = 0;
     static uint8_t led_state = false;
@@ -261,6 +271,8 @@ void led_blinking_task() {
     }
 #elif defined(CYW43_WL_GPIO_LED_PIN)
     cyw43_arch_gpio_put(led_color, led_state);
+#elif ESP_PLATFORM
+    neopixel_SetPixel(neopixel, &pixel[led_state], 1);
 #endif
     led_state ^= 1; // toggle
 }
@@ -287,7 +299,9 @@ void led_off_all() {
 }
 
 void init_rtc() {
-#ifndef ENABLE_EMULATION
+#if defined(ENABLE_EMULATION)
+#elif defined(ESP_PLATFORM)
+#else
     rtc_init();
     datetime_t dt = {
         .year  = 2020,
@@ -304,64 +318,16 @@ void init_rtc() {
 
 extern void neug_task();
 extern void usb_task();
-
-void execute_tasks() {
+void execute_tasks()
+{
     usb_task();
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
     tud_task(); // tinyusb device task
 #endif
     led_blinking_task();
 }
 
-char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
-pico_unique_board_id_t pico_serial;
-#ifdef ENABLE_EMULATION
-#define pico_get_unique_board_id(a) memset(a, 0, sizeof(*(a)))
-#endif
-
-int main(void) {
-	pico_get_unique_board_id(&pico_serial);
-    memset(pico_serial_str, 0, sizeof(pico_serial_str));
-    for (int i = 0; i < sizeof(pico_serial); i++) {
-        snprintf(&pico_serial_str[2 * i], 3, "%02X", pico_serial.id[i]);
-    }
-#ifndef ENABLE_EMULATION
-    usb_init();
-
-    board_init();
-    stdio_init_all();
-
-#ifdef PIMORONI_TINY2040
-    gpio_init(TINY2040_LED_R_PIN);
-    gpio_set_dir(TINY2040_LED_R_PIN, GPIO_OUT);
-    gpio_init(TINY2040_LED_G_PIN);
-    gpio_set_dir(TINY2040_LED_G_PIN, GPIO_OUT);
-    gpio_init(TINY2040_LED_B_PIN);
-    gpio_set_dir(TINY2040_LED_B_PIN, GPIO_OUT);
-#elif defined(PICO_DEFAULT_LED_PIN)
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-#elif defined(CYW43_WL_GPIO_LED_PIN)
-    cyw43_arch_init();
-#endif
-
-    led_off_all();
-
-    tusb_init();
-
-    //prepare_ccid();
-#else
-    emul_init("127.0.0.1", 35963);
-#endif
-
-    random_init();
-
-    low_flash_init();
-
-    init_rtc();
-
-    //ccid_prepare_receive(&ccid);
-
+void core0_loop() {
     while (1) {
         execute_tasks();
         neug_task();
@@ -386,7 +352,89 @@ int main(void) {
             }
         }
 #endif
+#ifdef ESP_PLATFORM
+    vTaskDelay(pdMS_TO_TICKS(10));
+#endif
     }
+}
+
+char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+pico_unique_board_id_t pico_serial;
+#ifdef ESP_PLATFORM
+#include "tinyusb.h"
+#include "esp_efuse.h"
+#define pico_get_unique_board_id(a) do { uint32_t value; esp_efuse_read_block(EFUSE_BLK1, &value, 0, 32); memcpy((uint8_t *)(a), &value, sizeof(uint32_t)); esp_efuse_read_block(EFUSE_BLK1, &value, 32, 32); memcpy((uint8_t *)(a)+4, &value, sizeof(uint32_t)); } while(0)
+extern const tinyusb_config_t tusb_cfg;
+TaskHandle_t hcore0 = NULL, hcore1 = NULL;
+int app_main() {
+#else
+#ifdef ENABLE_EMULATION
+#define pico_get_unique_board_id(a) memset(a, 0, sizeof(*(a)))
+#endif
+int main(void) {
+#endif
+    pico_get_unique_board_id(&pico_serial);
+    memset(pico_serial_str, 0, sizeof(pico_serial_str));
+    for (int i = 0; i < sizeof(pico_serial); i++) {
+        snprintf(&pico_serial_str[2 * i], 3, "%02X", pico_serial.id[i]);
+    }
+
+#ifndef ENABLE_EMULATION
+#ifndef ESP_PLATFORM
+    board_init();
+    stdio_init_all();
+#endif
+#ifdef PIMORONI_TINY2040
+    gpio_init(TINY2040_LED_R_PIN);
+    gpio_set_dir(TINY2040_LED_R_PIN, GPIO_OUT);
+    gpio_init(TINY2040_LED_G_PIN);
+    gpio_set_dir(TINY2040_LED_G_PIN, GPIO_OUT);
+    gpio_init(TINY2040_LED_B_PIN);
+    gpio_set_dir(TINY2040_LED_B_PIN, GPIO_OUT);
+#elif defined(PICO_DEFAULT_LED_PIN)
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    cyw43_arch_init();
+#endif
+
+    led_off_all();
+
+    //prepare_ccid();
+#else
+    emul_init("127.0.0.1", 35963);
+#endif
+
+    random_init();
+
+    low_flash_init();
+
+    scan_flash();
+
+    init_rtc();
+
+#ifndef ENABLE_EMULATION
+    usb_init();
+#ifdef ESP_PLATFORM
+    tusb_cfg.string_descriptor[3] = pico_serial_str;
+    tinyusb_driver_install(&tusb_cfg);
+#endif
+#endif
+
+    //ccid_prepare_receive(&ccid);
+#ifdef ESP_PLATFORM
+    uint8_t gpio = GPIO_NUM_48;
+    if (file_has_data(ef_phy)) {
+        gpio = file_get_data(ef_phy)[PHY_LED_GPIO];
+    }
+    neopixel = neopixel_Init(1, gpio);
+#endif
+
+#ifdef ESP_PLATFORM
+    xTaskCreate(core0_loop, "core0", 4096, NULL, CONFIG_TINYUSB_TASK_PRIORITY + 1, &hcore0);
+#else
+    core0_loop();
+#endif
 
     return 0;
 }

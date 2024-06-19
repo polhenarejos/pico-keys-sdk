@@ -15,28 +15,11 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-
-// Pico
-#include "pico/stdlib.h"
-
-// For memcpy
-#include <string.h>
-
-// Include descriptor struct definitions
-//#include "usb_common.h"
-// USB register definitions from pico-sdk
-#include "hardware/regs/usb.h"
-// USB hardware struct definitions from pico-sdk
-#include "hardware/structs/usb.h"
-// For interrupt enable and numbers
-#include "hardware/irq.h"
-// For resetting the USB controller
-#include "hardware/resets.h"
-
 #include "random.h"
 #include "pico_keys.h"
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #include "hardware/rtc.h"
+#endif
 #include "tusb.h"
 #include "ccid.h"
 #include "device/usbd_pvt.h"

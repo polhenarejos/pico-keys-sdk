@@ -18,10 +18,6 @@
 #ifndef _EAC_H_
 #define _EAC_H_
 
-#include <stdlib.h>
-#ifndef ENABLE_EMULATION
-#include "pico/stdlib.h"
-#endif
 #include "pico_keys.h"
 
 typedef enum MSE_protocol {

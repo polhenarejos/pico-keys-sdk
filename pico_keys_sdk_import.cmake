@@ -51,6 +51,15 @@ elseif (VIDPID STREQUAL "GnuPG")
      set(USB_PID 0x2440)
 endif()
 
+if(ESP_PLATFORM)
+    if (DEFINED CONFIG_TINYUSB_DESC_CUSTOM_VID)
+        set(USB_VID CONFIG_TINYUSB_DESC_CUSTOM_VID)
+    endif()
+    if(DEFINED CONFIG_TINYUSB_DESC_CUSTOM_PID)
+        set(USB_PID CONFIG_TINYUSB_DESC_CUSTOM_PID)
+    endif()
+endif()
+
 if (NOT DEFINED USB_VID)
     set(USB_VID 0xFEFF)
 endif()
@@ -82,13 +91,21 @@ endif(USB_ITF_HID)
 if(USB_ITF_CCID)
     add_definitions(-DUSB_ITF_CCID=1)
     message(STATUS "USB CCID Interface:\t\t enabled")
+    if(USB_ITF_WCID)
+        add_definitions(-DUSB_ITF_WCID=1)
+        message(STATUS "USB WebCCID Interface:\t enabled")
+    endif(USB_ITF_WCID)
 endif(USB_ITF_CCID)
 add_definitions(-DDEBUG_APDU=${DEBUG_APDU})
-add_definitions(-DMBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
+if (NOT ESP_PLATFORM)
+    add_definitions(-DMBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
+else()
+    add_definitions(-DCFG_TUSB_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/src/usb/tusb_config.h")
+endif()
 
 message(STATUS "USB VID/PID: ${USB_VID}:${USB_PID}")
 
-set(EXTERNAL_SOURCES
+set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1write.c
@@ -159,7 +176,15 @@ set(INCLUDES ${INCLUDES}
 )
 
 if(USB_ITF_HID OR ENABLE_EMULATION)
-    set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES}
+    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_csr.c
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk.c
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
+    )
+    set(CBOR_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser.c
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c
@@ -212,7 +237,7 @@ if (ENABLE_EMULATION)
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
     )
-    set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES}
+    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ctr_drbg.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/entropy.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/entropy_poll.c
@@ -237,6 +262,10 @@ else()
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )
+endif()
+set(EXTERNAL_SOURCES ${CBOR_SOURCES})
+if(NOT ESP_PLATFORM)
+    set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES} ${MBEDTLS_SOURCES})
 endif()
 if (MSVC)
     target_compile_options(pico_hsm PUBLIC
@@ -263,13 +292,14 @@ if (MSVC)
         COMPILE_FLAGS " -W3 -wd4242 -wd4065"
     )
 endif()
+set(INTERNAL_SOURCES ${SOURCES})
+set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
 if (NOT TARGET pico_keys_sdk)
-    if (ENABLE_EMULATION)
+    if (ENABLE_EMULATION OR ESP_PLATFORM)
         add_impl_library(pico_keys_sdk)
     else()
         pico_add_library(pico_keys_sdk)
     endif()
-    set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
     target_sources(pico_keys_sdk INTERFACE
         ${SOURCES}
     )

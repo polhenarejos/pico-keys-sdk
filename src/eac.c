@@ -103,10 +103,8 @@ int sm_unwrap() {
     if (r != CCID_OK) {
         return r;
     }
-    uint16_t le = sm_get_le();
-    if (le >= 0) {
-        apdu.ne = le;
-    }
+    apdu.ne = sm_get_le();
+
     uint8_t *body = NULL;
     uint16_t body_size = 0;
     bool is87 = false;
@@ -306,12 +304,12 @@ int sm_verify() {
 }
 
 uint16_t sm_remove_padding(const uint8_t *data, uint16_t data_len) {
-    uint16_t i = data_len - 1;
+    int32_t i = data_len - 1;
     for (; i >= 0 && data[i] == 0; i--) {
         ;
     }
     if (i < 0 || data[i] != 0x80) {
         return 0;
     }
-    return i;
+    return (uint16_t)i;
 }

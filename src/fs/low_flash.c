@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
@@ -38,14 +38,25 @@
 #define lseek _lseek
 #include "mman.h"
 #else
+#ifdef ESP_PLATFORM
+#include "esp_compat.h"
+#include "esp_partition.h"
+const esp_partition_t *part0;
+#define save_and_disable_interrupts() 1
+#define flash_range_erase(a,b) esp_partition_erase_range(part0, a, b)
+#define flash_range_program(a,b,c) esp_partition_write(part0, a, b, c);
+#define restore_interrupts(a) (void)a
+#else
 #include <unistd.h>
 #include <sys/mman.h>
 #endif
 #include <fcntl.h>
 #define FLASH_SECTOR_SIZE       4096
 #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
+#define XIP_BASE 0
 int fd_map = 0;
 uint8_t *map = NULL;
+#endif
 #endif
 #include "pico_keys.h"
 #include <string.h>
@@ -87,15 +98,15 @@ void do_flash() {
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
 #endif
     if (locked_out == true && flash_available == true && ready_pages > 0) {
-        //printf(" DO_FLASH AVAILABLE\r\n");
+        //printf(" DO_FLASH AVAILABLE\n");
         for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
             if (flash_pages[r].ready == true) {
 #ifndef ENABLE_EMULATION
-                //printf("WRITTING %X\r\n",flash_pages[r].address-XIP_BASE);
+                //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
                 while (multicore_lockout_start_timeout_us(1000) == false) {
                     ;
                 }
-                //printf("WRITTING %X\r\n",flash_pages[r].address-XIP_BASE);
+                //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
                 uint32_t ints = save_and_disable_interrupts();
                 flash_range_erase(flash_pages[r].address - XIP_BASE, FLASH_SECTOR_SIZE);
                 flash_range_program(flash_pages[r].address - XIP_BASE,
@@ -105,7 +116,7 @@ void do_flash() {
                 while (multicore_lockout_end_timeout_us(1000) == false) {
                     ;
                 }
-                //printf("WRITEN %X !\r\n",flash_pages[r].address);
+                //printf("WRITEN %X !\n",flash_pages[r].address);
 #else
                 memcpy(map + flash_pages[r].address, flash_pages[r].page, FLASH_SECTOR_SIZE);
 #endif
@@ -117,7 +128,7 @@ void do_flash() {
                 while (multicore_lockout_start_timeout_us(1000) == false) {
                     ;
                 }
-                //printf("WRITTING\r\n");
+                //printf("WRITTING\n");
                 flash_range_erase(flash_pages[r].address - XIP_BASE,
                                   flash_pages[r].page_size ? ((int) (flash_pages[r].page_size /
                                                                      FLASH_SECTOR_SIZE)) *
@@ -140,6 +151,10 @@ void do_flash() {
         }
     }
     flash_available = false;
+#ifdef ESP_PLATFORM
+    esp_partition_munmap(fd_map);
+    esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
+#endif
 #ifndef ENABLE_EMULATION
     mutex_exit(&mtx_flash);
 }
@@ -150,14 +165,18 @@ sem_release(&sem_wait);
 //this function has to be called from the core 0
 void low_flash_init() {
     memset(flash_pages, 0, sizeof(page_flash_t) * TOTAL_FLASH_PAGES);
-#ifndef ENABLE_EMULATION
-    mutex_init(&mtx_flash);
-    sem_init(&sem_wait, 0, 1);
-#else
+#if defined(ENABLE_EMULATION)
     fd_map = open("memory.flash", O_RDWR | O_CREAT, (mode_t) 0600);
     lseek(fd_map, PICO_FLASH_SIZE_BYTES - 1, SEEK_SET);
     write(fd_map, "", 1);
     map = mmap(0, PICO_FLASH_SIZE_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fd_map, 0);
+#else
+    mutex_init(&mtx_flash);
+    sem_init(&sem_wait, 0, 1);
+#if defined(ESP_PLATFORM)
+    part0 = esp_partition_find_first(0x40, 0x1, "part0");
+    esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
+#endif
 #endif
 }
 
@@ -198,12 +217,12 @@ page_flash_t *find_free_page(uintptr_t addr) {
             flash_pages[r].address == addr_alg) {                                                   //first available
             p = &flash_pages[r];
             if (!flash_pages[r].ready && !flash_pages[r].erase) {
-#ifndef ENABLE_EMULATION
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
                 memcpy(p->page, (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
 #else
                 memcpy(p->page,
                        (addr >= start_data_pool &&
-                        addr <= end_rom_pool) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg,
+                        addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg,
                        FLASH_SECTOR_SIZE);
 #endif
                 ready_pages++;
@@ -230,18 +249,18 @@ int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
 #endif
-        printf("ERROR: ALL FLASH PAGES CACHED\r\n");
+        printf("ERROR: ALL FLASH PAGES CACHED\n");
         return CCID_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
 #endif
-        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\r\n");
+        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
         return CCID_ERR_MEMORY_FATAL;
     }
     memcpy(&p->page[addr & (FLASH_SECTOR_SIZE - 1)], data, len);
-    //printf("Flash: modified page %X with data %x at [%x] (top page %X)\r\n",addr_alg,data,addr&(FLASH_SECTOR_SIZE-1),addr);
+    //printf("Flash: modified page %X with data %x at [%x]\n",(uintptr_t)addr,(uintptr_t)data,addr&(FLASH_SECTOR_SIZE-1));
 #ifndef ENABLE_EMULATION
     mutex_exit(&mtx_flash);
 #endif
@@ -279,8 +298,9 @@ uint8_t *flash_read(uintptr_t addr) {
     uint8_t *v = (uint8_t *) addr;
 #ifndef ENABLE_EMULATION
     mutex_exit(&mtx_flash);
-#else
-    if (addr >= start_data_pool && addr <= end_rom_pool) {
+#endif
+#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
+    if (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) {
         v += (uintptr_t) map;
     }
 #endif
@@ -317,11 +337,11 @@ int flash_erase_page(uintptr_t addr, size_t page_size) {
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
 #endif
-        printf("ERROR: ALL FLASH PAGES CACHED\r\n");
+        printf("ERROR: ALL FLASH PAGES CACHED\n");
         return CCID_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
-        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\r\n");
+        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
 #ifndef ENABLE_EMULATION
         mutex_exit(&mtx_flash);
 #endif

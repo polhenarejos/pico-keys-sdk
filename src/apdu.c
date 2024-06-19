@@ -19,6 +19,9 @@
 #include "pico_keys.h"
 #include "usb.h"
 #include <stdio.h>
+#ifdef ESP_PLATFORM
+#include "esp_compat.h"
+#endif
 
 uint8_t *rdata_gr = NULL;
 uint16_t rdata_bk = 0x0;
@@ -196,7 +199,9 @@ void apdu_thread() {
     card_init_core1();
     while (1) {
         uint32_t m = 0;
+#ifndef ENABLE_EMULATION
         queue_remove_blocking(&usb_to_card_q, &m);
+#endif
 
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE) {
             set_res_sw(0x6f, 0x00);
@@ -213,13 +218,21 @@ done:   ;
 
         finished_data_size = apdu_next();
         uint32_t flag = EV_EXEC_FINISHED;
+#ifndef ENABLE_EMULATION
         queue_add_blocking(&card_to_usb_q, &flag);
+#endif
+#ifdef ESP_PLATFORM
+        vTaskDelay(pdMS_TO_TICKS(10));
+#endif
     }
     //printf("EXIT !!!!!!\n");
     if (current_app && current_app->unload) {
         current_app->unload();
         current_app = NULL;
     }
+#ifdef ESP_PLATFORM
+    vTaskDelete(NULL);
+#endif
 }
 #endif
 

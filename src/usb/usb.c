@@ -169,15 +169,16 @@ void usb_init() {
     uint16_t usb_vid = USB_VID, usb_pid = USB_PID;
     if (file_has_data(ef_phy)) {
         uint8_t *data = file_get_data(ef_phy);
-        if (file_get_size(ef_phy) >= 4) {
-            usb_vid = (data[PHY_VID] << 8) | data[PHY_VID+1];
-            usb_pid = (data[PHY_PID] << 8) | data[PHY_PID+1];
-        }
+        uint16_t opts = 0;
         if (file_get_size(ef_phy) >= 8) {
-            uint16_t opts = (data[PHY_OPTS] << 8) | data[PHY_OPTS+1];
+            opts = (data[PHY_OPTS] << 8) | data[PHY_OPTS+1];
             if (opts & PHY_OPT_WCID) {
                 enable_wcid = true;
             }
+        }
+        if (file_get_size(ef_phy) >= 4 && opts & PHY_OPT_VPID) {
+            usb_vid = (data[PHY_VID] << 8) | data[PHY_VID+1];
+            usb_pid = (data[PHY_PID] << 8) | data[PHY_PID+1];
         }
     }
     desc_device.idVendor = usb_vid;

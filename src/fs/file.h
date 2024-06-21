@@ -76,6 +76,11 @@
 #define PHY_OPTS        0x6
 
 #define PHY_OPT_WCID    0x1
+#define PHY_OPT_VPID    0x2
+#define PHY_OPT_GPIO    0x4
+#define PHY_OPT_LED     0x8
+
+#define PHY_OPT_MASK    0x1
 
 #define PHY_MAX_SIZE    8
 

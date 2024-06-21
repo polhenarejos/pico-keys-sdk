@@ -432,7 +432,9 @@ int main(void) {
 #ifdef ESP_PLATFORM
     uint8_t gpio = GPIO_NUM_48;
     if (file_has_data(ef_phy)) {
-        gpio = file_get_data(ef_phy)[PHY_LED_GPIO];
+        if (file_read_uint8_offset(ef_phy, PHY_OPTS + 1) & PHY_OPT_GPIO) {
+            gpio = file_get_data(ef_phy)[PHY_LED_GPIO];
+        }
     }
     neopixel = neopixel_Init(1, gpio);
 #endif

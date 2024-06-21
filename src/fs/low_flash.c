@@ -61,7 +61,7 @@ uint8_t *map = NULL;
 #include "pico_keys.h"
 #include <string.h>
 
-#define TOTAL_FLASH_PAGES 4
+#define TOTAL_FLASH_PAGES 6
 
 extern const uintptr_t start_data_pool;
 extern const uintptr_t end_rom_pool;

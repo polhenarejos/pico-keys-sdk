@@ -80,7 +80,7 @@
 #define PHY_OPT_GPIO    0x4
 #define PHY_OPT_LED     0x8
 
-#define PHY_OPT_MASK    0x1
+#define PHY_OPT_MASK    (PHY_OPT_WCID)
 
 #define PHY_MAX_SIZE    8
 

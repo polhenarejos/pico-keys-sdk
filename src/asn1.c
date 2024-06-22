@@ -42,7 +42,7 @@ uint16_t asn1_len(asn1_ctx_t *ctx) {
 
 uint32_t asn1_get_uint(asn1_ctx_t *ctx) {
     uint32_t d = ctx->data[0];
-    for (uint8_t lt = 1; lt < ctx->len; lt++) {
+    for (uint8_t lt = 1; lt < MIN(ctx->len, sizeof(uint32_t)); lt++) {
         d <<= 8;
         d |= ctx->data[lt];
     }

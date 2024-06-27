@@ -34,7 +34,7 @@
 #define USB_PID   0xFCFD
 #endif
 
-#define USB_BCD   0x0210
+#define USB_BCD   0x0200
 
 #define USB_CONFIG_ATT_ONE TU_BIT(7)
 

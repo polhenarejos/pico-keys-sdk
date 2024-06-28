@@ -152,7 +152,7 @@ file_t *search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp
         if (p->fid != 0x0000 && p->fid == fid) {
             if (!parent || (parent && is_parent(p, parent))) {
                 if (!sp || sp == SPECIFY_ANY ||
-                    (((sp & SPECIFY_EF) && (p->type & FILE_TYPE_INTERNAL_EF)) ||
+                    (((sp & SPECIFY_EF) && (p->type & (FILE_TYPE_INTERNAL_EF|FILE_TYPE_WORKING_EF))) ||
                      ((sp & SPECIFY_DF) && p->type == FILE_TYPE_DF))) {
                     return p;
                 }

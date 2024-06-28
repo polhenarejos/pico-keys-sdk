@@ -30,7 +30,7 @@
 
 #define FILE_TYPE_NOT_KNOWN     0x00
 #define FILE_TYPE_DF            0x04
-#define FILE_TYPE_INTERNAL_EF   0x03
+#define FILE_TYPE_INTERNAL_EF   0x02
 #define FILE_TYPE_WORKING_EF    0x01
 #define FILE_TYPE_BSO           0x10
 #define FILE_PERSISTENT         0x20

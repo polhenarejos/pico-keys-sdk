@@ -146,15 +146,6 @@ void usb_clear_rx(uint8_t itf) {
     w_offset[itf] = r_offset[itf] = 0;
 }
 
-#ifndef USB_VID
-#define USB_VID   0xFEFF
-#endif
-#ifndef USB_PID
-#define USB_PID   0xFCFD
-#endif
-
-#define USB_BCD   0x0200
-
 #if !defined(ENABLE_EMULATION)
 queue_t usb_to_card_q;
 queue_t card_to_usb_q;
@@ -166,7 +157,6 @@ extern bool enable_wcid;
 #endif
 void usb_init() {
 #ifndef ENABLE_EMULATION
-    uint16_t usb_vid = USB_VID, usb_pid = USB_PID;
     if (file_has_data(ef_phy)) {
         uint8_t *data = file_get_data(ef_phy);
         uint16_t opts = 0;
@@ -177,12 +167,10 @@ void usb_init() {
             }
         }
         if (file_get_size(ef_phy) >= 4 && opts & PHY_OPT_VPID) {
-            usb_vid = (data[PHY_VID] << 8) | data[PHY_VID+1];
-            usb_pid = (data[PHY_PID] << 8) | data[PHY_PID+1];
+            desc_device.idVendor = (data[PHY_VID] << 8) | data[PHY_VID+1];
+            desc_device.idProduct = (data[PHY_PID] << 8) | data[PHY_PID+1];
         }
     }
-    desc_device.idVendor = usb_vid;
-    desc_device.idProduct = usb_pid;
 
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);

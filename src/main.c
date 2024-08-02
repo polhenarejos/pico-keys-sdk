@@ -242,11 +242,6 @@ tNeopixel pixel[] =
 void led_blinking_task() {
     static uint32_t start_ms = 0;
     static uint8_t led_state = false;
-#ifdef PICO_DEFAULT_LED_PIN_INVERTED
-    uint32_t interval = !led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
-#else
-    uint32_t interval = led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
-#endif
 #ifdef PICO_DEFAULT_LED_PIN
     static uint8_t led_color = PICO_DEFAULT_LED_PIN;
 #elif defined(PICO_DEFAULT_WS2812_PIN)
@@ -254,11 +249,32 @@ void led_blinking_task() {
     static uint8_t led_color = CYW43_WL_GPIO_LED_PIN;
 #endif
 
-    // Blink every interval ms
-    if (board_millis() - start_ms < interval) {
-        return; // not enough time
+    switch (blink_interval_ms) {
+        case BLINK_ALWAYS_ON:
+        case BLINK_ALWAYS_OFF: {
+            if (PICO_DEFAULT_LED_PIN_INVERTED) {
+                led_state = blink_interval_ms == BLINK_ALWAYS_OFF;
+            } else {
+                led_state = blink_interval_ms == BLINK_ALWAYS_ON;
+            }
+            start_ms = board_millis();
+        }
+        break;
+        default: {
+            // Blink every interval ms
+            uint32_t interval = 0;
+            if (PICO_DEFAULT_LED_PIN_INVERTED) {
+                interval = !led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
+            } else {
+                interval = led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
+            }
+            if (board_millis() - start_ms < interval) {
+                return; // not enough time
+            }
+            start_ms += interval;
+        }
+        break;
     }
-    start_ms += interval;
 
 #ifdef PICO_DEFAULT_LED_PIN
     gpio_put(led_color, led_state);

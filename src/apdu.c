@@ -133,7 +133,7 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
             if (itf == ITF_HID) {
-                driver_exec_finished_cont_hid(apdu.rlen + 2, rdata_gr - (usb_get_tx(itf)));
+                driver_exec_finished_cont_hid(itf, apdu.rlen + 2, rdata_gr - (usb_get_tx(itf)));
             }
 #endif
 #ifdef USB_ITF_CCID
@@ -162,7 +162,7 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
             if (itf == ITF_HID) {
-                driver_exec_finished_cont_hid(apdu.ne + 2, rdata_gr - apdu.ne - (usb_get_tx(itf)));
+                driver_exec_finished_cont_hid(itf, apdu.ne + 2, rdata_gr - apdu.ne - (usb_get_tx(itf)));
             }
 #endif
 #ifdef USB_ITF_CCID

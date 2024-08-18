@@ -112,15 +112,23 @@ int driver_init_ccid(uint8_t itf) {
 
 void tud_vendor_rx_cb(uint8_t itf) {
     uint32_t len = tud_vendor_n_available(itf);
+#ifdef USB_ITF_HID
+    itf += 2;
+#endif
     usb_rx(itf, NULL, len);
 }
 
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
-    //printf("written %ld\n", sent_bytes);
+#ifdef USB_ITF_HID
+    itf += 2;
+#endif
     usb_write_flush(itf);
 }
 
 int driver_write_ccid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
+#ifdef USB_ITF_HID
+    itf -= 2;
+#endif
     int r = tud_vendor_n_write(itf, buffer, buffer_size);
     if (r > 0) {
         return MAX(tud_vendor_n_flush(itf), r);
@@ -129,6 +137,9 @@ int driver_write_ccid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 }
 
 uint16_t driver_read_ccid(uint8_t itf, uint8_t *buffer, uint16_t buffer_size) {
+#ifdef USB_ITF_HID
+    itf -= 2;
+#endif
     return tud_vendor_n_read(itf, buffer, buffer_size);
 }
 
@@ -165,14 +176,14 @@ int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
                 //printf("1 %x %x %x || %x %x %x\n",ccid_response->apdu,apdu.rdata,ccid_response,ccid_header,ccid_header->apdu,apdu.data);
                 memcpy(&ccid_response[itf]->apdu, ccid_atr + 1, size_atr);
                 if (ccid_status == 1) {
-                    card_start(apdu_thread);
+                    //card_start(apdu_thread);
                 }
                 ccid_status = 0;
                 ccid_write(itf, size_atr);
             }
             else if (ccid_header[itf]->bMessageType == CCID_POWER_OFF) {
                 if (ccid_status == 0) {
-                    card_exit(0);
+                    //card_exit(0);
                 }
                 ccid_status = 1;
                 ccid_response[itf]->bMessageType = CCID_SLOT_STATUS_RET;
@@ -216,6 +227,9 @@ int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
 }
 
 bool driver_mounted_ccid(uint8_t itf) {
+#ifdef USB_ITF_HID
+    itf -= 2;
+#endif
     return tud_vendor_n_mounted(itf);
 }
 

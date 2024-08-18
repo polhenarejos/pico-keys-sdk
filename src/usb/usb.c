@@ -40,6 +40,9 @@ static uint16_t w_offset[ITF_TOTAL] = { 0 }, r_offset[ITF_TOTAL] = { 0 };
 static uint16_t w_len[ITF_TOTAL] = { 0 }, tx_r_offset[ITF_TOTAL] = { 0 };
 static uint32_t timeout_counter[ITF_TOTAL] = { 0 };
 uint8_t card_locked_itf = ITF_TOTAL; // no locked
+static uint8_t proc_locked = 0;
+
+void (*cbor_thread_func)() = NULL;
 
 void usb_set_timeout_counter(uint8_t itf, uint32_t v) {
     timeout_counter[itf] = v;
@@ -146,6 +149,22 @@ void usb_clear_rx(uint8_t itf) {
     w_offset[itf] = r_offset[itf] = 0;
 }
 
+uint16_t usb_get_r_offset(uint8_t itf) {
+    return r_offset[itf];
+}
+
+uint16_t usb_more_rx(uint8_t itf, uint16_t len) {
+    if (len > w_offset[itf] - r_offset[itf]) {
+        len = w_offset[itf] - r_offset[itf];
+    }
+    r_offset[itf] += len;
+    if (r_offset[itf] == w_offset[itf]) {
+        r_offset[itf] = w_offset[itf] = 0;
+        return 0;
+    }
+    return usb_read_available(itf);
+}
+
 #if !defined(ENABLE_EMULATION)
 queue_t usb_to_card_q;
 queue_t card_to_usb_q;
@@ -205,6 +224,17 @@ static int usb_event_handle(uint8_t itf) {
         card_locked_itf = itf;
         timeout_start();
 #ifndef ENABLE_EMULATION
+        if (proc_locked != proc_packet) {
+            if (proc_packet == 1) {
+                card_start(apdu_thread);
+            }
+            else if (proc_packet == 2) {
+                if (cbor_thread_func) {
+                    card_start(cbor_thread_func);
+                }
+            }
+            proc_locked = proc_packet;
+        }
         uint32_t flag = EV_CMD_AVAILABLE;
         queue_add_blocking(&usb_to_card_q, &flag);
 #endif

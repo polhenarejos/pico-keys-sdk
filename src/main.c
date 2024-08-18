@@ -440,7 +440,7 @@ int main(void) {
 #endif
 
 #ifdef ESP_PLATFORM
-    xTaskCreate(core0_loop, "core0", 4096, NULL, CONFIG_TINYUSB_TASK_PRIORITY + 1, &hcore0);
+    xTaskCreate(core0_loop, "core0", 4096*5, NULL, CONFIG_TINYUSB_TASK_PRIORITY + 1, &hcore0);
 #else
     core0_loop();
 #endif

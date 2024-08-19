@@ -73,12 +73,6 @@ int driver_init_hid() {
 }
 
 uint16_t send_buffer_size[ITF_TOTAL] = {0};
-typedef enum {
-    WRITE_UNKNOWN = 0,
-    WRITE_PENDING,
-    WRITE_FAILED,
-    WRITE_SUCCESS,
-} write_status_t;
 write_status_t last_write_result[ITF_TOTAL] = {0};
 
 uint16_t *get_send_buffer_size(uint8_t itf) {
@@ -217,7 +211,7 @@ void hid_task(void) {
 #endif
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len) {
-    if (instance == ITF_HID) {
+    if (instance == ITF_HID && len > 0) {
         if (last_write_result[instance] == WRITE_PENDING) {
             last_write_result[instance] = WRITE_SUCCESS;
             if (report[4] & TYPE_MASK) {
@@ -556,16 +550,14 @@ int driver_process_usb_packet_hid(uint16_t read) {
 }
 
 void send_keepalive() {
-    if (send_buffer_size[ITF_HID] != 0) {
-        CTAPHID_FRAME *resp = (CTAPHID_FRAME *) (usb_get_tx(ITF_HID) + 4096);
-        //memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
-        resp->cid = ctap_req->cid;
-        resp->init.cmd = CTAPHID_KEEPALIVE;
-        resp->init.bcntl = 1;
-        resp->init.data[0] = is_req_button_pending() ? 2 : 1;
-        send_buffer_size[ITF_HID] = 0;
-        hid_write_offset(64, 4096);
-    }
+    CTAPHID_FRAME *resp = (CTAPHID_FRAME *) (usb_get_tx(ITF_HID) + 4096);
+    //memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
+    resp->cid = ctap_req->cid;
+    resp->init.cmd = CTAPHID_KEEPALIVE;
+    resp->init.bcntl = 1;
+    resp->init.data[0] = is_req_button_pending() ? 2 : 1;
+    //send_buffer_size[ITF_HID] = 0;
+    hid_write_offset(64, 4096);
 }
 
 void driver_exec_timeout_hid() {

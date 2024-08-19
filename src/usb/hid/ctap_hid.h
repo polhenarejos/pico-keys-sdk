@@ -162,6 +162,13 @@ extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
 
 extern bool is_nitrokey;
 
+typedef enum {
+    WRITE_UNKNOWN = 0,
+    WRITE_PENDING,
+    WRITE_FAILED,
+    WRITE_SUCCESS,
+} write_status_t;
+
 #ifdef __cplusplus
 }
 #endif

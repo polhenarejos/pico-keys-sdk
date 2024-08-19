@@ -40,7 +40,9 @@ static uint16_t w_offset[ITF_TOTAL] = { 0 }, r_offset[ITF_TOTAL] = { 0 };
 static uint16_t w_len[ITF_TOTAL] = { 0 }, tx_r_offset[ITF_TOTAL] = { 0 };
 static uint32_t timeout_counter[ITF_TOTAL] = { 0 };
 uint8_t card_locked_itf = ITF_TOTAL; // no locked
+#ifndef ENABLE_EMULATION
 static uint8_t proc_locked = 0;
+#endif
 
 void (*cbor_thread_func)() = NULL;
 

@@ -45,6 +45,7 @@ typedef int socklen_t;
 #include "apdu.h"
 #include "usb.h"
 #include "ccid/ccid.h"
+#include "hid/ctap_hid.h"
 
 socket_t ccid_sock = 0;
 socket_t hid_server_sock = 0;
@@ -190,7 +191,7 @@ socket_t get_sock_itf(uint8_t itf) {
 extern void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len);
 const uint8_t *complete_report = NULL;
 uint16_t complete_len = 0;
-extern bool last_write_result;
+extern uint8_t last_write_result[ITF_TOTAL];
 extern uint16_t send_buffer_size[ITF_TOTAL];
 uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
     uint16_t size = htons(buffer_size);
@@ -211,7 +212,7 @@ uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_s
     } while (ret <= 0);
 #ifdef USB_ITF_HID
     if (itf == ITF_HID) {
-        last_write_result = true;
+        last_write_result[itf] = WRITE_PENDING;
         complete_report = buffer;
         complete_len = buffer_size;
     }
@@ -234,7 +235,7 @@ uint32_t emul_write(uint8_t itf, uint16_t size) {
 void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint16_t offset) {
 #ifdef USB_ITF_HID
     if (itf == ITF_HID) {
-        driver_exec_finished_cont_hid(size_next, offset);
+        driver_exec_finished_cont_hid(itf, size_next, offset);
     }
 #endif
 #ifdef USB_ITF_CCID
@@ -246,9 +247,9 @@ void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint16_t of
 
 int driver_process_usb_packet_emul(uint8_t itf, uint16_t len) {
     if (len > 0) {
-        uint8_t *data = usb_get_rx(itf);
 #ifdef USB_ITF_CCID
         if (itf == ITF_CCID) {
+            uint8_t *data = usb_get_rx(itf);
             if (len == 1) {
                 uint8_t c = data[0];
                 if (c == 4) {
@@ -324,7 +325,7 @@ uint16_t emul_read(uint8_t itf) {
             printf("hid_client connected!\n");
         }
         if (send_buffer_size > 0) {
-            last_write_result = true;
+            last_write_result[itf] = WRITE_PENDING;
             tud_hid_report_complete_cb(ITF_HID, complete_report, complete_len);
         }
     }

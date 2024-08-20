@@ -34,6 +34,7 @@ typedef struct app {
 } app_t;
 
 extern int register_app(int (*)(app_t *), const uint8_t *);
+extern int select_app(const uint8_t *aid, size_t aid_len);
 
 typedef struct cmd {
     uint8_t ins;

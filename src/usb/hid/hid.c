@@ -306,7 +306,7 @@ int driver_process_usb_nopacket_hid() {
     return 0;
 }
 
-const uint8_t *fido_aid = NULL;
+extern const uint8_t fido_aid[], u2f_aid[];
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
@@ -481,19 +481,10 @@ int driver_process_usb_packet_hid(uint16_t read) {
                   (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
             if (last_cmd == CTAPHID_OTP) {
                 is_nitrokey = true;
+                select_app(fido_aid + 1, fido_aid[0]);
             }
-
-            else if (current_app == NULL ||
-                current_app->aid != fido_aid) {
-                    if (current_app && current_app->unload) {
-                        current_app->unload();
-                    }
-                    for (int a = 0; a < num_apps; a++) {
-                        if (!memcmp(apps[a].aid + 1, fido_aid + 1, MIN(fido_aid[0], apps[a].aid[0]))) {
-                            current_app = &apps[a];
-                            current_app->select_aid(current_app);
-                        }
-                    }
+            else {
+                select_app(u2f_aid + 1, u2f_aid[0]);
             }
             //if (thread_type != 1)
 #ifndef ENABLE_EMULATION
@@ -515,6 +506,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
                  (msg_packet.len == 0 ||
                   (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
             thread_type = 2;
+            select_app(fido_aid + 1, fido_aid[0]);
             if (cbor_process_cb) {
                 if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
                     apdu_sent = cbor_process_cb(last_cmd, msg_packet.data, msg_packet.len);

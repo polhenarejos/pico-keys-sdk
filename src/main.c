@@ -114,6 +114,30 @@ int register_app(int (*select_aid)(app_t *), const uint8_t *aid) {
     return 0;
 }
 
+int select_app(const uint8_t *aid, size_t aid_len) {
+    if (current_app && current_app->aid && (current_app->aid + 1 == aid || !memcmp(current_app->aid + 1, aid, aid_len))) {
+        return CCID_OK;
+    }
+    for (int a = 0; a < num_apps; a++) {
+        if (!memcmp(apps[a].aid + 1, aid, MIN(aid_len, apps[a].aid[0]))) {
+            if (current_app) {
+                if (current_app->aid && !memcmp(current_app->aid + 1, aid, aid_len)) {
+                    current_app->select_aid(current_app);
+                    return CCID_OK;
+                }
+                if (current_app->unload) {
+                    current_app->unload();
+                }
+            }
+            current_app = &apps[a];
+            if (current_app->select_aid(current_app) == CCID_OK) {
+                return CCID_OK;
+            }
+        }
+    }
+    return CCID_ERR_FILE_NOT_FOUND;
+}
+
 int (*button_pressed_cb)(uint8_t) = NULL;
 
 static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;

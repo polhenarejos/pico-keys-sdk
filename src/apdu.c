@@ -53,22 +53,8 @@ int process_apdu() {
         }
     }
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
-        for (int a = 0; a < num_apps; a++) {
-            if (!memcmp(apps[a].aid + 1, apdu.data, MIN(apdu.nc, apps[a].aid[0]))) {
-                if (current_app) {
-                    if (current_app->aid && !memcmp(current_app->aid + 1, apdu.data, apdu.nc)) {
-                        current_app->select_aid(current_app);
-                        return SW_OK();
-                    }
-                    if (current_app->unload) {
-                        current_app->unload();
-                    }
-                }
-                current_app = &apps[a];
-                if (current_app->select_aid(current_app) == CCID_OK) {
-                    return SW_OK();
-                }
-            }
+        if (select_app(apdu.data, apdu.nc) == CCID_OK) {
+            return SW_OK();
         }
         return SW_FILE_NOT_FOUND();
     }

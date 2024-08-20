@@ -212,10 +212,13 @@ void hid_task(void) {
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len) {
     if (instance == ITF_HID && len > 0) {
+        CTAPHID_FRAME *ctap_req = (CTAPHID_FRAME *) report;
         if (last_write_result[instance] == WRITE_PENDING) {
             last_write_result[instance] = WRITE_SUCCESS;
-            if (report[4] & TYPE_MASK) {
-                send_buffer_size[instance] -= MIN(64 - 7, send_buffer_size[instance]);
+            if (FRAME_TYPE(ctap_req) == TYPE_INIT) {
+                if (ctap_req->init.cmd != CTAPHID_KEEPALIVE) {
+                    send_buffer_size[instance] -= MIN(64 - 7, send_buffer_size[instance]);
+                }
             }
             else {
                 send_buffer_size[instance] -= MIN(64 - 5, send_buffer_size[instance]);
@@ -223,8 +226,10 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_
         }
         if (send_buffer_size[instance] > 0) {
             if (last_write_result[instance] == WRITE_SUCCESS) {
-                ctap_resp = (CTAPHID_FRAME *) ((uint8_t *) ctap_resp + 64 - 5);
-                uint8_t seq = report[4] & TYPE_MASK ? 0 : report[4] + 1;
+                if (FRAME_TYPE(ctap_req) != TYPE_INIT || ctap_req->init.cmd != CTAPHID_KEEPALIVE) {
+                    ctap_resp = (CTAPHID_FRAME *) ((uint8_t *) ctap_resp + 64 - 5);
+                }
+                uint8_t seq = FRAME_TYPE(ctap_req) == TYPE_INIT ? 0 : FRAME_SEQ(ctap_req) + 1;
                 ctap_resp->cid = ctap_req->cid;
                 ctap_resp->cont.seq = seq;
             }

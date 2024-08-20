@@ -315,7 +315,7 @@ extern const uint8_t fido_aid[], u2f_aid[];
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
-    if (read >= 5 && send_buffer_size[ITF_HID] == 0) {
+    if (read >= 5) {
         driver_init_hid();
         last_packet_time = board_millis();
         DEBUG_PAYLOAD(usb_get_rx(ITF_HID) + usb_get_r_offset(ITF_HID), 64);

@@ -268,14 +268,11 @@ if(NOT ESP_PLATFORM)
     set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES} ${MBEDTLS_SOURCES})
 endif()
 if (MSVC)
-    target_compile_options(pico_hsm PUBLIC
-        -wd4820
-        -wd4255
-        -wd5045
-        -wd4706
-        -wd4061
-        -wd5105
-    )
+set(
+  CMAKE_C_FLAGS
+  "${CMAKE_C_FLAGS} -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105"
+)
+
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS
         __STDC_WANT_SECURE_LIB__=0
         _WIN32_WINNT_WIN10_TH2=0

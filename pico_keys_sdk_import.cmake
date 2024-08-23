@@ -175,7 +175,7 @@ set(INCLUDES ${INCLUDES}
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library
 )
 
-if(USB_ITF_HID OR ENABLE_EMULATION)
+if(USB_ITF_HID)
     set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
@@ -192,6 +192,15 @@ if(USB_ITF_HID OR ENABLE_EMULATION)
 
     set(INCLUDES ${INCLUDES}
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
+    )
+endif()
+
+if (USB_ITF_CCID)
+    set(SOURCES ${SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
+    )
+    set(INCLUDES ${INCLUDES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid
     )
 endif()
 
@@ -250,14 +259,6 @@ if (ENABLE_EMULATION)
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
     )
 else()
-    if (${USB_ITF_CCID})
-        set(SOURCES ${SOURCES}
-            ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
-        )
-        set(INCLUDES ${INCLUDES}
-            ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid
-        )
-    endif()
 
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c

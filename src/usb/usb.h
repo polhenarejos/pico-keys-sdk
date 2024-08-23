@@ -113,6 +113,7 @@ extern void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint
 #endif
 
 #define USB_BUFFER_SIZE         2048    // Size of USB buffer"
+
 PACK(
 typedef struct {
     uint8_t buffer[USB_BUFFER_SIZE];

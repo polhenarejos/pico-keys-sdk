@@ -22,6 +22,8 @@
 #else
 static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 #endif
+#else
+#include "emulation.h"
 #endif
 #include "ctap_hid.h"
 #include "pico_keys.h"
@@ -95,18 +97,12 @@ uint16_t *get_send_buffer_size(uint8_t itf) {
 // USB HID
 //--------------------------------------------------------------------+
 
-#ifndef ENABLE_EMULATION
-
 uint16_t (*hid_get_report_cb)(uint8_t, uint8_t, hid_report_type_t, uint8_t *, uint16_t) = NULL;
 // Invoked when received GET_REPORT control request
 // Application must fill buffer report's content and return its length.
 // Return zero will cause the stack to STALL request
 
-uint16_t tud_hid_get_report_cb(uint8_t itf,
-                               uint8_t report_id,
-                               hid_report_type_t report_type,
-                               uint8_t *buffer,
-                               uint16_t reqlen) {
+uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t report_type, uint8_t *buffer, uint16_t reqlen) {
     // TODO not Implemented
     (void) itf;
     (void) report_id;
@@ -120,7 +116,6 @@ uint16_t tud_hid_get_report_cb(uint8_t itf,
     }
     return reqlen;
 }
-#endif
 
 uint32_t hid_write_offset(uint16_t size, uint16_t offset) {
     if (hid_tx[ITF_HID_CTAP].buffer[offset] != 0x81) {
@@ -201,45 +196,6 @@ static void send_hid_report(uint8_t report_id) {
         default: break;
     }
 }
-
-void hid_task() {
-    int proc_pkt = 0;
-    if (hid_rx[ITF_HID_CTAP].w_ptr - hid_rx[ITF_HID_CTAP].r_ptr >= 64) {
-        //proc_pkt = driver_process_usb_packet_hid(64);
-    }
-    if (proc_pkt == 0) {
-        driver_process_usb_nopacket_hid();
-    }
-    int status = card_status(ITF_HID);
-    if (status == CCID_OK) {
-        driver_exec_finished_hid(finished_data_size);
-    }
-    else if (status == CCID_ERR_BLOCKED) {
-        send_keepalive();
-    }
-    if (hid_tx[ITF_HID_CTAP].w_ptr > hid_tx[ITF_HID_CTAP].r_ptr && last_write_result[ITF_HID_CTAP] != WRITE_PENDING) {
-        if (driver_write_hid(ITF_HID_CTAP, hid_tx[ITF_HID_CTAP].buffer + hid_tx[ITF_HID_CTAP].r_ptr, 64) > 0) {
-
-        }
-    }
-    /* Keyboard ITF */
-    // Poll every 10ms
-    const uint32_t interval_ms = 10;
-    static uint32_t start_ms = 0;
-
-    if (board_millis() - start_ms < interval_ms) {
-        return;
-    }
-    start_ms += interval_ms;
-
-    // Remote wakeup
-    if (tud_suspended() && keyboard_buffer_len > 0) {
-        tud_remote_wakeup();
-    }
-    else {
-        send_hid_report(REPORT_ID_KEYBOARD);
-    }
-}
 #endif
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len) {
@@ -284,7 +240,6 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_
     }
 }
 
-#ifndef ENABLE_EMULATION
 int driver_write_hid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
     if (last_write_result[itf] == WRITE_PENDING) {
         return 0;
@@ -294,11 +249,11 @@ int driver_write_hid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
     if (last_write_result[itf] == WRITE_FAILED) {
         return 0;
     }
+#ifdef ENABLE_EMULATION
+    tud_hid_report_complete_cb(ITF_HID, buffer, buffer_size);
+#endif
     return MIN(64, buffer_size);
 }
-#endif
-
-#ifndef ENABLE_EMULATION
 
 int (*hid_set_report_cb)(uint8_t, uint8_t, hid_report_type_t, uint8_t const *, uint16_t) = NULL;
 // Invoked when received SET_REPORT control request or
@@ -320,7 +275,6 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
         }
     }
 }
-#endif
 
 uint32_t last_cmd_time = 0, last_packet_time = 0;
 int ctap_error(uint8_t error) {
@@ -523,9 +477,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             else {
                 select_app(u2f_aid + 1, u2f_aid[0]);
             }
-            //if (thread_type != 1)
-#ifndef ENABLE_EMULATION
-#endif
+
             thread_type = 1;
 
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
@@ -571,6 +523,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
         // echo back anything we received from host
         //tud_hid_report(0, buffer, bufsize);
         //printf("END\n");
+#ifndef ENABLE_EMULATION
         if (apdu_sent > 0) {
             if (apdu_sent == 1) {
                 card_start(ITF_HID, apdu_thread);
@@ -580,6 +533,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             }
             usb_send_event(EV_CMD_AVAILABLE);
         }
+#endif
     }
     return apdu_sent;
 }
@@ -624,4 +578,51 @@ void driver_exec_finished_cont_hid(uint8_t itf, uint16_t size_next, uint16_t off
         //ctap_resp = (CTAPHID_FRAME *) ((uint8_t *) ctap_resp + 64 - 5);
         //send_buffer_size[ITF_HID_CTAP] -= MIN(64 - 7, send_buffer_size[ITF_HID_CTAP]);
     }
+}
+
+void hid_task() {
+#ifdef ENABLE_EMULATION
+    uint16_t rx_len = emul_read(ITF_HID);
+    if (rx_len) {
+        tud_hid_set_report_cb(ITF_HID, 0, 0, emul_rx, rx_len);
+    }
+#else
+    int proc_pkt = 0;
+    if (hid_rx[ITF_HID_CTAP].w_ptr - hid_rx[ITF_HID_CTAP].r_ptr >= 64) {
+        //proc_pkt = driver_process_usb_packet_hid(64);
+    }
+    if (proc_pkt == 0) {
+        driver_process_usb_nopacket_hid();
+    }
+    int status = card_status(ITF_HID);
+    if (status == CCID_OK) {
+        driver_exec_finished_hid(finished_data_size);
+    }
+    else if (status == CCID_ERR_BLOCKED) {
+        send_keepalive();
+    }
+    if (hid_tx[ITF_HID_CTAP].w_ptr > hid_tx[ITF_HID_CTAP].r_ptr && last_write_result[ITF_HID_CTAP] != WRITE_PENDING) {
+        if (driver_write_hid(ITF_HID_CTAP, hid_tx[ITF_HID_CTAP].buffer + hid_tx[ITF_HID_CTAP].r_ptr, 64) > 0) {
+
+        }
+    }
+
+    /* Keyboard ITF */
+    // Poll every 10ms
+    const uint32_t interval_ms = 10;
+    static uint32_t start_ms = 0;
+
+    if (board_millis() - start_ms < interval_ms) {
+        return;
+    }
+    start_ms += interval_ms;
+
+    // Remote wakeup
+    if (tud_suspended() && keyboard_buffer_len > 0) {
+        tud_remote_wakeup();
+    }
+    else {
+        send_hid_report(REPORT_ID_KEYBOARD);
+    }
+#endif
 }

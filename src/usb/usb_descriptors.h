@@ -18,6 +18,7 @@
 #ifndef USB_DESCRIPTORS_H_
 #define USB_DESCRIPTORS_H_
 
+PACK(
 struct ccid_class_descriptor {
     uint8_t  bLength;
     uint8_t  bDescriptorType;
@@ -41,6 +42,6 @@ struct ccid_class_descriptor {
     uint16_t wLcdLayout;
     uint8_t  bPINSupport;
     uint8_t  bMaxCCIDBusySlots;
-} __attribute__((__packed__));
+});
 
 #endif /* USB_DESCRIPTORS_H_ */

@@ -37,11 +37,12 @@ uint8_t (*get_version_minor)() = NULL;
 
 static usb_buffer_t hid_rx[ITF_HID_TOTAL] = {0}, hid_tx[ITF_HID_TOTAL] = {0};
 
+PACK(
 typedef struct msg_packet {
     uint16_t len;
     uint16_t current_len;
     uint8_t data[CTAP_MAX_PACKET_SIZE];
-} __attribute__((__packed__)) msg_packet_t;
+}) msg_packet_t;
 
 msg_packet_t msg_packet = { 0 };
 
@@ -247,11 +248,11 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_
 #ifdef ESP_PLATFORM
         taskENTER_CRITICAL(&mutex);
 #endif
-        CTAPHID_FRAME *ctap_req = (CTAPHID_FRAME *) report;
+        CTAPHID_FRAME *req = (CTAPHID_FRAME *) report;
         if (last_write_result[instance] == WRITE_PENDING) {
             last_write_result[instance] = WRITE_SUCCESS;
-            if (FRAME_TYPE(ctap_req) == TYPE_INIT) {
-                if (ctap_req->init.cmd != CTAPHID_KEEPALIVE) {
+            if (FRAME_TYPE(req) == TYPE_INIT) {
+                if (req->init.cmd != CTAPHID_KEEPALIVE) {
                     send_buffer_size[instance] -= MIN(64 - 7, send_buffer_size[instance]);
                 }
             }
@@ -260,11 +261,11 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_
             }
         }
         if (last_write_result[instance] == WRITE_SUCCESS) {
-            if (FRAME_TYPE(ctap_req) != TYPE_INIT || ctap_req->init.cmd != CTAPHID_KEEPALIVE) {
+            if (FRAME_TYPE(req) != TYPE_INIT || req->init.cmd != CTAPHID_KEEPALIVE) {
                 if (send_buffer_size[instance] > 0) {
                     ctap_resp = (CTAPHID_FRAME *) ((uint8_t *) ctap_resp + 64 - 5);
-                    uint8_t seq = FRAME_TYPE(ctap_req) == TYPE_INIT ? 0 : FRAME_SEQ(ctap_req) + 1;
-                    ctap_resp->cid = ctap_req->cid;
+                    uint8_t seq = FRAME_TYPE(req) == TYPE_INIT ? 0 : FRAME_SEQ(req) + 1;
+                    ctap_resp->cid = req->cid;
                     ctap_resp->cont.seq = seq;
 
                     hid_tx[ITF_HID_CTAP].r_ptr += 64 - 5;
@@ -352,7 +353,7 @@ int driver_process_usb_nopacket_hid() {
 }
 
 extern const uint8_t fido_aid[], u2f_aid[];
-extern void apdu_thread(), cbor_thread();
+extern void apdu_thread(void), cbor_thread(void);
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
@@ -552,7 +553,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
             if (apdu_sent < 0) {
-                return ctap_error(-apdu_sent);
+                return ctap_error((uint8_t)(-apdu_sent));
             }
             send_keepalive();
         }

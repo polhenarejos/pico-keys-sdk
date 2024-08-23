@@ -283,7 +283,7 @@ void led_blinking_task() {
     }
 #elif defined(CYW43_WL_GPIO_LED_PIN)
     cyw43_arch_gpio_put(led_color, led_state);
-#elif ESP_PLATFORM
+#elif defined(ESP_PLATFORM)
     neopixel_SetPixel(neopixel, &pixel[led_state], 1);
 #endif
     led_state ^= 1; // toggle

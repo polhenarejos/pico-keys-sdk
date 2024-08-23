@@ -77,6 +77,7 @@ static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 #define CCID_THREAD_TERMINATED 0xffff
 #define CCID_ACK_TIMEOUT 0x6600
 
+PACK(
 typedef struct {
     uint8_t bMessageType;
     uint32_t dwLength;
@@ -85,7 +86,7 @@ typedef struct {
     uint8_t abRFU0;
     uint16_t abRFU1;
     uint8_t apdu; //Actually it is an array
-} __attribute__((__packed__)) ccid_header_t;
+}) ccid_header_t;
 
 uint8_t ccid_status = 1;
 static uint8_t itf_num;

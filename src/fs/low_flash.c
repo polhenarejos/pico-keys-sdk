@@ -32,11 +32,13 @@
 #include <windows.h>
 #include <io.h>
 #define O_RDWR _O_RDWR
+#define O_CREAT _O_CREAT
 #define open _open
 #define write _write
 #define mode_t unsigned short
 #define lseek _lseek
 #include "mman.h"
+#include <fcntl.h>
 #else
 #ifdef ESP_PLATFORM
 #include "esp_compat.h"
@@ -50,13 +52,12 @@ const esp_partition_t *part0;
 #include <unistd.h>
 #include <sys/mman.h>
 #endif
-#include <fcntl.h>
+#endif
 #define FLASH_SECTOR_SIZE       4096
 #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
 #define XIP_BASE 0
 int fd_map = 0;
 uint8_t *map = NULL;
-#endif
 #endif
 #include "pico_keys.h"
 #include <string.h>
@@ -109,9 +110,7 @@ void do_flash() {
                 //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
                 uint32_t ints = save_and_disable_interrupts();
                 flash_range_erase(flash_pages[r].address - XIP_BASE, FLASH_SECTOR_SIZE);
-                flash_range_program(flash_pages[r].address - XIP_BASE,
-                                    flash_pages[r].page,
-                                    FLASH_SECTOR_SIZE);
+                flash_range_program(flash_pages[r].address - XIP_BASE, flash_pages[r].page, FLASH_SECTOR_SIZE);
                 restore_interrupts(ints);
                 while (multicore_lockout_end_timeout_us(1000) == false) {
                     ;

@@ -48,7 +48,7 @@ int process_apdu() {
         if (is_chaining) {
             memmove(apdu.data + (chain_ptr - chain_buf), apdu.data, apdu.nc);
             memcpy(apdu.data, chain_buf, chain_ptr - chain_buf);
-            apdu.nc += chain_ptr - chain_buf;
+            apdu.nc += (uint16_t)(chain_ptr - chain_buf);
             is_chaining = false;
         }
     }
@@ -180,7 +180,7 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
 }
 
 #ifndef ENABLE_EMULATION
-void apdu_thread() {
+void apdu_thread(void) {
     card_init_core1();
     while (1) {
         uint32_t m = 0;

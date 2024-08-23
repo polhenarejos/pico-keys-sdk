@@ -26,8 +26,7 @@
 #include "pico/util/queue.h"
 #endif
 
-
-#include "esp_compat.h"
+#include "compat.h"
 
 /* USB thread */
 #define EV_CARD_CHANGE        1
@@ -108,12 +107,18 @@ extern void driver_exec_finished_ccid(uint8_t itf, uint16_t size_next);
 extern void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t offset);
 #endif
 
-#define USB_BUFFER_SIZE         2048    // Size of USB buffer
+#ifdef ENABLE_EMULATION
+extern void driver_exec_finished_emul(uint8_t itf, uint16_t size_next);
+extern void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint16_t offset);
+#endif
 
+#define USB_BUFFER_SIZE         2048    // Size of USB buffer"
+PACK(
 typedef struct {
     uint8_t buffer[USB_BUFFER_SIZE];
-    uint16_t r_ptr, w_ptr;
-} __attribute__((__packed__)) usb_buffer_t;
+    uint16_t r_ptr;
+    uint16_t w_ptr;
+}) usb_buffer_t;
 
 typedef enum {
     WRITE_UNKNOWN = 0,

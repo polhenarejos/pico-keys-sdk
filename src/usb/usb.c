@@ -87,7 +87,9 @@ bool is_busy() {
 }
 
 void usb_send_event(uint32_t flag) {
+#if !defined(ENABLE_EMULATION)
     queue_add_blocking(&usb_to_card_q, &flag);
+#endif
     if (flag == EV_CMD_AVAILABLE) {
         timeout_start();
     }
@@ -183,16 +185,8 @@ int card_status(uint8_t itf) {
             }
         }
     }
+#else
+    (void) itf;
 #endif
     return CCID_ERR_FILE_NOT_FOUND;
-}
-
-uint8_t *usb_prepare_response(uint8_t itf) {
-#ifndef ENABLE_EMULATION
-#ifdef USB_ITF_CCID
-#endif
-    return NULL;
-#else
-    return driver_prepare_response_emul(itf);
-#endif
 }

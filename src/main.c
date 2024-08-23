@@ -104,7 +104,7 @@ app_t *current_app = NULL;
 
 const uint8_t *ccid_atr = NULL;
 
-int register_app(int (*select_aid)(app_t *), const uint8_t *aid) {
+int register_app(int (*select_aid)(app_t *, uint8_t), const uint8_t *aid) {
     if (num_apps < sizeof(apps) / sizeof(app_t)) {
         apps[num_apps].select_aid = select_aid;
         apps[num_apps].aid = aid;
@@ -116,13 +116,14 @@ int register_app(int (*select_aid)(app_t *), const uint8_t *aid) {
 
 int select_app(const uint8_t *aid, size_t aid_len) {
     if (current_app && current_app->aid && (current_app->aid + 1 == aid || !memcmp(current_app->aid + 1, aid, aid_len))) {
+        current_app->select_aid(current_app, 0);
         return CCID_OK;
     }
     for (int a = 0; a < num_apps; a++) {
         if (!memcmp(apps[a].aid + 1, aid, MIN(aid_len, apps[a].aid[0]))) {
             if (current_app) {
                 if (current_app->aid && !memcmp(current_app->aid + 1, aid, aid_len)) {
-                    current_app->select_aid(current_app);
+                    current_app->select_aid(current_app, 1);
                     return CCID_OK;
                 }
                 if (current_app->unload) {
@@ -130,7 +131,7 @@ int select_app(const uint8_t *aid, size_t aid_len) {
                 }
             }
             current_app = &apps[a];
-            if (current_app->select_aid(current_app) == CCID_OK) {
+            if (current_app->select_aid(current_app, 1) == CCID_OK) {
                 return CCID_OK;
             }
         }
@@ -144,19 +145,6 @@ static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
 void led_set_blink(uint32_t mode) {
     blink_interval_ms = mode;
-}
-
-uint32_t timeout = 0;
-void timeout_stop() {
-    timeout = 0;
-}
-
-void timeout_start() {
-    timeout = board_millis();
-}
-
-bool is_busy() {
-    return timeout > 0;
 }
 
 void execute_tasks();
@@ -344,10 +332,10 @@ extern void neug_task();
 extern void usb_task();
 void execute_tasks()
 {
-    usb_task();
 #if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
     tud_task(); // tinyusb device task
 #endif
+    usb_task();
     led_blinking_task();
 }
 
@@ -464,7 +452,7 @@ int main(void) {
 #endif
 
 #ifdef ESP_PLATFORM
-    xTaskCreate(core0_loop, "core0", 4096*ITF_TOTAL, NULL, CONFIG_TINYUSB_TASK_PRIORITY + 1, &hcore0);
+    xTaskCreatePinnedToCore(core0_loop, "core0", 4096*5, NULL, CONFIG_TINYUSB_TASK_PRIORITY - 1, &hcore0, 0);
 #else
     core0_loop();
 #endif

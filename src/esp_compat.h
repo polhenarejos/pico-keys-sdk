@@ -30,7 +30,7 @@ typedef QueueHandle_t queue_t;
 #define queue_is_empty(a) (uxQueueMessagesWaiting(*(a)) == 0)
 #define queue_try_remove(a,b) xQueueReceive(*(a), b, 0)
 extern TaskHandle_t hcore0, hcore1;
-#define multicore_launch_core1(a) xTaskCreate((void(*)(void *))a, "core1", 4096*ITF_TOTAL, NULL, CONFIG_TINYUSB_TASK_PRIORITY + 2, &hcore1)
+#define multicore_launch_core1(a) xTaskCreatePinnedToCore((void(*)(void *))a, "core1", 4096*5, NULL, CONFIG_TINYUSB_TASK_PRIORITY - 2, &hcore1, 1)
 #define multicore_reset_core1() do { if (hcore1) { eTaskState e = eTaskGetState(hcore1); if (e <= eSuspended) { vTaskDelete(hcore1); }} }while(0)
 #define sleep_ms(a) vTaskDelay(a / portTICK_PERIOD_MS)
 static inline uint32_t board_millis(void) {
@@ -46,10 +46,8 @@ typedef SemaphoreHandle_t semaphore_t;
 #define sem_release(a) xSemaphoreGive(*(a))
 #define sem_acquire_blocking(a) xSemaphoreTake(*(a), portMAX_DELAY)
 #define multicore_lockout_victim_init() (void)0
-static inline bool multicore_lockout_start_timeout_us(int a) {
-    vTaskSuspend(hcore1); return true; }
-static inline bool multicore_lockout_end_timeout_us(int a) {
-    vTaskResume(hcore1); return true; }
+static inline bool multicore_lockout_start_timeout_us(int a) { if (hcore1) { vTaskSuspend(hcore1); } return true; }
+static inline bool multicore_lockout_end_timeout_us(int a) { if (hcore1) { vTaskResume(hcore1); } return true; }
 
 #endif
 

@@ -33,6 +33,8 @@ typedef unsigned long int uint64_t;
 extern "C" {
 #endif
 
+#include "usb.h"
+
 // Size of HID reports
 
 #define HID_RPT_SIZE            64      // Default size of raw HID report
@@ -144,7 +146,8 @@ typedef struct {
 
 // Low-level error codes. Return as negatives.
 
-#define CTAP_MAX_PACKET_SIZE (64 - 7 + 128 * (64 - 5))
+#define CTAP_MAX_PACKET_SIZE    (64 - 7 + 128 * (64 - 5))
+#define CTAP_MAX_CBOR_PAYLOAD   (USB_BUFFER_SIZE - 64 - 7 - 1)
 
 #define CTAP1_ERR_NONE                0x00    // No error
 #define CTAP1_ERR_INVALID_CMD         0x01    // Invalid command
@@ -161,13 +164,6 @@ extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
 extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
 
 extern bool is_nitrokey;
-
-typedef enum {
-    WRITE_UNKNOWN = 0,
-    WRITE_PENDING,
-    WRITE_FAILED,
-    WRITE_SUCCESS,
-} write_status_t;
 
 #ifdef __cplusplus
 }

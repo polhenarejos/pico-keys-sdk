@@ -45,17 +45,31 @@
 #define EV_BUTTON_TIMEOUT        16
 #define EV_BUTTON_PRESSED        32
 
+enum {
+#ifdef USB_ITF_HID
+    ITF_HID_CTAP = 0,
+    ITF_HID_KB,
+#endif
+    ITF_HID_TOTAL
+};
+enum {
+#ifdef USB_ITF_CCID
+    ITF_SC_CCID = 0,
+    ITF_SC_WCID,
+#endif
+    ITF_SC_TOTAL
+};
 
 enum {
 #ifdef USB_ITF_HID
-    ITF_HID = 0,
-    ITF_KEYBOARD,
+    ITF_HID = ITF_HID_CTAP,
+    ITF_KEYBOARD = ITF_HID_KB,
 #endif
 #ifdef USB_ITF_CCID
-    ITF_CCID,
-    ITF_WCID,
+    ITF_CCID = ITF_SC_CCID + ITF_HID_TOTAL,
+    ITF_WCID = ITF_SC_WCID + ITF_HID_TOTAL,
 #endif
-    ITF_TOTAL
+    ITF_TOTAL = ITF_HID_TOTAL + ITF_SC_TOTAL
 };
 
 enum {
@@ -70,60 +84,42 @@ extern queue_t card_to_usb_q;
 #endif
 extern uint8_t card_locked_itf;
 
-#ifdef USB_ITF_HID
-extern int driver_process_usb_packet_hid(uint16_t rx_read);
-extern void driver_exec_finished_hid(uint16_t size_next);
-extern void driver_exec_finished_cont_hid(uint8_t itf, uint16_t size_next, uint16_t offset);
-extern void driver_exec_timeout_hid();
-extern bool driver_mounted_hid();
-extern uint8_t *driver_prepare_response_hid();
-extern int driver_write_hid(uint8_t, const uint8_t *, uint16_t);
-extern uint16_t driver_read_hid(uint8_t *, uint16_t);
-extern int driver_process_usb_nopacket_hid();
-#endif
-
-#ifdef USB_ITF_CCID
-extern int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read);
-extern void driver_exec_finished_ccid(uint8_t itf, uint16_t size_next);
-extern void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t offset);
-extern void driver_exec_timeout_ccid(uint8_t itf);
-extern bool driver_mounted_ccid(uint8_t itf);
-extern uint8_t *driver_prepare_response_ccid(uint8_t itf);
-extern int driver_write_ccid(uint8_t, const uint8_t *, uint16_t);
-extern uint16_t driver_read_ccid(uint8_t, uint8_t *, uint16_t);
-extern int driver_process_usb_nopacket_ccid();
-#endif
-
-#ifdef ENABLE_EMULATION
-extern int driver_process_usb_packet_emul(uint8_t, uint16_t rx_read);
-extern void driver_exec_finished_emul(uint8_t, uint16_t size_next);
-extern void driver_exec_finished_cont_emul(uint8_t, uint16_t size_next, uint16_t offset);
-extern void driver_exec_timeout_emul(uint8_t);
-extern bool driver_mounted_emul(uint8_t);
-extern uint8_t *driver_prepare_response_emul(uint8_t);
-extern uint16_t driver_write_emul(uint8_t, const uint8_t *, uint16_t);
-extern uint16_t driver_read_emul(uint8_t, uint8_t *, uint16_t);
-extern int driver_process_usb_nopacket_emul(uint8_t);
-extern uint16_t emul_read(uint8_t);
-#else
-extern uint16_t usb_rx(uint8_t itf, const uint8_t *buffer, uint16_t len);
-#endif
-
-extern void card_start(void (*func)(void));
+extern void card_start(uint8_t, void (*func)(void));
 extern void card_exit();
+extern int card_status(uint8_t itf);
 extern void usb_init();
-extern uint8_t *usb_prepare_response(uint8_t itf);
-extern uint8_t *usb_get_rx(uint8_t itf);
-extern uint8_t *usb_get_tx(uint8_t itf);
-extern uint32_t usb_write_offset(uint8_t itf, uint16_t len, uint16_t offset);
-extern void usb_clear_rx(uint8_t itf);
-extern uint16_t usb_more_rx(uint8_t itf, uint16_t len);
-extern uint16_t usb_get_r_offset(uint8_t itf);
+
 extern uint16_t finished_data_size;
 extern void usb_set_timeout_counter(uint8_t itf, uint32_t v);
 extern void card_init_core1();
-extern uint32_t usb_write_flush(uint8_t itf);
-extern uint16_t usb_read_available(uint8_t itf);
-extern uint16_t usb_write_available(uint8_t itf);
+
+extern void usb_send_event(uint32_t flag);
+extern void timeout_stop();
+extern void timeout_start();
+extern bool is_busy();
+
+#ifdef USB_ITF_HID
+extern void driver_exec_finished_hid(uint16_t size_next);
+extern void driver_exec_finished_cont_hid(uint8_t itf, uint16_t size_next, uint16_t offset);
+#endif
+
+#ifdef USB_ITF_CCID
+extern void driver_exec_finished_ccid(uint8_t itf, uint16_t size_next);
+extern void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t offset);
+#endif
+
+#define USB_BUFFER_SIZE         2048    // Size of USB buffer
+
+typedef struct {
+    uint8_t buffer[USB_BUFFER_SIZE];
+    uint16_t r_ptr, w_ptr;
+} __attribute__((__packed__)) usb_buffer_t;
+
+typedef enum {
+    WRITE_UNKNOWN = 0,
+    WRITE_PENDING,
+    WRITE_FAILED,
+    WRITE_SUCCESS,
+} write_status_t;
 
 #endif

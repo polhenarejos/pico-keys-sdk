@@ -92,7 +92,9 @@ typedef struct {
 }) ccid_header_t;
 
 uint8_t ccid_status = 1;
+#ifndef ENABLE_EMULATION
 static uint8_t itf_num;
+#endif
 
 static usb_buffer_t ccid_rx[ITF_SC_TOTAL] = {0}, ccid_tx[ITF_SC_TOTAL] = {0};
 static write_status_t last_write_result[ITF_SC_TOTAL] = {0};
@@ -311,12 +313,6 @@ void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t of
 }
 
 void ccid_task() {
-#ifdef ENABLE_EMULATION
-    uint16_t rx_len = emul_read(ITF_CCID);
-    if (rx_len) {
-        tud_vendor_rx_cb(ITF_CCID);
-    }
-#else
     for (int itf = 0; itf < ITF_SC_TOTAL; itf++) {
         int status = card_status(sc_itf_to_usb_itf(itf));
         if (status == CCID_OK) {
@@ -331,7 +327,6 @@ void ccid_task() {
             }
         }
     }
-#endif
 }
 
 #ifndef ENABLE_EMULATION

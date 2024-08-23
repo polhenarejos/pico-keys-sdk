@@ -250,7 +250,7 @@ int driver_write_hid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
         return 0;
     }
 #ifdef ENABLE_EMULATION
-    tud_hid_report_complete_cb(ITF_HID, buffer, buffer_size);
+    tud_hid_report_complete_cb(ITF_HID_CTAP, buffer, buffer_size);
 #endif
     return MIN(64, buffer_size);
 }
@@ -490,10 +490,8 @@ int driver_process_usb_packet_hid(uint16_t read) {
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
         }
-        else if ((last_cmd == CTAPHID_CBOR ||
-                  last_cmd >= CTAPHID_VENDOR_FIRST) &&
-                 (msg_packet.len == 0 ||
-                  (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
+        else if ((last_cmd == CTAPHID_CBOR || last_cmd >= CTAPHID_VENDOR_FIRST) &&
+                 (msg_packet.len == 0 || (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
             thread_type = 2;
             select_app(fido_aid + 1, fido_aid[0]);
             if (msg_packet.current_len == msg_packet.len && msg_packet.len > 0) {
@@ -523,7 +521,6 @@ int driver_process_usb_packet_hid(uint16_t read) {
         // echo back anything we received from host
         //tud_hid_report(0, buffer, bufsize);
         //printf("END\n");
-#ifndef ENABLE_EMULATION
         if (apdu_sent > 0) {
             if (apdu_sent == 1) {
                 card_start(ITF_HID, apdu_thread);
@@ -533,7 +530,6 @@ int driver_process_usb_packet_hid(uint16_t read) {
             }
             usb_send_event(EV_CMD_AVAILABLE);
         }
-#endif
     }
     return apdu_sent;
 }
@@ -584,9 +580,15 @@ void hid_task() {
 #ifdef ENABLE_EMULATION
     uint16_t rx_len = emul_read(ITF_HID);
     if (rx_len) {
-        tud_hid_set_report_cb(ITF_HID, 0, 0, emul_rx, rx_len);
+        uint16_t rptr = 0;
+        while (rx_len > 0) {
+            tud_hid_set_report_cb(ITF_HID, 0, 0, emul_rx + rptr, 64);
+            rx_len -= 64;
+            rptr += 64;
+        }
+        emul_rx_size = 0;
     }
-#else
+#endif
     int proc_pkt = 0;
     if (hid_rx[ITF_HID_CTAP].w_ptr - hid_rx[ITF_HID_CTAP].r_ptr >= 64) {
         //proc_pkt = driver_process_usb_packet_hid(64);
@@ -606,7 +608,7 @@ void hid_task() {
 
         }
     }
-
+#ifndef ENABLE_EMULATION
     /* Keyboard ITF */
     // Poll every 10ms
     const uint32_t interval_ms = 10;

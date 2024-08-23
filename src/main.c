@@ -85,14 +85,12 @@ static inline void ws2812_program_init(PIO pio,
 }
 #endif
 
-#if defined(ENABLE_EMULATION)
-#else
-#include "usb.h"
-#ifndef ESP_PLATFORM
+#if !defined(ESP_PLATFORM) && !defined(ENABLE_EMULATION)
 #include "hardware/rtc.h"
 #include "bsp/board.h"
 #endif
-#endif
+
+#include "usb.h"
 
 extern void do_flash();
 extern void low_flash_init();
@@ -427,8 +425,8 @@ int main(void) {
 
     init_rtc();
 
-#ifndef ENABLE_EMULATION
     usb_init();
+#ifndef ENABLE_EMULATION
 #ifdef ESP_PLATFORM
     tusb_cfg.string_descriptor[3] = pico_serial_str;
     if (enable_wcid) {

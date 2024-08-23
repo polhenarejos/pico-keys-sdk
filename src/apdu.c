@@ -22,6 +22,9 @@
 #ifdef ESP_PLATFORM
 #include "esp_compat.h"
 #endif
+#ifdef ENABLE_EMULATION
+#include "emulation.h"
+#endif
 
 uint8_t *rdata_gr = NULL;
 uint16_t rdata_bk = 0x0;
@@ -179,14 +182,13 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
     return make_uint16_t(sw1, sw2);
 }
 
-#ifndef ENABLE_EMULATION
 void apdu_thread(void) {
     card_init_core1();
     while (1) {
         uint32_t m = 0;
-#ifndef ENABLE_EMULATION
         queue_remove_blocking(&usb_to_card_q, &m);
-#endif
+        uint32_t flag = m + 1;
+        queue_add_blocking(&card_to_usb_q, &flag);
 
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE) {
             set_res_sw(0x6f, 0x00);
@@ -202,10 +204,8 @@ done:   ;
         apdu_finish();
 
         finished_data_size = apdu_next();
-        uint32_t flag = EV_EXEC_FINISHED;
-#ifndef ENABLE_EMULATION
+        flag = EV_EXEC_FINISHED;
         queue_add_blocking(&card_to_usb_q, &flag);
-#endif
 #ifdef ESP_PLATFORM
         vTaskDelay(pdMS_TO_TICKS(10));
 #endif
@@ -219,7 +219,6 @@ done:   ;
     vTaskDelete(NULL);
 #endif
 }
-#endif
 
 void apdu_finish() {
     apdu.rdata[apdu.rlen] = apdu.sw >> 8;

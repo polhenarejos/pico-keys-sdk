@@ -19,7 +19,7 @@
 #define _USB_H_
 
 #if defined(ENABLE_EMULATION)
-#include <stdbool.h>
+#include "emulation.h"
 #elif defined(ESP_PLATFORM)
 #include "esp_compat.h"
 #else
@@ -77,11 +77,8 @@ enum {
 };
 
 extern void usb_task();
-#ifndef ENABLE_EMULATION
 extern queue_t usb_to_card_q;
 extern queue_t card_to_usb_q;
-#endif
-extern uint8_t card_locked_itf;
 
 extern void card_start(uint8_t, void (*func)(void));
 extern void card_exit();

@@ -18,6 +18,8 @@
 #ifndef USB_DESCRIPTORS_H_
 #define USB_DESCRIPTORS_H_
 
+#include "compat.h"
+
 PACK(
 struct ccid_class_descriptor {
     uint8_t  bLength;

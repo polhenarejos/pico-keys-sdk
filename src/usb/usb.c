@@ -28,6 +28,8 @@
 #include "apdu.h"
 #ifndef ENABLE_EMULATION
 #include "tusb.h"
+#else
+#include "emulation.h"
 #endif
 
 // For memcpy
@@ -36,16 +38,15 @@
 
 // Device specific functions
 static uint32_t timeout_counter[ITF_TOTAL] = { 0 };
-uint8_t card_locked_itf = ITF_TOTAL; // no locked
+static uint8_t card_locked_itf = ITF_TOTAL; // no locked
+static void (*card_locked_func)(void) = NULL;
 
 void usb_set_timeout_counter(uint8_t itf, uint32_t v) {
     timeout_counter[itf] = v;
 }
 
-#if !defined(ENABLE_EMULATION)
-queue_t usb_to_card_q;
-queue_t card_to_usb_q;
-#endif
+queue_t usb_to_card_q = {0};
+queue_t card_to_usb_q = {0};
 
 #ifndef ENABLE_EMULATION
 extern tusb_desc_device_t desc_device;
@@ -67,10 +68,9 @@ void usb_init() {
             desc_device.idProduct = (data[PHY_PID] << 8) | data[PHY_PID+1];
         }
     }
-
+#endif
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
-#endif
 }
 
 uint32_t timeout = 0;
@@ -87,12 +87,12 @@ bool is_busy() {
 }
 
 void usb_send_event(uint32_t flag) {
-#if !defined(ENABLE_EMULATION)
     queue_add_blocking(&usb_to_card_q, &flag);
-#endif
     if (flag == EV_CMD_AVAILABLE) {
         timeout_start();
     }
+    uint32_t m;
+    queue_remove_blocking(&card_to_usb_q , &m);
 }
 
 extern void low_flash_init();
@@ -106,9 +106,23 @@ uint16_t finished_data_size = 0;
 
 void card_start(uint8_t itf, void (*func)(void)) {
     timeout_start();
-    if (card_locked_itf != itf) {
-#ifndef ENABLE_EMULATION
-        uint32_t m = 0;
+    if (card_locked_itf != itf || card_locked_func != func) {
+        if (card_locked_itf != ITF_TOTAL || card_locked_func != NULL) {
+            card_exit();
+        }
+        if (func) {
+            multicore_launch_core1(func);
+        }
+        led_set_blink(BLINK_MOUNTED);
+        card_locked_itf = itf;
+        card_locked_func = func;
+    }
+}
+
+void card_exit() {
+    if (card_locked_itf != ITF_TOTAL || card_locked_func != NULL) {
+        usb_send_event(EV_EXIT);
+        uint32_t m;
         while (queue_is_empty(&usb_to_card_q) == false) {
             if (queue_try_remove(&usb_to_card_q, &m) == false) {
                 break;
@@ -119,37 +133,25 @@ void card_start(uint8_t itf, void (*func)(void)) {
                 break;
             }
         }
+        led_set_blink(BLINK_SUSPENDED);
         multicore_reset_core1();
-        if (func) {
-            multicore_launch_core1(func);
-        }
-        led_set_blink(BLINK_MOUNTED);
-#else
-        (void)func;
-#endif
-        card_locked_itf = itf;
-    }
-}
-
-void card_exit() {
-#ifndef ENABLE_EMULATION
-    uint32_t flag = EV_EXIT;
-    queue_try_add(&usb_to_card_q, &flag);
-    led_set_blink(BLINK_SUSPENDED);
-    multicore_reset_core1();
 #ifdef ESP_PLATFORM
-    hcore1 = NULL;
+        hcore1 = NULL;
 #endif
+    }
     card_locked_itf = ITF_TOTAL;
-#endif
+    card_locked_func = NULL;
 }
 extern void hid_task();
 extern void ccid_task();
+extern void emul_task();
 void usb_task() {
-#ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
     hid_task();
 #endif
+#ifdef ENABLE_EMULATION
+    emul_task();
+#else
 #ifdef USB_ITF_CCID
     ccid_task();
 #endif
@@ -157,7 +159,6 @@ void usb_task() {
 }
 
 int card_status(uint8_t itf) {
-#ifndef ENABLE_EMULATION
     if (card_locked_itf == itf) {
         uint32_t m = 0x0;
         bool has_m = queue_try_remove(&card_to_usb_q, &m);
@@ -167,13 +168,14 @@ int card_status(uint8_t itf) {
             if (m == EV_EXEC_FINISHED) {
                 timeout_stop();
                 led_set_blink(BLINK_MOUNTED);
-                card_locked_itf = ITF_TOTAL;
                 return CCID_OK;
             }
+#ifndef ENABLE_EMULATION
             else if (m == EV_PRESS_BUTTON) {
                 uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
                 queue_try_add(&usb_to_card_q, &flag);
             }
+#endif
             return CCID_ERR_FILE_NOT_FOUND;
         }
         else {
@@ -185,8 +187,5 @@ int card_status(uint8_t itf) {
             }
         }
     }
-#else
-    (void) itf;
-#endif
     return CCID_ERR_FILE_NOT_FOUND;
 }

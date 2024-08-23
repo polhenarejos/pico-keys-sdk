@@ -38,7 +38,6 @@
 #define mode_t unsigned short
 #define lseek _lseek
 #include "mman.h"
-#include <fcntl.h>
 #else
 #ifdef ESP_PLATFORM
 #include "esp_compat.h"
@@ -58,6 +57,7 @@ const esp_partition_t *part0;
 #define XIP_BASE 0
 int fd_map = 0;
 uint8_t *map = NULL;
+#include <fcntl.h>
 #endif
 #include "pico_keys.h"
 #include <string.h>

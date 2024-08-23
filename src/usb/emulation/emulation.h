@@ -19,11 +19,12 @@
 #define _EMULATION_H_
 
 #include <stdint.h>
-#include <stdlib.h>
-#include "usb.h"
+#include <string.h>
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
+#include <stdbool.h>
+#define USB_BUFFER_SIZE 2048
 extern int emul_init(char *host, uint16_t port);
 extern uint8_t emul_rx[USB_BUFFER_SIZE];
 extern uint16_t emul_rx_size, emul_tx_size;
@@ -49,11 +50,7 @@ static inline uint32_t tud_vendor_n_read(uint8_t itf, uint8_t *buffer, uint32_t 
     return n;
 }
 extern void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes);
-static inline uint32_t tud_vendor_n_write(uint8_t itf, const uint8_t *buffer, uint32_t n) {
-    uint16_t ret = driver_write_emul(ITF_CCID, buffer, (uint16_t)n);
-    tud_vendor_tx_cb(itf, ret);
-    return ret;
-}
+extern uint32_t tud_vendor_n_write(uint8_t itf, const uint8_t *buffer, uint32_t n);
 static inline uint32_t tud_vendor_n_flush(uint8_t itf) {
     (void) itf;
     return emul_tx_size;
@@ -62,12 +59,101 @@ static inline uint32_t tud_vendor_n_flush(uint8_t itf) {
 
 #ifdef USB_ITF_HID
 extern void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len);
-static inline bool tud_hid_n_report(uint8_t itf, uint8_t report_id, const uint8_t *buffer, uint32_t n) {
-    (void) itf;
-    (void) report_id;
-    uint16_t ret = driver_write_emul(ITF_HID, buffer, (uint16_t)n);
-    return ret > 0;
-}
+extern bool tud_hid_n_report(uint8_t itf, uint8_t report_id, const uint8_t *buffer, uint32_t n);
 #endif
+
+#include <pthread.h>
+typedef struct {
+    pthread_mutex_t mtx;
+    pthread_cond_t  cnd;
+    size_t        size_elem;
+    size_t num_elem;
+    size_t max_elem;
+    uint8_t buf[1024];
+    bool is_init;
+} queue_t;
+
+static inline void queue_free(queue_t *a) {
+    pthread_mutex_destroy(&a->mtx);
+    pthread_cond_destroy(&a->cnd);
+    a->is_init = false;
+}
+static inline void queue_init(queue_t *a, size_t size_elem, size_t max_elem) {
+    if (a->is_init) {
+        queue_free(a);
+    }
+    pthread_mutex_init(&a->mtx, NULL);
+    pthread_cond_init(&a->cnd, NULL);
+    a->size_elem = size_elem;
+    a->max_elem = max_elem;
+    a->num_elem = 0;
+    a->is_init = true;
+}
+static inline void queue_add_blocking(queue_t *a, const void *b) {
+    pthread_mutex_lock(&a->mtx);
+    while (a->num_elem == a->max_elem) {
+        pthread_cond_wait(&a->cnd, &a->mtx);
+    }
+    memcpy(a->buf + a->num_elem * a->size_elem, b, a->size_elem);
+    a->num_elem++;
+    pthread_cond_signal(&a->cnd);
+    pthread_mutex_unlock(&a->mtx);
+}
+static inline void queue_remove_blocking(queue_t *a, void *b) {
+    pthread_mutex_lock(&a->mtx);
+    while (a->num_elem == 0) {
+        pthread_cond_wait(&a->cnd, &a->mtx);
+    }
+    memcpy(b, a->buf, a->size_elem);
+    memmove(a->buf, a->buf + a->size_elem, a->size_elem * (a->num_elem - 1));
+    a->num_elem--;
+    pthread_cond_signal(&a->cnd);
+    pthread_mutex_unlock(&a->mtx);
+}
+static inline int queue_try_add(queue_t *a, const void *b) {
+    pthread_mutex_lock(&a->mtx);
+    if (a->num_elem == a->max_elem) {
+        pthread_mutex_unlock(&a->mtx);
+        return 0;
+    }
+    memcpy(a->buf + a->num_elem * a->size_elem, b, a->size_elem);
+    a->num_elem++;
+    pthread_cond_signal(&a->cnd);
+    pthread_mutex_unlock(&a->mtx);
+    return 1;
+}
+static inline int queue_try_remove(queue_t *a, void *b) {
+    pthread_mutex_lock(&a->mtx);
+    if (a->num_elem == 0) {
+        pthread_mutex_unlock(&a->mtx);
+        return 0;
+    }
+    memcpy(b, a->buf, a->size_elem);
+    memmove(a->buf, a->buf + a->size_elem, a->size_elem * (a->num_elem - 1));
+    a->num_elem--;
+    pthread_cond_signal(&a->cnd);
+    pthread_mutex_unlock(&a->mtx);
+    return 1;
+}
+static inline int queue_is_empty(queue_t *a) {
+    pthread_mutex_lock(&a->mtx);
+    bool ret = a->num_elem == 0;
+    pthread_mutex_unlock(&a->mtx);
+    return ret;
+}
+static inline int queue_is_full(queue_t *a) {
+    pthread_mutex_lock(&a->mtx);
+    bool ret = a->num_elem == a->max_elem;
+    pthread_mutex_unlock(&a->mtx);
+    return ret;
+}
+static inline void queue_clear(queue_t *a) {
+    pthread_mutex_lock(&a->mtx);
+    a->num_elem = 0;
+    pthread_mutex_unlock(&a->mtx);
+}
+extern pthread_t hcore0, hcore1;
+#define multicore_launch_core1(a) pthread_create(&hcore1, NULL, (void *(*) (void *))a, NULL)
+#define multicore_reset_core1() pthread_cancel(hcore1)
 
 #endif // _EMULATION_H_

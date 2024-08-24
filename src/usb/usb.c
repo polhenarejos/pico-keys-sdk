@@ -97,9 +97,7 @@ void usb_send_event(uint32_t flag) {
 
 extern void low_flash_init();
 void card_init_core1() {
-#ifndef ENABLE_EMULATION
     low_flash_init_core1();
-#endif
 }
 
 uint16_t finished_data_size = 0;

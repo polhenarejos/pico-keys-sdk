@@ -154,6 +154,6 @@ static inline void queue_clear(queue_t *a) {
 }
 extern pthread_t hcore0, hcore1;
 #define multicore_launch_core1(a) pthread_create(&hcore1, NULL, (void *(*) (void *))a, NULL)
-#define multicore_reset_core1() pthread_cancel(hcore1)
+#define multicore_reset_core1()
 
 #endif // _EMULATION_H_

@@ -19,10 +19,9 @@
 #include <string.h>
 #include <stdio.h>
 #if defined(ENABLE_EMULATION)
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
-
-mbedtls_ctr_drbg_context ctr_drbg;
+#include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
 extern uint32_t board_millis();
 #elif (ESP_PLATFORM)
 #include "bootloader_random.h"
@@ -42,6 +41,7 @@ extern uint32_t board_millis();
 
 void adc_start() {
 #if defined(ENABLE_EMULATION)
+    srand(time(0));
 #elif defined(ESP_PLATFORM)
     bootloader_random_enable();
 #else
@@ -65,16 +65,6 @@ static uint8_t ep_round = 0;
 static void ep_init() {
     random_word = 0xcbf29ce484222325;
     ep_round = 0;
-#ifdef ENABLE_EMULATION
-    mbedtls_entropy_context entropy;
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_ctr_drbg_seed(&ctr_drbg,
-                          mbedtls_entropy_func,
-                          &entropy,
-                          (const unsigned char *) "RANDOM_GEN",
-                          10);
-#endif
 }
 
 /* Here, we assume a little endian architecture.  */
@@ -85,7 +75,9 @@ static int ep_process() {
     uint64_t word = 0x0;
 
 #if defined(ENABLE_EMULATION)
-    mbedtls_ctr_drbg_random(&ctr_drbg, (uint8_t *) &word, sizeof(word));
+    word = rand();
+    word <<= 32;
+    word |= rand();
 #elif defined(ESP_PLATFORM)
     esp_fill_random((uint8_t *)&word, sizeof(word));
 #else

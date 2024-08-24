@@ -238,13 +238,7 @@ if (ENABLE_EMULATION)
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
     )
     set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ctr_drbg.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/entropy.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/entropy_poll.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aesni.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pem.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/base64.c
     )
     set(INCLUDES ${INCLUDES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation

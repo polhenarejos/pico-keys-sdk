@@ -225,7 +225,7 @@ void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint16_t of
 #endif
 #ifdef USB_ITF_CCID
     if (itf == ITF_CCID) {
-        driver_write_emul(itf, emul_tx, size_next);
+        driver_write_emul(itf, emul_tx + offset, size_next);
     }
 #endif
 }

@@ -302,7 +302,7 @@ void driver_exec_finished_ccid(uint8_t itf, uint16_t size_next) {
 }
 
 void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t offset) {
-    //ccid_response[itf] = (ccid_header_t *) (ccid_tx[itf].buffer + ccid_tx[itf].w_ptr + offset);
+    ccid_response[itf] = (ccid_header_t *) (ccid_tx[itf].buffer + ccid_tx[itf].w_ptr + offset);
     ccid_response[itf]->bMessageType = CCID_DATA_BLOCK_RET;
     ccid_response[itf]->dwLength = size_next;
     ccid_response[itf]->bSlot = 0;

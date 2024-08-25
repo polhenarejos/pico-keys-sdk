@@ -187,12 +187,14 @@ uint32_t tud_vendor_n_write(uint8_t itf, const uint8_t *buffer, uint32_t n) {
     return ret;
 }
 
+#ifdef USB_ITF_HID
 bool tud_hid_n_report(uint8_t itf, uint8_t report_id, const uint8_t *buffer, uint32_t n) {
     (void) itf;
     (void) report_id;
     uint16_t ret = driver_write_emul(ITF_HID, buffer, (uint16_t)n);
     return ret > 0;
 }
+#endif
 
 uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
     uint16_t size = htons(buffer_size);

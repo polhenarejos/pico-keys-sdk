@@ -92,13 +92,11 @@ typedef struct {
 }) ccid_header_t;
 
 uint8_t ccid_status = 1;
-static bool tx_finished = true;
 #ifndef ENABLE_EMULATION
 static uint8_t itf_num;
 #endif
 
 static usb_buffer_t ccid_rx[ITF_SC_TOTAL] = {0}, ccid_tx[ITF_SC_TOTAL] = {0};
-static write_status_t last_write_result[ITF_SC_TOTAL] = {0};
 
 int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read);
 
@@ -114,7 +112,6 @@ void ccid_write(uint8_t itf, uint16_t size) {
 ccid_header_t *ccid_response[ITF_SC_TOTAL];
 ccid_header_t *ccid_resp_fast[ITF_SC_TOTAL];
 ccid_header_t *ccid_header[ITF_SC_TOTAL];
-ccid_header_t ccid_response_last[ITF_SC_TOTAL];
 
 uint8_t sc_itf_to_usb_itf(uint8_t itf) {
     if (itf == ITF_SC_CCID) {
@@ -158,42 +155,23 @@ void tud_vendor_rx_cb(uint8_t itf) {
 }
 
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
-    if (sent_bytes) {
-#ifdef ESP_PLATFORM
-        taskENTER_CRITICAL(&mutex);
-#endif
-        if (last_write_result[itf] == WRITE_PENDING) {
-            last_write_result[itf] = WRITE_SUCCESS;
-            ccid_header_t *lresp = &ccid_response_last[itf];
-            if (lresp->bMessageType != CCID_DATA_BLOCK_RET || lresp->dwLength != 0 || lresp->bSlot != 0 || lresp->abRFU0 != CCID_CMD_STATUS_TIMEEXT) {
-                ccid_tx[itf].r_ptr += (uint16_t)sent_bytes;
-            }
-            if (ccid_tx[itf].r_ptr >= ccid_tx[itf].w_ptr) {
-                ccid_tx[itf].r_ptr = ccid_tx[itf].w_ptr = 0;
-                tx_finished = true;
-            }
-        }
-#ifdef ESP_PLATFORM
-        taskEXIT_CRITICAL(&mutex);
-#endif
-    }
+    (void) sent_bytes;
+    tud_vendor_n_write_flush(itf);
 }
 
 int driver_write_ccid(uint8_t itf, const uint8_t *tx_buffer, uint16_t buffer_size) {
-    if (last_write_result[itf] == WRITE_PENDING) {
-        return 0;
-    }
-    memcpy(&ccid_response_last[itf], tx_buffer, 10);
     if (*tx_buffer != 0x81) {
-        DEBUG_PAYLOAD(tx_buffer, MIN(buffer_size,64));
+        DEBUG_PAYLOAD(tx_buffer, buffer_size);
     }
-    int r = tud_vendor_n_write(itf, tx_buffer, MIN(buffer_size,64));
-    last_write_result[itf] = r > 0 ? WRITE_PENDING : WRITE_FAILED;
-    if (r < buffer_size) {
-        tx_finished = false;
-    }
+    int r = tud_vendor_n_write(itf, tx_buffer, buffer_size);
     if (r > 0) {
-        r = tud_vendor_n_flush(itf);
+        tud_vendor_n_flush(itf);
+
+        ccid_tx[itf].r_ptr += (uint16_t)buffer_size;
+        if (ccid_tx[itf].r_ptr >= ccid_tx[itf].w_ptr) {
+            ccid_tx[itf].r_ptr = ccid_tx[itf].w_ptr = 0;
+        }
+
     }
 #ifdef ENABLE_EMULATION
     tud_vendor_tx_cb(itf, r);
@@ -202,10 +180,7 @@ int driver_write_ccid(uint8_t itf, const uint8_t *tx_buffer, uint16_t buffer_siz
 }
 
 int ccid_write_fast(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
-    if (tx_finished) {
-        return driver_write_ccid(itf, buffer, buffer_size);
-    }
-    return 0;
+    return driver_write_ccid(itf, buffer, buffer_size);
 }
 
 int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
@@ -333,7 +308,7 @@ void ccid_task() {
         else if (status == CCID_ERR_BLOCKED) {
             driver_exec_timeout_ccid(itf);
         }
-        if (ccid_tx[itf].w_ptr > ccid_tx[itf].r_ptr && last_write_result[itf] != WRITE_PENDING) {
+        if (ccid_tx[itf].w_ptr > ccid_tx[itf].r_ptr) {
             if (driver_write_ccid(itf, ccid_tx[itf].buffer + ccid_tx[itf].r_ptr, ccid_tx[itf].w_ptr - ccid_tx[itf].r_ptr) > 0) {
 
             }

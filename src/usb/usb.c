@@ -40,6 +40,9 @@
 static uint32_t timeout_counter[ITF_TOTAL] = { 0 };
 static uint8_t card_locked_itf = ITF_TOTAL; // no locked
 static void (*card_locked_func)(void) = NULL;
+#ifndef ENABLE_EMULATION
+static mutex_t mutex;
+#endif
 
 void usb_set_timeout_counter(uint8_t itf, uint32_t v) {
     timeout_counter[itf] = v;
@@ -68,6 +71,7 @@ void usb_init() {
             desc_device.idProduct = (data[PHY_PID] << 8) | data[PHY_PID+1];
         }
     }
+    mutex_init(&mutex);
 #endif
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
@@ -87,12 +91,18 @@ bool is_busy() {
 }
 
 void usb_send_event(uint32_t flag) {
+#ifndef ENABLE_EMULATION
+    mutex_enter_blocking(&mutex);
+#endif
     queue_add_blocking(&usb_to_card_q, &flag);
     if (flag == EV_CMD_AVAILABLE) {
         timeout_start();
     }
     uint32_t m;
     queue_remove_blocking(&card_to_usb_q , &m);
+#ifndef ENABLE_EMULATION
+    mutex_exit(&mutex);
+#endif
 }
 
 extern void low_flash_init();
@@ -127,9 +137,15 @@ void card_exit() {
             }
         }
         while (queue_is_empty(&card_to_usb_q) == false) {
+#ifndef ENABLE_EMULATION
+            mutex_enter_blocking(&mutex);
+#endif
             if (queue_try_remove(&card_to_usb_q, &m) == false) {
                 break;
             }
+#ifndef ENABLE_EMULATION
+            mutex_exit(&mutex);
+#endif
         }
         led_set_blink(BLINK_SUSPENDED);
         multicore_reset_core1();
@@ -159,7 +175,13 @@ void usb_task() {
 int card_status(uint8_t itf) {
     if (card_locked_itf == itf) {
         uint32_t m = 0x0;
+#ifndef ENABLE_EMULATION
+        mutex_enter_blocking(&mutex);
+#endif
         bool has_m = queue_try_remove(&card_to_usb_q, &m);
+#ifndef ENABLE_EMULATION
+        mutex_exit(&mutex);
+#endif
         //if (m != 0)
         //    printf("\n ------ M = %lu\n",m);
         if (has_m) {

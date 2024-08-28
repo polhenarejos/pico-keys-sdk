@@ -29,11 +29,14 @@
 #include "tusb.h"
 #else
 #include "pico/stdlib.h"
+#include "bsp/board.h"
+#include "pico/aon_timer.h"
 #endif
 
 #include "random.h"
 #include "pico_keys.h"
 #include "apdu.h"
+#include "usb.h"
 #ifdef CYW43_WL_GPIO_LED_PIN
 #include "pico/cyw43_arch.h"
 #endif
@@ -84,13 +87,6 @@ static inline void ws2812_program_init(PIO pio,
     pio_sm_set_enabled(pio, sm, true);
 }
 #endif
-
-#if !defined(ESP_PLATFORM) && !defined(ENABLE_EMULATION)
-#include "hardware/rtc.h"
-#include "bsp/board.h"
-#endif
-
-#include "usb.h"
 
 extern void do_flash();
 extern void low_flash_init();
@@ -309,20 +305,10 @@ void led_off_all() {
 }
 
 void init_rtc() {
-#if defined(ENABLE_EMULATION)
-#elif defined(ESP_PLATFORM)
-#else
-    rtc_init();
-    datetime_t dt = {
-        .year  = 2020,
-        .month = 1,
-        .day   = 1,
-        .dotw  = 3,     // 0 is Sunday, so 5 is Friday
-        .hour  = 00,
-        .min   = 00,
-        .sec   = 00
-    };
-    rtc_set_datetime(&dt);
+#ifdef PICO_PLATFORM
+    struct timespec tv = {0};
+    tv.tv_sec = 1577836800; // 2020-01-01
+    aon_timer_start(&tv);
 #endif
 }
 

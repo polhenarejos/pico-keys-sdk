@@ -17,8 +17,7 @@
 
 #include "random.h"
 #include "pico_keys.h"
-#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
-#include "hardware/rtc.h"
+#ifdef PICO_PLATFORM
 #include "bsp/board.h"
 #endif
 #ifdef ESP_PLATFORM

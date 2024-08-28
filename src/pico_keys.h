@@ -18,6 +18,10 @@
 #ifndef _PICO_KEYS_H_
 #define _PICO_KEYS_H_
 
+#if defined(PICO_RP2040) || defined(PICO_RP2350)
+#define PICO_PLATFORM
+#endif
+
 #include "file.h"
 #if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 #include <stdint.h>

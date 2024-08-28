@@ -52,12 +52,17 @@
 
 //To avoid possible future allocations, data region starts at the end of flash and goes upwards to the center region
 
+#ifdef PICO_RP2350
+// Table partition for RP2350 needs 8kb
+const uintptr_t end_flash = (XIP_BASE + PICO_FLASH_SIZE_BYTES - 2 * FLASH_SECTOR_SIZE);
+#else
+const uintptr_t end_flash = (XIP_BASE + PICO_FLASH_SIZE_BYTES);
+#endif
+
+const uintptr_t end_rom_pool = end_flash - FLASH_DATA_HEADER_SIZE - 4; //This is a fixed value. DO NOT CHANGE
+const uintptr_t start_rom_pool = end_rom_pool - FLASH_PERMANENT_REGION; //This is a fixed value. DO NOT CHANGE
+const uintptr_t end_data_pool = start_rom_pool - FLASH_DATA_HEADER_SIZE;  //This is a fixed value. DO NOT CHANGE
 const uintptr_t start_data_pool = (XIP_BASE + FLASH_TARGET_OFFSET);
-const uintptr_t end_data_pool = (XIP_BASE + PICO_FLASH_SIZE_BYTES) - FLASH_DATA_HEADER_SIZE -
-                                FLASH_PERMANENT_REGION - FLASH_DATA_HEADER_SIZE - 4;                                                           //This is a fixed value. DO NOT CHANGE
-const uintptr_t end_rom_pool = (XIP_BASE + PICO_FLASH_SIZE_BYTES) - FLASH_DATA_HEADER_SIZE - 4; //This is a fixed value. DO NOT CHANGE
-const uintptr_t start_rom_pool = (XIP_BASE + PICO_FLASH_SIZE_BYTES) - FLASH_DATA_HEADER_SIZE -
-                                 FLASH_PERMANENT_REGION;                                                           //This is a fixed value. DO NOT CHANGE
 
 extern int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len);
 extern int flash_program_halfword(uintptr_t addr, uint16_t data);

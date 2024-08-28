@@ -251,8 +251,7 @@ void scan_region(bool persistent) {
         endp = end_rom_pool;
         startp = start_rom_pool;
     }
-    for (uintptr_t base = flash_read_uintptr(endp); base >= startp;
-         base = flash_read_uintptr(base)) {
+    for (uintptr_t base = flash_read_uintptr(endp); base >= startp; base = flash_read_uintptr(base)) {
         if (base == 0x0) { //all is empty
             break;
         }
@@ -276,8 +275,8 @@ void scan_region(bool persistent) {
 void wait_flash_finish();
 void scan_flash() {
     initialize_flash(false); //soft initialization
-    if (*(uintptr_t *) flash_read(end_rom_pool) == 0xffffffff &&
-        *(uintptr_t *) flash_read(end_rom_pool + sizeof(uintptr_t)) == 0xffffffff) {
+    uint32_t r1 = *(uintptr_t *) flash_read(end_rom_pool), r2 = *(uintptr_t *) flash_read(end_rom_pool + sizeof(uintptr_t));
+    if ((r1 == 0xffffffff || r1 == 0xefefefef) && (r2 == 0xffffffff || r2 == 0xefefefef)) {
         printf("First initialization (or corrupted!)\n");
         uint8_t empty[sizeof(uintptr_t) * 2 + sizeof(uint32_t)];
         memset(empty, 0, sizeof(empty));

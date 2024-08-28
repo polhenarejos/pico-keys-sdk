@@ -202,7 +202,6 @@ set(LIBRARIES
     hardware_sync
     hardware_adc
     pico_unique_id
-    hardware_rtc
     tinyusb_device
     tinyusb_board
     hardware_pio
@@ -282,6 +281,10 @@ set(
         COMPILE_FLAGS " -W3 -wd4242 -wd4065"
     )
 endif()
+if (PICO_RP2350)
+pico_set_uf2_family(${CMAKE_PROJECT_NAME} "rp2350-arm-s")
+pico_embed_pt_in_binary(${CMAKE_PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/config/rp2350/pt.json")
+endif()
 set(INTERNAL_SOURCES ${SOURCES})
 set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
 if (NOT TARGET pico_keys_sdk)
@@ -289,6 +292,8 @@ if (NOT TARGET pico_keys_sdk)
         add_impl_library(pico_keys_sdk)
     else()
         pico_add_library(pico_keys_sdk)
+
+        pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
     endif()
     target_sources(pico_keys_sdk INTERFACE
         ${SOURCES}

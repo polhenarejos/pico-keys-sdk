@@ -110,6 +110,7 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
     (void) buffer;
     (void) reqlen;
     printf("get_report %d %d %d\n", itf, report_id, report_type);
+    memset(buffer, 0, reqlen);
     DEBUG_PAYLOAD(buffer, reqlen);
     if (hid_get_report_cb) {
         hid_get_report_cb(itf, report_id, report_type, buffer, reqlen);

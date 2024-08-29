@@ -12,6 +12,7 @@
     {
       "name": "Pico Keys Firmware",
       "id": 0,
+      "start": 0,
       "size": "1024K",
       "families": ["rp2350-arm-s", "rp2350-riscv"],
       "permissions": {

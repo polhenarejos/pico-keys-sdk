@@ -119,6 +119,7 @@ void card_start(uint8_t itf, void (*func)(void)) {
             card_exit();
         }
         if (func) {
+            multicore_reset_core1();
             multicore_launch_core1(func);
         }
         led_set_blink(BLINK_MOUNTED);
@@ -148,7 +149,6 @@ void card_exit() {
 #endif
         }
         led_set_blink(BLINK_SUSPENDED);
-        multicore_reset_core1();
 #ifdef ESP_PLATFORM
         hcore1 = NULL;
 #endif

@@ -63,6 +63,7 @@ extern bool tud_hid_n_report(uint8_t itf, uint8_t report_id, const uint8_t *buff
 #endif
 
 #include <pthread.h>
+#include <semaphore.h>
 typedef struct {
     pthread_mutex_t mtx;
     pthread_cond_t  cnd;
@@ -155,5 +156,15 @@ static inline void queue_clear(queue_t *a) {
 extern pthread_t hcore0, hcore1;
 #define multicore_launch_core1(a) pthread_create(&hcore1, NULL, (void *(*) (void *))a, NULL)
 #define multicore_reset_core1()
+
+typedef pthread_mutex_t mutex_t;
+typedef sem_t semaphore_t;
+#define mutex_init(a) pthread_mutex_init(a, NULL)
+#define mutex_try_enter(a,b) (pthread_mutex_trylock(a) == 0)
+#define mutex_enter_blocking(a) pthread_mutex_lock(a)
+#define mutex_exit(a) pthread_mutex_unlock(a)
+#define sem_release(a) sem_post(a)
+#define sem_acquire_blocking(a) sem_wait(a)
+#define multicore_lockout_victim_init() (void)0
 
 #endif // _EMULATION_H_

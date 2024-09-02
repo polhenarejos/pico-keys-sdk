@@ -200,7 +200,7 @@ static void send_hid_report(uint8_t report_id) {
 #endif
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len) {
-    printf("report_complete %d %d %d\n", instance, len, send_buffer_size[instance]);
+    //printf("report_complete %d %d %d\n", instance, len, send_buffer_size[instance]);
     if (instance == ITF_HID_CTAP && len > 0) {
 #ifdef ESP_PLATFORM
         taskENTER_CRITICAL(&mutex);

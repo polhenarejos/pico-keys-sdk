@@ -218,6 +218,8 @@ int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
                 }
                 ccid_status = 0;
                 ccid_write_fast(itf, (const uint8_t *)ccid_resp_fast[itf], (uint16_t)(size_atr + 10));
+
+                led_set_blink(BLINK_MOUNTED);
             }
             else if (ccid_header[itf]->bMessageType == CCID_POWER_OFF) {
                 if (ccid_status == 0) {
@@ -231,6 +233,8 @@ int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
                 ccid_resp_fast[itf]->abRFU0 = ccid_status;
                 ccid_resp_fast[itf]->abRFU1 = 0;
                 ccid_write_fast(itf, (const uint8_t *)ccid_resp_fast[itf], 10);
+
+                led_set_blink(BLINK_SUSPENDED);
             }
             else if (ccid_header[itf]->bMessageType == CCID_SET_PARAMS ||
                      ccid_header[itf]->bMessageType == CCID_GET_PARAMS ||

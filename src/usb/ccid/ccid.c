@@ -20,9 +20,6 @@
 #ifdef PICO_PLATFORM
 #include "bsp/board.h"
 #endif
-#ifdef ESP_PLATFORM
-static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
-#endif
 #ifndef ENABLE_EMULATION
 #include "tusb.h"
 #include "device/usbd_pvt.h"

@@ -27,10 +27,19 @@
 #include "emulation.h"
 #elif defined(ESP_PLATFORM)
 #include "tusb.h"
+#include "driver/gpio.h"
+#include "rom/gpio.h"
+#include "tinyusb.h"
+#include "esp_efuse.h"
+#define BOOT_PIN GPIO_NUM_0
 #else
 #include "pico/stdlib.h"
 #include "bsp/board.h"
 #include "pico/aon_timer.h"
+#include "hardware/gpio.h"
+#include "hardware/sync.h"
+#include "hardware/structs/ioqspi.h"
+#include "hardware/structs/sio.h"
 #endif
 
 #include "random.h"
@@ -190,8 +199,48 @@ uint32_t board_millis() {
 
 #else
 #ifdef ESP_PLATFORM
-bool board_button_read() {
-    return true;
+bool picok_board_button_read() {
+    int boot_state = gpio_get_level(BOOT_PIN);
+    return boot_state == 0;
+}
+#else
+bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
+    const uint CS_PIN_INDEX = 1;
+
+    // Must disable interrupts, as interrupt handlers may be in flash, and we
+    // are about to temporarily disable flash access!
+    uint32_t flags = save_and_disable_interrupts();
+
+    // Set chip select to Hi-Z
+    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
+                    GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    // Note we can't call into any sleep functions in flash right now
+    for (volatile int i = 0; i < 1000; ++i);
+
+    // The HI GPIO registers in SIO can observe and control the 6 QSPI pins.
+    // Note the button pulls the pin *low* when pressed.
+#if PICO_RP2040
+    #define CS_BIT (1u << 1)
+#else
+    #define CS_BIT SIO_GPIO_HI_IN_QSPI_CSN_BITS
+#endif
+    bool button_state = !(sio_hw->gpio_hi_in & CS_BIT);
+
+    // Need to restore the state of chip select, else we are going to have a
+    // bad time when we return to code in flash!
+    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
+                    GPIO_OVERRIDE_NORMAL << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
+                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
+
+    restore_interrupts(flags);
+
+    return button_state;
+}
+uint32_t picok_board_button_read(void)
+{
+  return picok_get_bootsel_button();
 }
 #endif
 bool button_pressed_state = false;
@@ -203,7 +252,7 @@ bool wait_button() {
     cancel_button = false;
     led_set_blink((1000 << 16) | 100);
     req_button_pending = true;
-    while (board_button_read() == false && cancel_button == false) {
+    while (picok_board_button_read() == false && cancel_button == false) {
         execute_tasks();
         //sleep_ms(10);
         if (start_button + button_timeout < board_millis()) { /* timeout */
@@ -212,7 +261,7 @@ bool wait_button() {
         }
     }
     if (!timeout) {
-        while (board_button_read() == true && cancel_button == false) {
+        while (picok_board_button_read() == true && cancel_button == false) {
             execute_tasks();
             //sleep_ms(10);
             if (start_button + 15000 < board_millis()) { /* timeout */
@@ -329,8 +378,8 @@ void core0_loop() {
         neug_task();
         do_flash();
 #ifndef ENABLE_EMULATION
-        if (board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up
-            bool current_button_state = board_button_read();
+        if (button_pressed_cb && board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up
+            bool current_button_state = picok_board_button_read();
             if (current_button_state != button_pressed_state) {
                 if (current_button_state == false) { // unpressed
                     if (button_pressed_time == 0 || button_pressed_time + 1000 > board_millis()) {
@@ -357,8 +406,6 @@ void core0_loop() {
 char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
 pico_unique_board_id_t pico_serial;
 #ifdef ESP_PLATFORM
-#include "tinyusb.h"
-#include "esp_efuse.h"
 #define pico_get_unique_board_id(a) do { uint32_t value; esp_efuse_read_block(EFUSE_BLK1, &value, 0, 32); memcpy((uint8_t *)(a), &value, sizeof(uint32_t)); esp_efuse_read_block(EFUSE_BLK1, &value, 32, 32); memcpy((uint8_t *)(a)+4, &value, sizeof(uint32_t)); } while(0)
 extern tinyusb_config_t tusb_cfg;
 extern bool enable_wcid;
@@ -414,6 +461,10 @@ int main(void) {
     usb_init();
 #ifndef ENABLE_EMULATION
 #ifdef ESP_PLATFORM
+    gpio_pad_select_gpio(BOOT_PIN);
+    gpio_set_direction(BOOT_PIN, GPIO_MODE_INPUT);
+    gpio_pulldown_dis(BOOT_PIN);
+
     tusb_cfg.string_descriptor[3] = pico_serial_str;
     if (enable_wcid) {
         tusb_cfg.configuration_descriptor = desc_config;

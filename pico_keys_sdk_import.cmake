@@ -26,12 +26,13 @@ elseif (VIDPID STREQUAL "NitroFIDO2")
      set(USB_VID 0x20A0)
      set(USB_PID 0x42B1)
 elseif (VIDPID STREQUAL "NitroStart")
-     set(USB_VID 0x20A0)
+         set(USB_VID 0x20A0)
      set(USB_PID 0x4211)
-elseif (VIDPID STREQUAL "NitroPro")
+    elseif (VIDPID STREQUAL "NitroPro")
      set(USB_VID 0x20A0)
-     set(USB_PID 0x4108)
-elseif (VIDPID STREQUAL "Nitro3")
+         set(USB_PID 0x4108)
+
+    elseif (VIDPID STREQUAL "Nitro3")
      set(USB_VID 0x20A0)
      set(USB_PID 0x42B2)
 elseif (VIDPID STREQUAL "Yubikey5")
@@ -157,7 +158,26 @@ set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/crypto_utils.c
     ${CMAKE_CURRENT_LIST_DIR}/src/asn1.c
     ${CMAKE_CURRENT_LIST_DIR}/src/apdu.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/led/led.c
 )
+if (PICO_BOARD STREQUAL "pico_w")
+    set(SOURCES ${SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/led/led_cyw43.c
+    )
+elseif (PICO_BOARD MATCHES "^pimoroni")
+    set(SOURCES ${SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pimoroni.c
+    )
+elseif (ESP_PLATFORM)
+    set(SOURCES ${SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c
+    )
+else()
+    set(SOURCES ${SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/led/led_ws2812.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
+    )
+endif()
 ## mbedTLS reports an stringop overflow for cmac.c
 if (NOT ENABLE_EMULATION AND NOT APPLE)
     set_source_files_properties(
@@ -171,6 +191,7 @@ set(INCLUDES ${INCLUDES}
     ${CMAKE_CURRENT_LIST_DIR}/src/usb
     ${CMAKE_CURRENT_LIST_DIR}/src/fs
     ${CMAKE_CURRENT_LIST_DIR}/src/rng
+    ${CMAKE_CURRENT_LIST_DIR}/src/led
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library
 )

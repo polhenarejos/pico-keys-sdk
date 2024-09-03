@@ -21,9 +21,6 @@
 // Pico
 
 #if defined(ENABLE_EMULATION)
-#if !defined(_MSC_VER)
-#include <sys/time.h>
-#endif
 #include "emulation.h"
 #elif defined(ESP_PLATFORM)
 #include "tusb.h"
@@ -46,57 +43,6 @@
 #include "pico_keys.h"
 #include "apdu.h"
 #include "usb.h"
-#ifdef CYW43_WL_GPIO_LED_PIN
-#include "pico/cyw43_arch.h"
-#endif
-#ifdef PICO_DEFAULT_WS2812_PIN
-#include "hardware/pio.h"
-#include "hardware/clocks.h"
-#define ws2812_wrap_target 0
-#define ws2812_wrap 3
-#define ws2812_T1 2
-#define ws2812_T2 5
-#define ws2812_T3 3
-static const uint16_t ws2812_program_instructions[] = {
-    //     .wrap_target
-    0x6221, //  0: out    x, 1            side 0 [2]
-    0x1123, //  1: jmp    !x, 3           side 1 [1]
-    0x1400, //  2: jmp    0               side 1 [4]
-    0xa442, //  3: nop                    side 0 [4]
-            //     .wrap
-};
-static const struct pio_program ws2812_program = {
-    .instructions = ws2812_program_instructions,
-    .length = 4,
-    .origin = -1,
-};
-
-static inline pio_sm_config ws2812_program_get_default_config(uint offset) {
-    pio_sm_config c = pio_get_default_sm_config();
-    sm_config_set_wrap(&c, offset + ws2812_wrap_target, offset + ws2812_wrap);
-    sm_config_set_sideset(&c, 1, false, false);
-    return c;
-}
-static inline void ws2812_program_init(PIO pio,
-                                       uint sm,
-                                       uint offset,
-                                       uint pin,
-                                       float freq,
-                                       bool rgbw) {
-    pio_gpio_init(pio, pin);
-    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
-    pio_sm_config c = ws2812_program_get_default_config(offset);
-    sm_config_set_sideset_pins(&c, pin);
-    sm_config_set_out_shift(&c, false, true, rgbw ? 32 : 24);
-    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
-    int cycles_per_bit = ws2812_T1 + ws2812_T2 + ws2812_T3;
-    float div = clock_get_hz(clk_sys) / (freq * cycles_per_bit);
-    sm_config_set_clkdiv(&c, div);
-    pio_sm_init(pio, sm, offset, &c);
-    pio_sm_set_enabled(pio, sm, true);
-}
-#endif
-
 extern void do_flash();
 extern void low_flash_init();
 
@@ -144,12 +90,6 @@ int select_app(const uint8_t *aid, size_t aid_len) {
 
 int (*button_pressed_cb)(uint8_t) = NULL;
 
-static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
-
-void led_set_blink(uint32_t mode) {
-    blink_interval_ms = mode;
-}
-
 void execute_tasks();
 
 static bool req_button_pending = false;
@@ -191,12 +131,6 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
     return 0;
 }
 #endif
-uint32_t board_millis() {
-    struct timeval start;
-    gettimeofday(&start, NULL);
-    return start.tv_sec * 1000 + start.tv_usec / 1000;
-}
-
 #else
 #ifdef ESP_PLATFORM
 bool picok_board_button_read() {
@@ -250,7 +184,7 @@ bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
     cancel_button = false;
-    led_set_blink((1000 << 16) | 100);
+    led_set_blink(BLINK_BUTTON);
     req_button_pending = true;
     while (picok_board_button_read() == false && cancel_button == false) {
         execute_tasks();
@@ -277,81 +211,6 @@ bool wait_button() {
 #endif
 
 struct apdu apdu;
-
-#ifdef ESP_PLATFORM
-#include "driver/gpio.h"
-#include "neopixel.h"
-tNeopixelContext neopixel = NULL;
-tNeopixel pixel[] =
-   {
-       { 0, NP_RGB(0,  0,  0) }, /* off */
-       { 0, NP_RGB(255,  0, 255) }, /* magenta */
-       { 0, NP_RGB(255,  0, 0) }, /* green */
-       { 0, NP_RGB(0, 255,  0) }, /* red */
-       { 0, NP_RGB(0, 0,  255) }, /* red */
-       { 0, NP_RGB(255,  255, 0) }, /* yellow */
-       { 0, NP_RGB(0, 255,  255) }, /* cyan */
-       { 0, NP_RGB(255, 255,  255) }, /* white */
-   };
-#endif
-void led_blinking_task() {
-    static uint32_t start_ms = 0;
-    static uint8_t led_state = false;
-#ifdef PICO_DEFAULT_LED_PIN_INVERTED
-    uint32_t interval = !led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
-#else
-    uint32_t interval = led_state ? blink_interval_ms & 0xffff : blink_interval_ms >> 16;
-#endif
-#ifdef PICO_DEFAULT_LED_PIN
-    static uint8_t led_color = PICO_DEFAULT_LED_PIN;
-#elif defined(PICO_DEFAULT_WS2812_PIN)
-#elif defined(CYW43_WL_GPIO_LED_PIN)
-    static uint8_t led_color = CYW43_WL_GPIO_LED_PIN;
-#endif
-
-    // Blink every interval ms
-    if (board_millis() - start_ms < interval) {
-        return; // not enough time
-    }
-    start_ms += interval;
-
-#ifdef PICO_DEFAULT_LED_PIN
-    gpio_put(led_color, led_state);
-#elif defined(PICO_DEFAULT_WS2812_PIN)
-    if (led_state == 0) {
-        pio_sm_put_blocking(pio0, 0, 0);
-    }
-    else {
-        pio_sm_put_blocking(pio0, 0, 0xff000000);
-    }
-#elif defined(CYW43_WL_GPIO_LED_PIN)
-    cyw43_arch_gpio_put(led_color, led_state);
-#elif defined(ESP_PLATFORM)
-    neopixel_SetPixel(neopixel, &pixel[led_state], 1);
-#endif
-    led_state ^= 1; // toggle
-}
-
-void led_off_all() {
-#ifndef ENABLE_EMULATION
-#ifdef PIMORONI_TINY2040
-    gpio_put(TINY2040_LED_R_PIN, 1);
-    gpio_put(TINY2040_LED_G_PIN, 1);
-    gpio_put(TINY2040_LED_B_PIN, 1);
-#elif defined(PICO_DEFAULT_LED_PIN)
-    gpio_put(PICO_DEFAULT_LED_PIN, 0);
-#elif defined(CYW43_WL_GPIO_LED_PIN)
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-#endif
-#if (PICO_DEFAULT_WS2812_PIN)
-    PIO pio = pio0;
-    int sm = 0;
-    uint offset = pio_add_program(pio, &ws2812_program);
-
-    ws2812_program_init(pio, sm, offset, PICO_DEFAULT_WS2812_PIN, 800000, true);
-#endif
-#endif
-}
 
 void init_rtc() {
 #ifdef PICO_PLATFORM
@@ -429,23 +288,8 @@ int main(void) {
     board_init();
     stdio_init_all();
 #endif
-#ifdef PIMORONI_TINY2040
-    gpio_init(TINY2040_LED_R_PIN);
-    gpio_set_dir(TINY2040_LED_R_PIN, GPIO_OUT);
-    gpio_init(TINY2040_LED_G_PIN);
-    gpio_set_dir(TINY2040_LED_G_PIN, GPIO_OUT);
-    gpio_init(TINY2040_LED_B_PIN);
-    gpio_set_dir(TINY2040_LED_B_PIN, GPIO_OUT);
-#elif defined(PICO_DEFAULT_LED_PIN)
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-#elif defined(CYW43_WL_GPIO_LED_PIN)
-    cyw43_arch_init();
-#endif
+    led_init();
 
-    led_off_all();
-
-    //prepare_ccid();
 #else
     emul_init("127.0.0.1", 35963);
 #endif
@@ -473,16 +317,6 @@ int main(void) {
 #else
     tusb_init();
 #endif
-#endif
-
-#ifdef ESP_PLATFORM
-    uint8_t gpio = GPIO_NUM_48;
-    if (file_has_data(ef_phy)) {
-        if (file_read_uint8_offset(ef_phy, PHY_OPTS) & PHY_OPT_GPIO) {
-            gpio = file_get_data(ef_phy)[PHY_LED_GPIO];
-        }
-    }
-    neopixel = neopixel_Init(1, gpio);
 #endif
 
 #ifdef ESP_PLATFORM

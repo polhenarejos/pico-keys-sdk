@@ -23,11 +23,9 @@
 #endif
 
 #include "file.h"
+#include "led/led.h"
 #if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 #include <stdint.h>
-#ifdef ENABLE_EMULATION
-extern uint32_t board_millis();
-#endif
 #if !defined(MIN)
 #if defined(_MSC_VER)
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -80,17 +78,6 @@ extern void low_flash_available();
 extern int flash_clear_file(file_t *file);
 
 extern int (*button_pressed_cb)(uint8_t);
-
-enum  {
-    BLINK_NOT_MOUNTED = (250 << 16) | 250,
-    BLINK_MOUNTED     = (250 << 16) | 250,
-    BLINK_SUSPENDED   = (500 << 16) | 1000,
-    BLINK_PROCESSING  = (50 << 16) | 50,
-
-    BLINK_ALWAYS_ON   = UINT32_MAX,
-    BLINK_ALWAYS_OFF  = 0
-};
-extern void led_set_blink(uint32_t mode);
 
 extern bool is_req_button_pending();
 extern uint32_t button_timeout;

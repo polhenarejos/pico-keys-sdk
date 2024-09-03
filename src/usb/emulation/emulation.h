@@ -22,14 +22,23 @@
 #include <string.h>
 #ifdef _MSC_VER
 #include <windows.h>
+#else
+#include <sys/time.h>
 #endif
 #include <stdbool.h>
+
 #define USB_BUFFER_SIZE 2048
 extern int emul_init(char *host, uint16_t port);
 extern uint8_t emul_rx[USB_BUFFER_SIZE];
 extern uint16_t emul_rx_size, emul_tx_size;
 extern uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size);
 extern uint16_t emul_read(uint8_t itf);
+
+static inline uint32_t board_millis() {
+    struct timeval start;
+    gettimeofday(&start, NULL);
+    return start.tv_sec * 1000 + start.tv_usec / 1000;
+}
 
 #ifdef USB_ITF_HID
 typedef uint8_t hid_report_type_t;

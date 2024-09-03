@@ -22,7 +22,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <time.h>
-extern uint32_t board_millis();
+#include "emulation.h"
 #elif (ESP_PLATFORM)
 #include "bootloader_random.h"
 #include "esp_random.h"

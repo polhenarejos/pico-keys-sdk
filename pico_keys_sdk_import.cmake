@@ -1,23 +1,23 @@
- #
- # This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
- # Copyright (c) 2022 Pol Henarejos.
- #
- # This program is free software: you can redistribute it and/or modify
- # it under the terms of the GNU General Public License as published by
- # the Free Software Foundation, version 3.
- #
- # This program is distributed in the hope that it will be useful, but
- # WITHOUT ANY WARRANTY; without even the implied warranty of
- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- # General Public License for more details.
- #
- # You should have received a copy of the GNU General Public License
- # along with this program. If not, see <http://www.gnu.org/licenses/>.
- #
+#
+# This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
+# Copyright (c) 2022 Pol Henarejos.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
 
 macro(HEXCHAR2DEC VAR VAL)
-    if (${VAL} MATCHES "[0-9]")
+    if(${VAL} MATCHES "[0-9]")
         SET(${VAR} ${VAL})
     elseif(${VAL} MATCHES "[aA]")
         SET(${VAR} 10)
@@ -40,7 +40,7 @@ macro(HEX2DEC VAR VAL)
     SET(CURINDEX 0)
     STRING(LENGTH "${VAL}" CURLENGTH)
     SET(${VAR} 0)
-    while (CURINDEX LESS  CURLENGTH)
+    while(CURINDEX LESS CURLENGTH)
         STRING(SUBSTRING "${VAL}" ${CURINDEX} 1 CHAR)
         HEXCHAR2DEC(CHAR ${CHAR})
         MATH(EXPR POWAH "(1<<((${CURLENGTH}-${CURINDEX}-1)*4))")
@@ -58,7 +58,7 @@ macro(SET_VERSION MAJOR MINOR FILE)
     HEX2DEC(ver_major ${ver_major})
     HEX2DEC(ver_minor ${ver_minor})
     message(STATUS "Found version: ${ver_major}.${ver_minor}")
-    if (NOT ENABLE_EMULATION AND NOT ESP_PLATFORM)
+    if(NOT ENABLE_EMULATION AND NOT ESP_PLATFORM)
         pico_set_binary_version(${CMAKE_PROJECT_NAME} MAJOR ${ver_major} MINOR ${ver_minor})
     endif()
     SET(${MAJOR} ${ver_major})
@@ -69,41 +69,41 @@ option(VIDPID "Set specific VID/PID from a known platform {NitroHSM, NitroFIDO2,
 
 message(STATUS "VIDPID:\t\t\t '${VIDPID}'")
 
-if (VIDPID STREQUAL "NitroHSM")
-     set(USB_VID 0x20A0)
-     set(USB_PID 0x4230)
-elseif (VIDPID STREQUAL "NitroFIDO2")
-     set(USB_VID 0x20A0)
-     set(USB_PID 0x42B1)
-elseif (VIDPID STREQUAL "NitroStart")
-         set(USB_VID 0x20A0)
-     set(USB_PID 0x4211)
-    elseif (VIDPID STREQUAL "NitroPro")
-     set(USB_VID 0x20A0)
-         set(USB_PID 0x4108)
+if(VIDPID STREQUAL "NitroHSM")
+    set(USB_VID 0x20A0)
+    set(USB_PID 0x4230)
+elseif(VIDPID STREQUAL "NitroFIDO2")
+    set(USB_VID 0x20A0)
+    set(USB_PID 0x42B1)
+elseif(VIDPID STREQUAL "NitroStart")
+    set(USB_VID 0x20A0)
+    set(USB_PID 0x4211)
+elseif(VIDPID STREQUAL "NitroPro")
+    set(USB_VID 0x20A0)
+    set(USB_PID 0x4108)
 
-    elseif (VIDPID STREQUAL "Nitro3")
-     set(USB_VID 0x20A0)
-     set(USB_PID 0x42B2)
-elseif (VIDPID STREQUAL "Yubikey5")
-     set(USB_VID 0x1050)
-     set(USB_PID 0x0407)
-elseif (VIDPID STREQUAL "YubikeyNeo")
-     set(USB_VID 0x1050)
-     set(USB_PID 0x0116)
-elseif (VIDPID STREQUAL "YubiHSM")
-     set(USB_VID 0x1050)
-     set(USB_PID 0x0030)
-elseif (VIDPID STREQUAL "Gnuk")
-     set(USB_VID 0x234B)
-     set(USB_PID 0x0000)
-elseif (VIDPID STREQUAL "GnuPG")
-     set(USB_VID 0x1209)
-     set(USB_PID 0x2440)
+elseif(VIDPID STREQUAL "Nitro3")
+    set(USB_VID 0x20A0)
+    set(USB_PID 0x42B2)
+elseif(VIDPID STREQUAL "Yubikey5")
+    set(USB_VID 0x1050)
+    set(USB_PID 0x0407)
+elseif(VIDPID STREQUAL "YubikeyNeo")
+    set(USB_VID 0x1050)
+    set(USB_PID 0x0116)
+elseif(VIDPID STREQUAL "YubiHSM")
+    set(USB_VID 0x1050)
+    set(USB_PID 0x0030)
+elseif(VIDPID STREQUAL "Gnuk")
+    set(USB_VID 0x234B)
+    set(USB_PID 0x0000)
+elseif(VIDPID STREQUAL "GnuPG")
+    set(USB_VID 0x1209)
+    set(USB_PID 0x2440)
 endif()
 
 if(ESP_PLATFORM)
-    if (DEFINED CONFIG_TINYUSB_DESC_CUSTOM_VID)
+    if(DEFINED CONFIG_TINYUSB_DESC_CUSTOM_VID)
         set(USB_VID CONFIG_TINYUSB_DESC_CUSTOM_VID)
     endif()
     if(DEFINED CONFIG_TINYUSB_DESC_CUSTOM_PID)
@@ -111,20 +111,20 @@ if(ESP_PLATFORM)
     endif()
 endif()
 
-if (NOT DEFINED USB_VID)
+if(NOT DEFINED USB_VID)
     set(USB_VID 0xFEFF)
 endif()
 add_definitions(-DUSB_VID=${USB_VID})
 
-if (NOT DEFINED USB_PID)
+if(NOT DEFINED USB_PID)
     set(USB_PID 0xFCFD)
 endif()
 add_definitions(-DUSB_PID=${USB_PID})
 
-if (NOT DEFINED DEBUG_APDU)
+if(NOT DEFINED DEBUG_APDU)
     set(DEBUG_APDU 0)
 endif()
-if (NOT DEFINED ENABLE_EMULATION)
+if(NOT DEFINED ENABLE_EMULATION)
     set(ENABLE_EMULATION 0)
 endif()
 
@@ -148,7 +148,7 @@ if(USB_ITF_CCID)
     endif(USB_ITF_WCID)
 endif(USB_ITF_CCID)
 add_definitions(-DDEBUG_APDU=${DEBUG_APDU})
-if (NOT ESP_PLATFORM)
+if(NOT ESP_PLATFORM)
     add_definitions(-DMBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
 else()
     add_definitions(-DCFG_TUSB_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/src/usb/tusb_config.h")
@@ -210,15 +210,15 @@ set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/apdu.c
     ${CMAKE_CURRENT_LIST_DIR}/src/led/led.c
 )
-if (PICO_BOARD STREQUAL "pico_w")
+if(PICO_BOARD STREQUAL "pico_w")
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/led/led_cyw43.c
     )
-elseif (PICO_BOARD MATCHES "^pimoroni")
+elseif(PICO_BOARD MATCHES "^pimoroni")
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pimoroni.c
     )
-elseif (ESP_PLATFORM)
+elseif(ESP_PLATFORM)
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c
     )
@@ -229,7 +229,7 @@ else()
     )
 endif()
 ## mbedTLS reports an stringop overflow for cmac.c
-if (NOT ENABLE_EMULATION AND NOT APPLE)
+if(NOT ENABLE_EMULATION AND NOT APPLE)
     set_source_files_properties(
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
         PROPERTIES
@@ -295,7 +295,7 @@ if(${USB_ITF_HID})
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid
     )
 endif()
-if (ENABLE_EMULATION)
+if(ENABLE_EMULATION)
     if(APPLE)
         set(CMAKE_OSX_SYSROOT "/Library/Developer/CommandLineTools//SDKs/MacOSX11.3.sdk")
         add_definitions("-Wno-deprecated-declarations")
@@ -315,7 +315,7 @@ if (ENABLE_EMULATION)
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
     )
 else()
-    if (USB_ITF_CCID)
+    if(USB_ITF_CCID)
         set(SOURCES ${SOURCES}
             ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
         )
@@ -331,11 +331,11 @@ set(EXTERNAL_SOURCES ${CBOR_SOURCES})
 if(NOT ESP_PLATFORM)
     set(EXTERNAL_SOURCES ${EXTERNAL_SOURCES} ${MBEDTLS_SOURCES})
 endif()
-if (MSVC)
-set(
-  CMAKE_C_FLAGS
-  "${CMAKE_C_FLAGS} -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105"
-)
+if(MSVC)
+    set(
+        CMAKE_C_FLAGS
+        "${CMAKE_C_FLAGS} -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105"
+    )
 
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS
         __STDC_WANT_SECURE_LIB__=0
@@ -353,29 +353,26 @@ set(
         COMPILE_FLAGS " -W3 -wd4242 -wd4065"
     )
 endif()
-if (PICO_RP2350)
-pico_set_uf2_family(${CMAKE_PROJECT_NAME} "rp2350-arm-s")
-pico_embed_pt_in_binary(${CMAKE_PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/config/rp2350/pt.json")
+if(PICO_RP2350)
+    pico_set_uf2_family(${CMAKE_PROJECT_NAME} "rp2350-arm-s")
+    pico_embed_pt_in_binary(${CMAKE_PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/config/rp2350/pt.json")
+    pico_set_binary_type(${CMAKE_PROJECT_NAME} copy_to_ram)
+    if (SECURE_BOOT_PKEY)
+        message(STATUS "Secure Boot Key ${SECURE_BOOT_PKEY}")
+        pico_sign_binary(${CMAKE_PROJECT_NAME} ${SECURE_BOOT_PKEY})
+        pico_hash_binary(${CMAKE_PROJECT_NAME})
+    endif()
 endif()
 set(INTERNAL_SOURCES ${SOURCES})
 set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
-if (NOT TARGET pico_keys_sdk)
-    if (ENABLE_EMULATION OR ESP_PLATFORM)
+if(NOT TARGET pico_keys_sdk)
+    if(ENABLE_EMULATION OR ESP_PLATFORM)
         add_impl_library(pico_keys_sdk)
     else()
         pico_add_library(pico_keys_sdk)
-
         pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
     endif()
-    target_sources(pico_keys_sdk INTERFACE
-        ${SOURCES}
-    )
-    target_include_directories(pico_keys_sdk INTERFACE
-        ${INCLUDES}
-    )
+    target_sources(pico_keys_sdk INTERFACE ${SOURCES})
+    target_include_directories(pico_keys_sdk INTERFACE ${INCLUDES})
     target_link_libraries(pico_keys_sdk INTERFACE ${LIBRARIES})
 endif()
-
-
-
-

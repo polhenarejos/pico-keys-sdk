@@ -34,10 +34,6 @@ void random_init(void) {
     }
 }
 
-void random_fini(void) {
-    neug_fini();
-}
-
 /*
  * Return pointer to random 32-byte
  */

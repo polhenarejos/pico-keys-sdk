@@ -29,35 +29,18 @@
 #include "esp_compat.h"
 #else
 #include "pico/stdlib.h"
-
 #include "hwrng.h"
-#include "hardware/structs/rosc.h"
-#include "hardware/gpio.h"
-#include "hardware/adc.h"
 #include "bsp/board.h"
-
-#include "pico/time.h"
+#include "pico/rand.h"
 #endif
 
-void adc_start() {
+void hwrng_start() {
 #if defined(ENABLE_EMULATION)
     srand(time(0));
 #elif defined(ESP_PLATFORM)
     bootloader_random_enable();
-#else
-    adc_init();
-    adc_gpio_init(27);
-    adc_select_input(1);
 #endif
 }
-
-void adc_stop() {
-}
-#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
-uint32_t adc_read() {
-    return 0;
-}
-#endif
 
 static uint64_t random_word = 0xcbf29ce484222325;
 static uint8_t ep_round = 0;
@@ -81,27 +64,15 @@ static int ep_process() {
 #elif defined(ESP_PLATFORM)
     esp_fill_random((uint8_t *)&word, sizeof(word));
 #else
-    for (int n = 0; n < 64; n++) {
-        uint8_t bit1, bit2;
-        do {
-            bit1 = rosc_hw->randombit & 0xff;
-            //sleep_ms(1);
-            bit2 = rosc_hw->randombit & 0xff;
-        } while (bit1 == bit2);
-        word = (word << 1) | bit1;
-    }
+    word = get_rand_64();
 #endif
-    random_word ^= word ^ board_millis() ^ adc_read();
+    random_word ^= word ^ board_millis();
     random_word *= 0x00000100000001B3;
     if (++ep_round == 8) {
         ep_round = 0;
         return 2; //2 words
     }
     return 0;
-}
-
-static const uint32_t *ep_output() {
-    return (uint32_t *) &random_word;
 }
 
 struct rng_rb {
@@ -113,8 +84,6 @@ struct rng_rb {
 };
 
 static void rb_init(struct rng_rb *rb, uint32_t *p, uint8_t size) {
-#ifdef ENABLE_EMULATION
-#endif
     rb->buf = p;
     rb->size = size;
     rb->head = rb->tail = 0;
@@ -156,8 +125,7 @@ void *neug_task() {
 
     if ((n = ep_process())) {
         int i;
-        const uint32_t *vp;
-        vp = ep_output();
+        const uint32_t *vp = (const uint32_t *) &random_word;
 
         for (i = 0; i < n; i++) {
             rb_add(rb, *vp++);
@@ -174,7 +142,7 @@ void neug_init(uint32_t *buf, uint8_t size) {
 
     rb_init(rb, buf, size);
 
-    adc_start();
+    hwrng_start();
 
     ep_init();
 }
@@ -217,8 +185,4 @@ void neug_wait_full() {
 #endif
         neug_task();
     }
-}
-
-void neug_fini(void) {
-    neug_get();
 }

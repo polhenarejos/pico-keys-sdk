@@ -45,6 +45,7 @@
 #include "usb.h"
 extern void do_flash();
 extern void low_flash_init();
+extern void init_otp_files();
 
 app_t apps[4];
 uint8_t num_apps = 0;
@@ -296,6 +297,8 @@ int main(void) {
 
     random_init();
 
+    init_otp_files();
+
     low_flash_init();
 
     scan_flash();
@@ -303,6 +306,7 @@ int main(void) {
     init_rtc();
 
     usb_init();
+
 #ifndef ENABLE_EMULATION
 #ifdef ESP_PLATFORM
     gpio_pad_select_gpio(BOOT_PIN);

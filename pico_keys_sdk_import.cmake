@@ -202,6 +202,7 @@ set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/flash.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/low_flash.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/fs/otp.c
     ${CMAKE_CURRENT_LIST_DIR}/src/rng/random.c
     ${CMAKE_CURRENT_LIST_DIR}/src/rng/hwrng.c
     ${CMAKE_CURRENT_LIST_DIR}/src/eac.c
@@ -362,6 +363,7 @@ if(PICO_RP2350)
         pico_sign_binary(${CMAKE_PROJECT_NAME} ${SECURE_BOOT_PKEY})
         pico_hash_binary(${CMAKE_PROJECT_NAME})
     endif()
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pico_bootrom)
 endif()
 set(INTERNAL_SOURCES ${SOURCES})
 set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})

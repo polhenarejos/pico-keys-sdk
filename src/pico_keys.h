@@ -50,6 +50,7 @@
 #include "pico/unique_id.h"
 #endif
 #include <string.h>
+#include "debug.h"
 
 #if defined(ENABLE_EMULATION)
 #include <stdbool.h>

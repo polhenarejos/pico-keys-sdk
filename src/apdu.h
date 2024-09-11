@@ -41,42 +41,6 @@ typedef struct cmd {
     int (*cmd_handler)();
 } cmd_t;
 
-
-#if defined(DEBUG_APDU) && DEBUG_APDU == 1
-#define DEBUG_PAYLOAD(_p, _s) { \
-        printf("Payload %s (%d bytes):\n", #_p, (int) (_s)); \
-        for (int _i = 0; _i < _s; _i += 16) { \
-            printf("%" PRIxPTR "h : ", (uintptr_t) (_i + _p)); \
-            for (int _j = 0; _j < 16; _j++) { \
-                if (_j < _s - _i) printf("%02X ", (_p)[_i + _j]); \
-                else printf("   "); \
-                if (_j == 7) printf(" "); \
-            } printf(":  "); \
-            for (int _j = 0; _j < 16; _j++) { \
-                if (_j < _s - _i && (_p)[_i + _j] > 32 && (_p)[_i + _j] != 127 && (_p)[_i + _j] < 176) printf("%c", (_p)[_i + _j]); \
-                else printf(" "); \
-                if (_j == 7) printf(" "); \
-            } \
-            printf("\n"); \
-        } printf("\n"); \
-}
-#define DEBUG_DATA(_p, _s)                               \
-    {                                                    \
-        printf("Data %s (%d bytes):\n", #_p, (int) (_s));      \
-        char *tmp = (char *) calloc(1, 2 * _s + 1); \
-        for (int _i = 0; _i < _s; _i++)                  \
-        {                                                \
-            sprintf(&tmp[2 * _i], "%02X", (_p)[_i]);       \
-        }                                                \
-        printf("%s\n", tmp);                             \
-        free(tmp);                                       \
-    }
-
-#else
-#define DEBUG_PAYLOAD(_p, _s)
-#define DEBUG_DATA(_p, _s)
-#endif
-
 extern uint8_t num_apps;
 extern app_t apps[4];
 extern app_t *current_app;

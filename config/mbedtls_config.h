@@ -329,7 +329,9 @@
 //#define MBEDTLS_RIPEMD160_ALT
 //#define MBEDTLS_RSA_ALT
 //#define MBEDTLS_SHA1_ALT
-//#define MBEDTLS_SHA256_ALT
+#ifdef PICO_RP2350
+#define MBEDTLS_SHA256_ALT
+#endif
 //#define MBEDTLS_SHA512_ALT
 
 /*

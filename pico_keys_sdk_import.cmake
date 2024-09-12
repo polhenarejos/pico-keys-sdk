@@ -364,6 +364,13 @@ if(PICO_RP2350)
         pico_hash_binary(${CMAKE_PROJECT_NAME})
     endif()
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pico_bootrom)
+
+    set(INCLUDES ${INCLUDES}
+        ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt
+    )
+    set(SOURCES ${SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt/sha256_alt.c
+    )
 endif()
 set(INTERNAL_SOURCES ${SOURCES})
 set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
@@ -374,7 +381,7 @@ if(NOT TARGET pico_keys_sdk)
         pico_add_library(pico_keys_sdk)
         pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
 
-        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pico_keys_sdk pico_stdlib pico_multicore pico_rand hardware_flash pico_unique_id pico_aon_timer tinyusb_device tinyusb_board)
+        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pico_keys_sdk pico_stdlib pico_multicore pico_rand hardware_flash pico_unique_id pico_aon_timer pico_sha256 tinyusb_device tinyusb_board)
     endif()
     target_sources(pico_keys_sdk INTERFACE ${SOURCES})
     target_include_directories(pico_keys_sdk INTERFACE ${INCLUDES})

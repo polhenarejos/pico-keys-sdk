@@ -270,13 +270,12 @@ endif()
 set(LIBRARIES
     pico_stdlib
     pico_multicore
+    pico_rand
+    pico_aon_timer
     hardware_flash
-    hardware_sync
-    hardware_adc
     pico_unique_id
     tinyusb_device
     tinyusb_board
-    hardware_pio
 )
 
 if(PICO_BOARD STREQUAL "pico_w")
@@ -371,6 +370,7 @@ if(PICO_RP2350)
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt/sha256_alt.c
     )
+    set(LIBRARIES ${LIBRARIES} pico_sha256)
 endif()
 set(INTERNAL_SOURCES ${SOURCES})
 set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
@@ -381,7 +381,7 @@ if(NOT TARGET pico_keys_sdk)
         pico_add_library(pico_keys_sdk)
         pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
 
-        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pico_keys_sdk pico_stdlib pico_multicore pico_rand hardware_flash pico_unique_id pico_aon_timer pico_sha256 tinyusb_device tinyusb_board)
+        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBRARIES})
     endif()
     target_sources(pico_keys_sdk INTERFACE ${SOURCES})
     target_include_directories(pico_keys_sdk INTERFACE ${INCLUDES})

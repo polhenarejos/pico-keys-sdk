@@ -233,7 +233,7 @@ int mbedtls_sha256_update(mbedtls_sha256_context *ctx, const unsigned char *inpu
     return 0;
 }
 
-int mbedtls_sha256_finish(mbedtls_sha256_context *ctx, unsigned char output[32]) {
+int mbedtls_sha256_finish(mbedtls_sha256_context *ctx, unsigned char *output) {
     if (ctx->is224) {
         int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
         uint32_t used;

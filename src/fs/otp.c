@@ -50,11 +50,11 @@ static int otp_write_data_mode(uint16_t row, uint8_t *data, uint16_t len, bool i
 static int otp_write_data(uint16_t row, uint8_t *data, uint16_t len) {
     return otp_write_data_mode(row, data, len, true);
 }
-/*
+
 static int otp_write_data_raw(uint16_t row, uint8_t *data, uint16_t len) {
     return otp_write_data_mode(row, data, len, false);
 }
-*/
+
 static uint8_t* otp_buffer(uint16_t row) {
     volatile uint32_t *p = ((uint32_t *)(OTP_DATA_GUARDED_BASE + (row*2)));
     return (uint8_t *)p;
@@ -72,18 +72,33 @@ static bool is_otp_locked_page(uint8_t page) {
 static void otp_lock_page(uint8_t page) {
     if (!is_otp_locked_page(page)) {
         uint32_t value = 0x3c3c3c;
-        printf("Locking page %d, with row %d and value %lx\n", page, OTP_DATA_PAGE0_LOCK0_ROW + page*2 + 1, value);
-        //otp_write_data_raw(OTP_DATA_PAGE0_LOCK0_ROW + page*2 + 1, (uint8_t *)&value, sizeof(value));
+        otp_write_data_raw(OTP_DATA_PAGE0_LOCK0_ROW + page*2 + 1, (uint8_t *)&value, sizeof(value));
     }
 
     otp_hw->sw_lock[page] = 0b1100;
 }
 #endif
 
+#ifdef ESP_PLATFORM
+
+uint8_t _otp_key_1[32] = {0};
+
+esp_err_t read_key_from_efuse(esp_efuse_block_t block, uint8_t *key, size_t key_len) {
+    const esp_efuse_desc_t **key_desc = esp_efuse_get_key(block);
+
+    if (!key_desc) {
+        return ESP_FAIL;
+    }
+
+    return esp_efuse_read_field_blob(key_desc, key, key_len * 8);
+}
+
+#endif
+
 const uint8_t *otp_key_1 = NULL;
 void init_otp_files() {
-#ifdef PICO_RP2350
 
+#ifdef PICO_RP2350
     uint8_t page = OTP_KEY_1 >> 6;
     if (is_empty_otp_buffer(OTP_KEY_1, 32)) {
         uint8_t mkek[32] = {0};
@@ -96,5 +111,33 @@ void init_otp_files() {
     otp_key_1 = otp_buffer(OTP_KEY_1);
 
     otp_lock_page(page);
+
+#elif defined(ESP_PLATFORM)
+    if (esp_efuse_key_block_unused(OTP_KEY_1)) {
+        uint8_t mkek[32] = {0};
+        random_gen(NULL, mkek, sizeof(mkek));
+        DEBUG_DATA(mkek, 32);
+        esp_err_t ret = esp_efuse_write_key(OTP_KEY_1, ESP_EFUSE_KEY_PURPOSE_USER, mkek, sizeof(mkek));
+        if (ret != ESP_OK) {
+            printf("Error writing OTP key 1 [%d]\n", ret);
+        }
+        ret = esp_efuse_set_key_dis_write(OTP_KEY_1);
+        if (ret != ESP_OK) {
+            printf("Error setting OTP key 1 to read only [%d]\n", ret);
+        }
+        ret = esp_efuse_set_keypurpose_dis_write(OTP_KEY_1);
+        if (ret != ESP_OK) {
+            printf("Error setting OTP key 1 purpose to read only [%d]\n", ret);
+        }
+    }
+    esp_err_t ret = read_key_from_efuse(OTP_KEY_1, _otp_key_1, sizeof(_otp_key_1));
+    if (ret != ESP_OK) {
+        printf("Error reading OTP key 1 [%d]\n", ret);
+    }
+    else {
+        DEBUG_DATA(_otp_key_1, 32);
+    }
+    otp_key_1 = _otp_key_1;
+
 #endif
 }

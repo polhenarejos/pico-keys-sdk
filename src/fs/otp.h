@@ -25,6 +25,12 @@
 
 #define OTP_KEY_1    OTP_TEST_ROW
 
+#elif defined(ESP_PLATFORM)
+
+#include "esp_efuse.h"
+
+#define OTP_KEY_1    EFUSE_BLK_KEY3
+
 #endif
 
 extern const uint8_t *otp_key_1;

@@ -20,7 +20,7 @@
 
 #ifdef ESP_PLATFORM
 
-#include "freertos/freertos.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 typedef QueueHandle_t queue_t;
 #define queue_init(a,b,c) do { *(a) = xQueueCreate(c, b); } while(0)

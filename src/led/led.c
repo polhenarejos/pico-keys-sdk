@@ -29,10 +29,10 @@
 extern void led_driver_init();
 extern void led_driver_color(uint8_t);
 
-static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
+static uint32_t led_mode = MODE_NOT_MOUNTED;
 
-void led_set_blink(uint32_t mode) {
-    blink_interval_ms = mode;
+void led_set_mode(uint32_t mode) {
+    led_mode = mode;
 }
 
 void led_blinking_task() {
@@ -43,9 +43,9 @@ void led_blinking_task() {
 #ifdef PICO_DEFAULT_LED_PIN_INVERTED
     state = !state;
 #endif
-    uint32_t led_color = (blink_interval_ms & LED_COLOR_MASK) >> LED_COLOR_SHIFT;
-    uint32_t led_off = (blink_interval_ms & LED_OFF_MASK) >> LED_OFF_SHIFT;
-    uint32_t led_on = (blink_interval_ms & LED_ON_MASK) >> LED_ON_SHIFT;
+    uint32_t led_color = (led_mode & LED_COLOR_MASK) >> LED_COLOR_SHIFT;
+    uint32_t led_off = (led_mode & LED_OFF_MASK) >> LED_OFF_SHIFT;
+    uint32_t led_on = (led_mode & LED_ON_MASK) >> LED_ON_SHIFT;
     uint32_t led_interval = led_state ? led_on : led_off;
 
     // Blink every interval ms
@@ -73,6 +73,6 @@ void led_off_all() {
 void led_init() {
 #ifndef ENABLE_EMULATION
     led_driver_init();
-    led_set_blink(BLINK_NOT_MOUNTED);
+    led_set_mode(MODE_NOT_MOUNTED);
 #endif
 }

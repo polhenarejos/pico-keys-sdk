@@ -276,6 +276,7 @@ set(LIBRARIES
     pico_unique_id
     tinyusb_device
     tinyusb_board
+    hardware_pio
 )
 
 if(PICO_BOARD STREQUAL "pico_w")

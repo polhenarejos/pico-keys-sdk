@@ -79,8 +79,17 @@ uint32_t pixel[] = {
     0xffffff00  // 7: white
 };
 
-void led_driver_color(uint8_t color) {
-    pio_sm_put_blocking(pio0, 0, pixel[color]);
+void led_driver_color(uint8_t color, float brightness) {
+    uint32_t pixel_color = pixel[color];
+    uint8_t r = (pixel_color >> 16) & 0xFF;
+    uint8_t g = (pixel_color >> 24) & 0xFF;
+    uint8_t b = (pixel_color >>  8) & 0xFF;
+
+    r = (uint8_t)(r * brightness);
+    g = (uint8_t)(g * brightness);
+    b = (uint8_t)(b * brightness);
+
+    pio_sm_put_blocking(pio0, 0, (g << 24) | (r << 16) | (b << 8));
 }
 
 #endif

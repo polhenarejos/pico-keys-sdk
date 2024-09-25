@@ -18,8 +18,10 @@
 include(pico-keys-sdk/cmake/version.cmake)
 include(pico-keys-sdk/cmake/boards.cmake)
 
-dict(GET led_driver ${PICO_BOARD} LED_DRIVER)
-message(STATUS "LED driver:\t\t\t ${LED_DRIVER}")
+if(PICO_BOARD)
+  dict(GET led_driver ${PICO_BOARD} LED_DRIVER)
+endif()
+
 option(VIDPID "Set specific VID/PID from a known platform {NitroHSM, NitroFIDO2, NitroStart, NitroPro, Nitro3, Yubikey5, YubikeyNeo, YubiHSM, Gnuk, GnuPG}" "None")
 
 message(STATUS "VIDPID:\t\t\t '${VIDPID}'")
@@ -109,7 +111,7 @@ else()
     add_definitions(-DCFG_TUSB_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/src/usb/tusb_config.h")
 endif()
 
-message(STATUS "USB VID/PID: ${USB_VID}:${USB_PID}")
+message(STATUS "USB VID/PID:\t\t\t ${USB_VID}:${USB_PID}")
 
 set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
@@ -167,7 +169,13 @@ set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/led/led.c
 )
 
-set(SOURCES ${SOURCES} ${CMAKE_CURRENT_LIST_DIR}/src/led/${LED_DRIVER}.c)
+if(ESP_PLATFORM)
+  set(LED_DRIVER led_neopixel)
+endif()
+if (LED_DRIVER)
+    message(STATUS "LED driver:\t\t\t ${LED_DRIVER}")
+    set(SOURCES ${SOURCES} ${CMAKE_CURRENT_LIST_DIR}/src/led/${LED_DRIVER}.c)
+endif()
 
 ## mbedTLS reports an stringop overflow for cmac.c
 if(NOT ENABLE_EMULATION AND NOT APPLE)

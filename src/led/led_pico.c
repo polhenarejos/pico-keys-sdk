@@ -17,7 +17,7 @@
 
 #include "pico_keys.h"
 
-#ifdef PICO_DEFAULT_LED_PIN
+#if defined(PICO_DEFAULT_LED_PIN) && !defined(PICO_DEFAULT_WS2812_PIN)
 
 void led_driver_init() {
     gpio_init(PICO_DEFAULT_LED_PIN);

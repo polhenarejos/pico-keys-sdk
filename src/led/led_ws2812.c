@@ -79,7 +79,8 @@ uint32_t pixel[] = {
     0xffffff00  // 7: white
 };
 
-void led_driver_color(uint8_t color, float brightness) {
+void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
+    float brightness = ((float)led_brightness / MAX_BTNESS) * progress;
     uint32_t pixel_color = pixel[color];
     uint8_t r = (pixel_color >> 16) & 0xFF;
     uint8_t g = (pixel_color >> 24) & 0xFF;

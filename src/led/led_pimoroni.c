@@ -49,7 +49,10 @@ void led_driver_init() {
     gpio_set_dir(LED_B_PIN, GPIO_OUT);
 }
 
-void led_driver_color(uint8_t color, float brightness) {
+void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
+    if (progress < 0.5) {
+        color = LED_COLOR_OFF;
+    }
     gpio_put(LED_R_PIN, pixel[color][0]);
     gpio_put(LED_G_PIN, pixel[color][1]);
     gpio_put(LED_B_PIN, pixel[color][2]);

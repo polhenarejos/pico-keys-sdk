@@ -45,8 +45,19 @@ void led_driver_init() {
     neopixel = neopixel_Init(1, gpio);
 }
 
-void led_driver_color(uint8_t color, float brightness) {
-    neopixel_SetPixel(neopixel, &pixel[color], 1);
+void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
+    static tNeopixel spx = {.index = 0, .rgb = 0};
+    float brightness = ((float)led_brightness / MAX_BTNESS) * progress;
+    uint32_t pixel_color = pixel[color].rgb;
+    uint8_t r = (pixel_color >> 16) & 0xFF;
+    uint8_t g = (pixel_color >> 8) & 0xFF;
+    uint8_t b = (pixel_color) & 0xFF;
+
+    r = (uint8_t)(r * brightness);
+    g = (uint8_t)(g * brightness);
+    b = (uint8_t)(b * brightness);
+    spx.rgb = NP_RGB(r, g, b);
+    neopixel_SetPixel(neopixel, &spx, 1);
 }
 
 #endif

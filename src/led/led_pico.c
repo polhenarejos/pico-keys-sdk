@@ -24,8 +24,9 @@ void led_driver_init() {
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 }
 
-void led_driver_color(uint8_t color, float brightness) {
-    gpio_put(PICO_DEFAULT_LED_PIN, color != LED_COLOR_OFF);
+void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
+    (void)led_brightness;
+    gpio_put(PICO_DEFAULT_LED_PIN, progress >= 0.5);
 }
 
 #endif

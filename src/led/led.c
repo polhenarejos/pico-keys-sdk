@@ -27,7 +27,7 @@
 #endif
 
 extern void led_driver_init();
-extern void led_driver_color(uint8_t, float);
+extern void led_driver_color(uint8_t, uint32_t, float);
 
 static uint32_t led_mode = MODE_NOT_MOUNTED;
 
@@ -44,7 +44,7 @@ void led_blinking_task() {
 #ifdef PICO_DEFAULT_LED_PIN_INVERTED
     state = !state;
 #endif
-    uint32_t led_max_brightness = (led_mode & LED_BTNESS_MASK) >> LED_BTNESS_SHIFT;
+    uint32_t led_brightness = (led_mode & LED_BTNESS_MASK) >> LED_BTNESS_SHIFT;
     uint32_t led_color = (led_mode & LED_COLOR_MASK) >> LED_COLOR_SHIFT;
     uint32_t led_off = (led_mode & LED_OFF_MASK) >> LED_OFF_SHIFT;
     uint32_t led_on = (led_mode & LED_ON_MASK) >> LED_ON_SHIFT;
@@ -64,9 +64,8 @@ void led_blinking_task() {
     // maybe quick return if progress didn't changed much ?
 
     // current one from 0 - 1
-    float led_brightness = ((float)led_max_brightness / MAX_BTNESS) * progress;
 
-    led_driver_color(led_color, led_brightness);
+    led_driver_color(led_color, led_brightness, progress);
 
     if (board_millis() >= stop_ms){
         start_ms = stop_ms;
@@ -78,7 +77,7 @@ void led_blinking_task() {
 
 void led_off_all() {
 #ifndef ENABLE_EMULATION
-    led_driver_color(LED_COLOR_OFF, 0);
+    led_driver_color(LED_COLOR_OFF, 0, 0);
 #endif
 }
 

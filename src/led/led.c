@@ -44,13 +44,14 @@ void led_blinking_task() {
 #ifdef PICO_DEFAULT_LED_PIN_INVERTED
     state = !state;
 #endif
+    uint8_t led_fade = (led_mode & LED_FADE_MASK) >> LED_FADE_SHIFT;
     uint32_t led_max_brightness = (led_mode & LED_BTNESS_MASK) >> LED_BTNESS_SHIFT;
     uint32_t led_color = (led_mode & LED_COLOR_MASK) >> LED_COLOR_SHIFT;
     uint32_t led_off = (led_mode & LED_OFF_MASK) >> LED_OFF_SHIFT;
     uint32_t led_on = (led_mode & LED_ON_MASK) >> LED_ON_SHIFT;
 
     // how far in the current state from 0 - 1
-    float progress = (board_millis() - start_ms) / (stop_ms - start_ms);
+    float progress = (float)(board_millis() - start_ms) / (stop_ms - start_ms);
 
     if (!state){
         // fading down so 1 -> 0
@@ -60,7 +61,10 @@ void led_blinking_task() {
     // maybe quick return if progress didn't changed much ?
 
     // current one from 0 - 1 
-    float led_brightness = (led_max_brightness / MAX_BTNESS) * progress;
+    float led_brightness = ((float)led_max_brightness / MAX_BTNESS) * progress;
+    if (!led_fade){
+        led_brightness = led_max_brightness;
+    }
 
     led_driver_color(led_color, led_brightness);
 

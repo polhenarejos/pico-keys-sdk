@@ -50,17 +50,21 @@ void led_blinking_task() {
     uint32_t led_on = (led_mode & LED_ON_MASK) >> LED_ON_SHIFT;
 
     // how far in the current state from 0 - 1
-    float progress = (board_millis() - start_ms) / (stop_ms - start_ms);
+    float progress = 0;
 
-    if (!state){
+    if (stop_ms > start_ms) {
+        progress = (float)(board_millis() - start_ms) / (stop_ms - start_ms);
+    }
+
+    if (!state) {
         // fading down so 1 -> 0
-        progress = 1 - progress;
+        progress = 1. - progress;
     }
 
     // maybe quick return if progress didn't changed much ?
 
-    // current one from 0 - 1 
-    float led_brightness = (led_max_brightness / MAX_BTNESS) * progress;
+    // current one from 0 - 1
+    float led_brightness = ((float)led_max_brightness / MAX_BTNESS) * progress;
 
     led_driver_color(led_color, led_brightness);
 

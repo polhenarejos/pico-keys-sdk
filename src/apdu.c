@@ -34,7 +34,7 @@ uint8_t chain_buf[4096];
 uint8_t *chain_ptr = NULL;
 
 int process_apdu() {
-    led_set_blink(BLINK_PROCESSING);
+    led_set_mode(MODE_PROCESSING);
     if (CLA(apdu) & 0x10) {
         if (!is_chaining) {
             chain_ptr = chain_buf;

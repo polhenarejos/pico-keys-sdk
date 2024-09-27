@@ -45,7 +45,7 @@ void led_driver_init() {
     neopixel = neopixel_Init(1, gpio);
 }
 
-void led_driver_color(int color) {
+void led_driver_color(uint8_t color, float brightness) {
     neopixel_SetPixel(neopixel, &pixel[color], 1);
 }
 

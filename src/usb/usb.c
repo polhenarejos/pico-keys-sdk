@@ -122,7 +122,7 @@ void card_start(uint8_t itf, void (*func)(void)) {
             multicore_reset_core1();
             multicore_launch_core1(func);
         }
-        led_set_blink(BLINK_MOUNTED);
+        led_set_mode(MODE_MOUNTED);
         card_locked_itf = itf;
         card_locked_func = func;
     }
@@ -148,7 +148,7 @@ void card_exit() {
             mutex_exit(&mutex);
 #endif
         }
-        led_set_blink(BLINK_SUSPENDED);
+        led_set_mode(MODE_SUSPENDED);
 #ifdef ESP_PLATFORM
         hcore1 = NULL;
 #endif
@@ -187,7 +187,7 @@ int card_status(uint8_t itf) {
         if (has_m) {
             if (m == EV_EXEC_FINISHED) {
                 timeout_stop();
-                led_set_blink(BLINK_MOUNTED);
+                led_set_mode(MODE_MOUNTED);
                 return CCID_OK;
             }
 #ifndef ENABLE_EMULATION

@@ -25,7 +25,7 @@ void led_driver_init() {
     cyw43_arch_init();
 }
 
-void led_driver_color(uint8_t color) {
+void led_driver_color(uint8_t color, float brightness) {
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, color != LED_COLOR_OFF);
 }
 

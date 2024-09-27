@@ -27,52 +27,60 @@
 #endif
 
 extern void led_driver_init();
-extern void led_driver_color(uint8_t);
+extern void led_driver_color(uint8_t, float);
 
-static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
+static uint32_t led_mode = MODE_NOT_MOUNTED;
 
-void led_set_blink(uint32_t mode) {
-    blink_interval_ms = mode;
+void led_set_mode(uint32_t mode) {
+    led_mode = mode;
 }
 
 void led_blinking_task() {
 #ifndef ENABLE_EMULATION
     static uint32_t start_ms = 0;
+    static uint32_t stop_ms = 0;
     static uint8_t led_state = false;
     uint8_t state = led_state;
 #ifdef PICO_DEFAULT_LED_PIN_INVERTED
     state = !state;
 #endif
-    uint32_t led_color = (blink_interval_ms & LED_COLOR_MASK) >> LED_COLOR_SHIFT;
-    uint32_t led_off = (blink_interval_ms & LED_OFF_MASK) >> LED_OFF_SHIFT;
-    uint32_t led_on = (blink_interval_ms & LED_ON_MASK) >> LED_ON_SHIFT;
-    uint32_t led_interval = led_state ? led_on : led_off;
+    uint32_t led_max_brightness = (led_mode & LED_BTNESS_MASK) >> LED_BTNESS_SHIFT;
+    uint32_t led_color = (led_mode & LED_COLOR_MASK) >> LED_COLOR_SHIFT;
+    uint32_t led_off = (led_mode & LED_OFF_MASK) >> LED_OFF_SHIFT;
+    uint32_t led_on = (led_mode & LED_ON_MASK) >> LED_ON_SHIFT;
 
-    // Blink every interval ms
-    if (board_millis() - start_ms < led_interval) {
-        return; // not enough time
-    }
-    start_ms += led_interval;
+    // how far in the current state from 0 - 1
+    float progress = (board_millis() - start_ms) / (stop_ms - start_ms);
 
-    if (state == false) {
-        led_driver_color(LED_COLOR_OFF);
+    if (!state){
+        // fading down so 1 -> 0
+        progress = 1 - progress;
     }
-    else {
-        led_driver_color(led_color);
+
+    // maybe quick return if progress didn't changed much ?
+
+    // current one from 0 - 1 
+    float led_brightness = (led_max_brightness / MAX_BTNESS) * progress;
+
+    led_driver_color(led_color, led_brightness);
+
+    if (board_millis() >= stop_ms){
+        start_ms = stop_ms;
+        led_state ^= 1; // toggle
+        stop_ms = start_ms + (led_state ? led_on : led_off);
     }
-    led_state ^= 1; // toggle
 #endif
 }
 
 void led_off_all() {
 #ifndef ENABLE_EMULATION
-    led_driver_color(LED_COLOR_OFF);
+    led_driver_color(LED_COLOR_OFF, 0);
 #endif
 }
 
 void led_init() {
 #ifndef ENABLE_EMULATION
     led_driver_init();
-    led_set_blink(BLINK_NOT_MOUNTED);
+    led_set_mode(MODE_NOT_MOUNTED);
 #endif
 }

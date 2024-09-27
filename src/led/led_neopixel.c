@@ -47,7 +47,10 @@ void led_driver_init() {
 
 void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
     static tNeopixel spx = {.index = 0, .rgb = 0};
-    float brightness = ((float)led_brightness / MAX_BTNESS) * progress;
+    if (!led_dimmable) {
+        progress = progress >= 0.5 ? 1 : 0;
+    }
+    float brightness = ((float)led_brightness / MAX_BTNESS) * ((float)led_phy_btness / MAX_BTNESS) * progress;
     uint32_t pixel_color = pixel[color].rgb;
     uint8_t r = (pixel_color >> 16) & 0xFF;
     uint8_t g = (pixel_color >> 8) & 0xFF;

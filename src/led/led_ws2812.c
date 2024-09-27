@@ -80,7 +80,10 @@ uint32_t pixel[] = {
 };
 
 void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
-    float brightness = ((float)led_brightness / MAX_BTNESS) * progress;
+    if (!led_dimmable) {
+        progress = progress >= 0.5 ? 1 : 0;
+    }
+    float brightness = ((float)led_brightness / MAX_BTNESS) * ((float)led_phy_btness / MAX_BTNESS) * progress;
     uint32_t pixel_color = pixel[color];
     uint8_t r = (pixel_color >> 16) & 0xFF;
     uint8_t g = (pixel_color >> 24) & 0xFF;

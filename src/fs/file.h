@@ -72,15 +72,16 @@
 #define PHY_VID         0x0
 #define PHY_PID         0x2
 #define PHY_LED_GPIO    0x4
-#define PHY_LED_MODE    0x5
+#define PHY_LED_BTNESS  0x5
 #define PHY_OPTS        0x6
 
 #define PHY_OPT_WCID    0x1
 #define PHY_OPT_VPID    0x2
 #define PHY_OPT_GPIO    0x4
-#define PHY_OPT_LED     0x8
+#define PHY_OPT_BTNESS  0x8
+#define PHY_OPT_DIMM    0x10
 
-#define PHY_OPT_MASK    (PHY_OPT_WCID)
+#define PHY_OPT_MASK    (PHY_OPT_DIMM | PHY_OPT_WCID)
 
 #define PHY_MAX_SIZE    8
 

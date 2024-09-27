@@ -65,10 +65,16 @@ void usb_init() {
             if (opts & PHY_OPT_WCID) {
                 enable_wcid = true;
             }
+            if (opts & PHY_OPT_DIMM) {
+                led_dimmable = true;
+            }
         }
         if (file_get_size(ef_phy) >= 4 && opts & PHY_OPT_VPID) {
             desc_device.idVendor = (data[PHY_VID] << 8) | data[PHY_VID+1];
             desc_device.idProduct = (data[PHY_PID] << 8) | data[PHY_PID+1];
+        }
+        if (opts & PHY_OPT_BTNESS) {
+            led_phy_btness = data[PHY_LED_BTNESS];
         }
     }
     mutex_init(&mutex);

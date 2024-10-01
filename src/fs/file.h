@@ -87,7 +87,7 @@
 
 #define MAX_DEPTH 4
 
-typedef PACK(struct file {
+typedef struct file {
     const uint16_t fid;
     const uint8_t parent; //entry number in the whole table!!
     const uint8_t *name;
@@ -95,7 +95,7 @@ typedef PACK(struct file {
     const uint8_t ef_structure;
     uint8_t *data; //should include 2 bytes len at begining
     const uint8_t acl[7];
-}) file_t;
+} file_t;
 
 extern bool file_has_data(file_t *);
 

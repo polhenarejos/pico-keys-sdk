@@ -246,7 +246,6 @@ if(${USB_ITF_HID})
 endif()
 if(ENABLE_EMULATION)
     if(APPLE)
-        set(CMAKE_OSX_SYSROOT "/Library/Developer/CommandLineTools//SDKs/MacOSX11.3.sdk")
         add_definitions("-Wno-deprecated-declarations")
     elseif(MSVC)
         set(SOURCES ${SOURCES}

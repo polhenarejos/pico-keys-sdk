@@ -56,7 +56,7 @@ static int otp_write_data_raw(uint16_t row, uint8_t *data, uint16_t len) {
 }
 
 static uint8_t* otp_buffer(uint16_t row) {
-    volatile uint32_t *p = ((uint32_t *)(OTP_DATA_GUARDED_BASE + (row*2)));
+    volatile uint32_t *p = ((uint32_t *)(OTP_DATA_BASE + (row*2)));
     return (uint8_t *)p;
 }
 

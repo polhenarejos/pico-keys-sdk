@@ -51,12 +51,17 @@ int otp_write_data(uint16_t row, uint8_t *data, uint16_t len) {
     return otp_write_data_mode(row, data, len, true);
 }
 
-static int otp_write_data_raw(uint16_t row, uint8_t *data, uint16_t len) {
+int otp_write_data_raw(uint16_t row, uint8_t *data, uint16_t len) {
     return otp_write_data_mode(row, data, len, false);
 }
 
 uint8_t* otp_buffer(uint16_t row) {
     volatile uint32_t *p = ((uint32_t *)(OTP_DATA_BASE + (row*2)));
+    return (uint8_t *)p;
+}
+
+uint8_t* otp_buffer_raw(uint16_t row) {
+    volatile uint32_t *p = ((uint32_t *)(OTP_DATA_RAW_BASE + (row*4)));
     return (uint8_t *)p;
 }
 

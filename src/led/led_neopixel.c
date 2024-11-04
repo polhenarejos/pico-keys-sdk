@@ -37,10 +37,8 @@ tNeopixel pixel[] = {
 
 void led_driver_init() {
     uint8_t gpio = GPIO_NUM_48;
-    if (file_has_data(ef_phy)) {
-        if (file_read_uint8_offset(ef_phy, PHY_OPTS) & PHY_OPT_GPIO) {
-            gpio = file_get_data(ef_phy)[PHY_LED_GPIO];
-        }
+    if (phy_data.led_gpio_present) {
+        gpio = phy_data.led_gpio;
     }
     neopixel = neopixel_Init(1, gpio);
 }

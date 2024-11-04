@@ -15,7 +15,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifndef _FILE_H_
 #define _FILE_H_
 
@@ -27,6 +26,7 @@
 #include <stdint.h>
 #endif
 #include "compat.h"
+#include "phy.h"
 
 #define FILE_TYPE_NOT_KNOWN     0x00
 #define FILE_TYPE_DF            0x04
@@ -66,28 +66,6 @@
 #define EF_DODFS    0x6044
 #define EF_SKDFS    0x6045
 #define EF_META     0xE010
-
-#define EF_PHY       0xE020
-
-#define PHY_VID         0x0
-#define PHY_PID         0x2
-#define PHY_LED_GPIO    0x4
-#define PHY_LED_BTNESS  0x5
-#define PHY_OPTS        0x6
-
-#define PHY_OPT_WCID    0x1
-#define PHY_OPT_VPID    0x2
-#define PHY_OPT_GPIO    0x4
-#define PHY_OPT_BTNESS  0x8
-#define PHY_OPT_DIMM    0x10
-
-#define PHY_OPT_MASK    (PHY_OPT_DIMM | PHY_OPT_WCID)
-
-#define PHY_MAX_SIZE    8
-
-#ifndef ENABLE_EMULATION
-extern int parse_phy_data(const uint8_t *data, uint8_t len);
-#endif
 
 #define MAX_DEPTH 4
 

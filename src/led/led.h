@@ -66,7 +66,4 @@ extern void led_blinking_task();
 extern void led_off_all();
 extern void led_init();
 
-extern uint32_t led_phy_btness;
-extern bool led_dimmable;
-
 #endif // _LED_H_

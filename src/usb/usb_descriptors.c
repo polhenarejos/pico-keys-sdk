@@ -40,8 +40,6 @@
 
 #define MAX_USB_POWER       2
 
-bool enable_wcid = false;
-
 //--------------------------------------------------------------------+
 // Device Descriptors
 //--------------------------------------------------------------------+
@@ -172,7 +170,7 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {
 #ifndef ESP_PLATFORM
 uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
     (void) index; // for multiple configurations
-    if (enable_wcid) {
+    if (phy_data.opts & PHY_OPT_WCID) {
         return desc_config;
     }
     return desc_config_nowcid;
@@ -188,7 +186,7 @@ enum
   VENDOR_REQUEST_WEBUSB = 1,
   VENDOR_REQUEST_MICROSOFT = 2
 };
-#define URL  "www.picokeys.com/pki/"
+#define URL  "www.picokeys.com"
 static bool web_serial_connected = false;
 
 const tusb_desc_webusb_url_t desc_url =
@@ -279,7 +277,7 @@ uint8_t const desc_bos[] = {
 };
 
 uint8_t const *tud_descriptor_bos_cb(void) {
-    if (enable_wcid) {
+    if (phy_data.opts & PHY_OPT_WCID) {
         return desc_bos;
     }
     return NULL;

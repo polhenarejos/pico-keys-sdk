@@ -53,29 +53,12 @@ queue_t card_to_usb_q = {0};
 
 #ifndef ENABLE_EMULATION
 extern tusb_desc_device_t desc_device;
-extern bool enable_wcid;
 #endif
 void usb_init() {
 #ifndef ENABLE_EMULATION
-    if (file_has_data(ef_phy)) {
-        uint8_t *data = file_get_data(ef_phy);
-        uint16_t opts = 0;
-        if (file_get_size(ef_phy) >= 8) {
-            opts = (data[PHY_OPTS] << 8) | data[PHY_OPTS+1];
-            if (opts & PHY_OPT_WCID) {
-                enable_wcid = true;
-            }
-            if (opts & PHY_OPT_DIMM) {
-                led_dimmable = true;
-            }
-        }
-        if (file_get_size(ef_phy) >= 4 && opts & PHY_OPT_VPID) {
-            desc_device.idVendor = (data[PHY_VID] << 8) | data[PHY_VID+1];
-            desc_device.idProduct = (data[PHY_PID] << 8) | data[PHY_PID+1];
-        }
-        if (opts & PHY_OPT_BTNESS) {
-            led_phy_btness = data[PHY_LED_BTNESS];
-        }
+    if (phy_data.vidpid_present) {
+        desc_device.idVendor = phy_data.vid;
+        desc_device.idProduct = phy_data.pid;
     }
     mutex_init(&mutex);
 #endif

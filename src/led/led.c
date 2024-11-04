@@ -31,9 +31,6 @@ extern void led_driver_color(uint8_t, uint32_t, float);
 
 static uint32_t led_mode = MODE_NOT_MOUNTED;
 
-uint32_t led_phy_btness = MAX_BTNESS;
-bool led_dimmable = false;
-
 void led_set_mode(uint32_t mode) {
     led_mode = mode;
 }

@@ -268,7 +268,6 @@ pico_unique_board_id_t pico_serial;
 #ifdef ESP_PLATFORM
 #define pico_get_unique_board_id(a) do { uint32_t value; esp_efuse_read_block(EFUSE_BLK1, &value, 0, 32); memcpy((uint8_t *)(a), &value, sizeof(uint32_t)); esp_efuse_read_block(EFUSE_BLK1, &value, 32, 32); memcpy((uint8_t *)(a)+4, &value, sizeof(uint32_t)); } while(0)
 extern tinyusb_config_t tusb_cfg;
-extern bool enable_wcid;
 extern const uint8_t desc_config[];
 TaskHandle_t hcore0 = NULL, hcore1 = NULL;
 int app_main() {
@@ -305,16 +304,19 @@ int main(void) {
 
     init_rtc();
 
+#ifndef ENABLE_EMULATION
+
+    phy_init();
+
     usb_init();
 
-#ifndef ENABLE_EMULATION
 #ifdef ESP_PLATFORM
     gpio_pad_select_gpio(BOOT_PIN);
     gpio_set_direction(BOOT_PIN, GPIO_MODE_INPUT);
     gpio_pulldown_dis(BOOT_PIN);
 
     tusb_cfg.string_descriptor[3] = pico_serial_str;
-    if (enable_wcid) {
+    if (phy_data.opts & PHY_OPT_WCID) {
         tusb_cfg.configuration_descriptor = desc_config;
     }
     tinyusb_driver_install(&tusb_cfg);

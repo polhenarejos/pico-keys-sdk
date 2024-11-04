@@ -85,6 +85,10 @@
 
 #define PHY_MAX_SIZE    8
 
+#ifndef ENABLE_EMULATION
+extern int parse_phy_data(const uint8_t *data, uint8_t len);
+#endif
+
 #define MAX_DEPTH 4
 
 typedef struct file {

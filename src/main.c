@@ -47,7 +47,7 @@ extern void do_flash();
 extern void low_flash_init();
 extern void init_otp_files();
 
-app_t apps[4];
+app_t apps[8];
 uint8_t num_apps = 0;
 
 app_t *current_app = NULL;

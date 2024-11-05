@@ -189,6 +189,7 @@ set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/crypto_utils.c
     ${CMAKE_CURRENT_LIST_DIR}/src/asn1.c
     ${CMAKE_CURRENT_LIST_DIR}/src/apdu.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/rescue.c
     ${CMAKE_CURRENT_LIST_DIR}/src/led/led.c
 )
 

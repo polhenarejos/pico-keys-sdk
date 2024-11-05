@@ -305,11 +305,12 @@ int main(void) {
     init_rtc();
 
 #ifndef ENABLE_EMULATION
-
     phy_init();
+#endif
 
     usb_init();
 
+#ifndef ENABLE_EMULATION
 #ifdef ESP_PLATFORM
     gpio_pad_select_gpio(BOOT_PIN);
     gpio_set_direction(BOOT_PIN, GPIO_MODE_INPUT);

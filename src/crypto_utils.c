@@ -82,7 +82,7 @@ int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     }
     int r = mbedtls_aes_setkey_enc(&aes, key, key_size);
     if (r != 0) {
-        return CCID_EXEC_ERROR;
+        return PICOKEY_EXEC_ERROR;
     }
     if (mode == PICO_KEYS_AES_MODE_CBC) {
         return mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, len, tmp_iv, data, data);
@@ -101,7 +101,7 @@ int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     }
     int r = mbedtls_aes_setkey_dec(&aes, key, key_size);
     if (r != 0) {
-        return CCID_EXEC_ERROR;
+        return PICOKEY_EXEC_ERROR;
     }
     if (mode == PICO_KEYS_AES_MODE_CBC) {
         return mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, len, tmp_iv, data, data);

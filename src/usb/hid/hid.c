@@ -598,10 +598,10 @@ void hid_task() {
         driver_process_usb_nopacket_hid();
     }
     int status = card_status(ITF_HID);
-    if (status == CCID_OK) {
+    if (status == PICOKEY_OK) {
         driver_exec_finished_hid(finished_data_size);
     }
-    else if (status == CCID_ERR_BLOCKED) {
+    else if (status == PICOKEY_ERR_BLOCKED) {
         send_keepalive();
     }
     if (hid_tx[ITF_HID_CTAP].w_ptr > hid_tx[ITF_HID_CTAP].r_ptr && last_write_result[ITF_HID_CTAP] != WRITE_PENDING) {

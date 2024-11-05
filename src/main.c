@@ -67,26 +67,26 @@ int register_app(int (*select_aid)(app_t *, uint8_t), const uint8_t *aid) {
 int select_app(const uint8_t *aid, size_t aid_len) {
     if (current_app && current_app->aid && (current_app->aid + 1 == aid || !memcmp(current_app->aid + 1, aid, aid_len))) {
         current_app->select_aid(current_app, 0);
-        return CCID_OK;
+        return PICOKEY_OK;
     }
     for (int a = 0; a < num_apps; a++) {
         if (!memcmp(apps[a].aid + 1, aid, MIN(aid_len, apps[a].aid[0]))) {
             if (current_app) {
                 if (current_app->aid && !memcmp(current_app->aid + 1, aid, aid_len)) {
                     current_app->select_aid(current_app, 1);
-                    return CCID_OK;
+                    return PICOKEY_OK;
                 }
                 if (current_app->unload) {
                     current_app->unload();
                 }
             }
             current_app = &apps[a];
-            if (current_app->select_aid(current_app, 1) == CCID_OK) {
-                return CCID_OK;
+            if (current_app->select_aid(current_app, 1) == PICOKEY_OK) {
+                return PICOKEY_OK;
             }
         }
     }
-    return CCID_ERR_FILE_NOT_FOUND;
+    return PICOKEY_ERR_FILE_NOT_FOUND;
 }
 
 int (*button_pressed_cb)(uint8_t) = NULL;

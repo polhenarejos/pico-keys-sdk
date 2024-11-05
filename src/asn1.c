@@ -20,17 +20,17 @@
 
 int asn1_ctx_init(uint8_t *data, uint16_t len, asn1_ctx_t *ctx) {
     if (!ctx) {
-        return CCID_ERR_NULL_PARAM;
+        return PICOKEY_ERR_NULL_PARAM;
     }
     ctx->data = data;
     ctx->len = len;
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 int asn1_ctx_clear(asn1_ctx_t *ctx) {
     ctx->data = NULL;
     ctx->len = 0;
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 uint16_t asn1_len(asn1_ctx_t *ctx) {

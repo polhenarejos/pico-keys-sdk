@@ -97,10 +97,10 @@ int sm_sign(uint8_t *in, size_t in_len, uint8_t *out) {
 int sm_unwrap() {
     uint8_t sm_indicator = (CLA(apdu) >> 2) & 0x3;
     if (sm_indicator == 0) {
-        return CCID_OK;
+        return PICOKEY_OK;
     }
     int r = sm_verify();
-    if (r != CCID_OK) {
+    if (r != PICOKEY_OK) {
         return r;
     }
     apdu.ne = sm_get_le();
@@ -126,23 +126,23 @@ int sm_unwrap() {
     }
     if (!body) {
         apdu.nc = 0;
-        return CCID_OK;
+        return PICOKEY_OK;
     }
     if (is87 && *body++ != 0x1) {
-        return CCID_WRONG_PADDING;
+        return PICOKEY_WRONG_PADDING;
     }
     sm_update_iv();
     aes_decrypt(sm_kenc, sm_iv, 128, PICO_KEYS_AES_MODE_CBC, body, body_size);
     memmove(apdu.data, body, body_size);
     apdu.nc = sm_remove_padding(apdu.data, body_size);
     DEBUG_PAYLOAD(apdu.data, (int) apdu.nc);
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 int sm_wrap() {
     uint8_t sm_indicator = (CLA(apdu) >> 2) & 0x3;
     if (sm_indicator == 0) {
-        return CCID_OK;
+        return PICOKEY_OK;
     }
     uint8_t input[4096];
     size_t input_len = 0;
@@ -153,7 +153,7 @@ int sm_wrap() {
     mbedtls_mpi_copy(&sm_mSSC, &ssc);
     int r = mbedtls_mpi_write_binary(&ssc, input, sm_blocksize);
     if (r != 0) {
-        return CCID_EXEC_ERROR;
+        return PICOKEY_EXEC_ERROR;
     }
     input_len += sm_blocksize;
     mbedtls_mpi_free(&ssc);
@@ -203,7 +203,7 @@ int sm_wrap() {
         apdu.ne = res_APDU_size;
     }
     set_res_sw(0x90, 0x00);
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 uint16_t sm_get_le() {
@@ -243,7 +243,7 @@ int sm_verify() {
         data_len += sm_blocksize;
     }
     if (data_len + (add_header ? sm_blocksize : 0) > 4096) {
-        return CCID_WRONG_LENGTH;
+        return PICOKEY_WRONG_LENGTH;
     }
     mbedtls_mpi ssc;
     mbedtls_mpi_init(&ssc);
@@ -253,7 +253,7 @@ int sm_verify() {
     input_len += sm_blocksize;
     mbedtls_mpi_free(&ssc);
     if (r != 0) {
-        return CCID_EXEC_ERROR;
+        return PICOKEY_EXEC_ERROR;
     }
     if (add_header) {
         input[input_len++] = CLA(apdu);
@@ -286,7 +286,7 @@ int sm_verify() {
         }
     }
     if (!mac) {
-        return CCID_WRONG_DATA;
+        return PICOKEY_WRONG_DATA;
     }
     if (some_added) {
         input[input_len++] = 0x80;
@@ -295,12 +295,12 @@ int sm_verify() {
     uint8_t signature[16];
     r = sm_sign(input, input_len, signature);
     if (r != 0) {
-        return CCID_EXEC_ERROR;
+        return PICOKEY_EXEC_ERROR;
     }
     if (memcmp(signature, mac, mac_len) == 0) {
-        return CCID_OK;
+        return PICOKEY_OK;
     }
-    return CCID_VERIFICATION_FAILED;
+    return PICOKEY_VERIFICATION_FAILED;
 }
 
 uint16_t sm_remove_padding(const uint8_t *data, uint16_t data_len) {

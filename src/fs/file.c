@@ -332,7 +332,7 @@ file_t *search_dynamic_file(uint16_t fid) {
 
 int delete_dynamic_file(file_t *f) {
     if (f == NULL) {
-        return CCID_ERR_FILE_NOT_FOUND;
+        return PICOKEY_ERR_FILE_NOT_FOUND;
     }
     for (int i = 0; i < dynamic_files; i++) {
         if (dynamic_file[i].fid == f->fid) {
@@ -340,10 +340,10 @@ int delete_dynamic_file(file_t *f) {
                 memcpy(&dynamic_file[j - 1], &dynamic_file[j], sizeof(file_t));
             }
             dynamic_files--;
-            return CCID_OK;
+            return PICOKEY_OK;
         }
     }
-    return CCID_ERR_FILE_NOT_FOUND;
+    return PICOKEY_ERR_FILE_NOT_FOUND;
 }
 
 file_t *file_new(uint16_t fid) {
@@ -396,7 +396,7 @@ uint16_t meta_find(uint16_t fid, uint8_t **out) {
 int meta_delete(uint16_t fid) {
     file_t *ef = search_file(EF_META);
     if (!ef) {
-        return CCID_ERR_FILE_NOT_FOUND;
+        return PICOKEY_ERR_FILE_NOT_FOUND;
     }
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
@@ -425,21 +425,21 @@ int meta_delete(uint16_t fid) {
                 }
                 int r = file_put_data(ef, fdata, new_len);
                 free(fdata);
-                if (r != CCID_OK) {
-                    return CCID_EXEC_ERROR;
+                if (r != PICOKEY_OK) {
+                    return PICOKEY_EXEC_ERROR;
                 }
             }
             low_flash_available();
             break;
         }
     }
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     int r;
     file_t *ef = search_file(EF_META);
     if (!ef) {
-        return CCID_ERR_FILE_NOT_FOUND;
+        return PICOKEY_ERR_FILE_NOT_FOUND;
     }
     uint16_t ef_size = file_get_size(ef);
     uint8_t *fdata = (uint8_t *) calloc(1, ef_size);
@@ -459,10 +459,10 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 memcpy(p - tag_len + 2, data, len);
                 r = file_put_data(ef, fdata, ef_size);
                 free(fdata);
-                if (r != CCID_OK) {
-                    return CCID_EXEC_ERROR;
+                if (r != PICOKEY_OK) {
+                    return PICOKEY_EXEC_ERROR;
                 }
-                return CCID_OK;
+                return PICOKEY_OK;
             }
             else {   //needs reallocation
                 uint8_t *tpos = p - asn1_len_tag(tag, tag_len);
@@ -477,7 +477,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                     }
                     else {
                         free(fdata);
-                        return CCID_ERR_MEMORY_FATAL;
+                        return PICOKEY_ERR_MEMORY_FATAL;
                     }
                 }
                 uint8_t *f = fdata + meta_offset;
@@ -488,10 +488,10 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 memcpy(f, data, len);
                 r = file_put_data(ef, fdata, ef_size);
                 free(fdata);
-                if (r != CCID_OK) {
-                    return CCID_EXEC_ERROR;
+                if (r != PICOKEY_OK) {
+                    return PICOKEY_EXEC_ERROR;
                 }
-                return CCID_OK;
+                return PICOKEY_OK;
             }
         }
     }
@@ -504,10 +504,10 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     memcpy(f, data, len);
     r = file_put_data(ef, fdata, ef_size + (uint16_t)asn1_len_tag(fid & 0x1f, len + 2));
     free(fdata);
-    if (r != CCID_OK) {
-        return CCID_EXEC_ERROR;
+    if (r != PICOKEY_OK) {
+        return PICOKEY_EXEC_ERROR;
     }
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 bool file_has_data(file_t *f) {
@@ -516,15 +516,15 @@ bool file_has_data(file_t *f) {
 
 int delete_file(file_t *ef) {
     if (ef == NULL) {
-        return CCID_OK;
+        return PICOKEY_OK;
     }
     meta_delete(ef->fid);
-    if (flash_clear_file(ef) != CCID_OK) {
-        return CCID_EXEC_ERROR;
+    if (flash_clear_file(ef) != PICOKEY_OK) {
+        return PICOKEY_EXEC_ERROR;
     }
-    if (delete_dynamic_file(ef) != CCID_OK) {
-        return CCID_EXEC_ERROR;
+    if (delete_dynamic_file(ef) != PICOKEY_OK) {
+        return PICOKEY_EXEC_ERROR;
     }
     low_flash_available();
-    return CCID_OK;
+    return PICOKEY_OK;
 }

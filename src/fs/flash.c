@@ -128,7 +128,7 @@ uintptr_t allocate_free_addr(uint16_t size, bool persistent) {
 
 int flash_clear_file(file_t *file) {
     if (file == NULL || file->data == NULL) {
-        return CCID_OK;
+        return PICOKEY_OK;
     }
     uintptr_t base_addr =
         (uintptr_t)(file->data - sizeof(uintptr_t) - sizeof(uint16_t) - sizeof(uintptr_t));
@@ -144,18 +144,18 @@ int flash_clear_file(file_t *file) {
     flash_program_uintptr(base_addr + sizeof(uintptr_t), 0);
     file->data = NULL;
     //printf("na %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr));
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t len,
                                     uint16_t offset) {
     if (!file) {
-        return CCID_ERR_NULL_PARAM;
+        return PICOKEY_ERR_NULL_PARAM;
     }
     uint16_t size_file_flash = file->data ? flash_read_uint16((uintptr_t) file->data) : 0;
     uint8_t *old_data = NULL;
     if (offset + len > FLASH_SECTOR_SIZE || offset > size_file_flash) {
-        return CCID_ERR_NO_MEMORY;
+        return PICOKEY_ERR_NO_MEMORY;
     }
     if (file->data) { //already in flash
         if (offset + len <= size_file_flash) { //it fits, no need to move it
@@ -163,7 +163,7 @@ int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t 
             if (data) {
                 flash_program_block((uintptr_t) file->data + sizeof(uint16_t) + offset, data, len);
             }
-            return CCID_OK;
+            return PICOKEY_OK;
         }
         else {   //we clear the old file
             flash_clear_file(file);
@@ -180,7 +180,7 @@ int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t 
     uintptr_t new_addr = allocate_free_addr(len, (file->type & FILE_PERSISTENT) == FILE_PERSISTENT);
     //printf("na %x\n",new_addr);
     if (new_addr == 0x0) {
-        return CCID_ERR_NO_MEMORY;
+        return PICOKEY_ERR_NO_MEMORY;
     }
     file->data = (uint8_t *) new_addr + sizeof(uintptr_t) + sizeof(uint16_t) + sizeof(uintptr_t); //next addr+fid+prev addr
     flash_program_halfword(new_addr + sizeof(uintptr_t) + sizeof(uintptr_t), file->fid);
@@ -191,7 +191,7 @@ int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t 
     if (old_data) {
         free(old_data);
     }
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len) {
     return flash_write_data_to_file_offset(file, data, len, 0);

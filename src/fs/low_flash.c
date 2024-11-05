@@ -224,24 +224,24 @@ int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
     page_flash_t *p = NULL;
 
     if (!data || len == 0) {
-        return CCID_ERR_NULL_PARAM;
+        return PICOKEY_ERR_NULL_PARAM;
     }
 
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
         printf("ERROR: ALL FLASH PAGES CACHED\n");
-        return CCID_ERR_NO_MEMORY;
+        return PICOKEY_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
         mutex_exit(&mtx_flash);
         printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
-        return CCID_ERR_MEMORY_FATAL;
+        return PICOKEY_ERR_MEMORY_FATAL;
     }
     memcpy(&p->page[addr & (FLASH_SECTOR_SIZE - 1)], data, len);
     //printf("Flash: modified page %X with data %x at [%x]\n",(uintptr_t)addr,(uintptr_t)data,addr&(FLASH_SECTOR_SIZE-1));
     mutex_exit(&mtx_flash);
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 int flash_program_halfword(uintptr_t addr, uint16_t data) {
@@ -305,19 +305,19 @@ int flash_erase_page(uintptr_t addr, size_t page_size) {
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
         printf("ERROR: ALL FLASH PAGES CACHED\n");
-        return CCID_ERR_NO_MEMORY;
+        return PICOKEY_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
         printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
         mutex_exit(&mtx_flash);
-        return CCID_ERR_MEMORY_FATAL;
+        return PICOKEY_ERR_MEMORY_FATAL;
     }
     p->erase = true;
     p->ready = false;
     p->page_size = page_size;
     mutex_exit(&mtx_flash);
 
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 bool flash_check_blank(const uint8_t *p_start, size_t size) {

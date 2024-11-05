@@ -24,7 +24,7 @@ phy_data_t phy_data;
 
 int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     if (!phy || !data || !len) {
-        return CCID_ERR_NULL_PARAM;
+        return PICOKEY_ERR_NULL_PARAM;
     }
     uint8_t *p = data;
     if (phy->vidpid_present) {
@@ -46,12 +46,12 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     *p++ = phy->opts >> 8;
     *p++ = phy->opts & 0xff;
     *len = p - data;
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 #include <stdio.h>
 int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
     if (!phy || !data || !len) {
-        return CCID_ERR_NULL_PARAM;
+        return PICOKEY_ERR_NULL_PARAM;
     }
     memset(phy, 0, sizeof(phy_data_t));
     const uint8_t *p = data;
@@ -80,7 +80,7 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
                 break;
         }
     }
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 int phy_init() {
@@ -89,11 +89,11 @@ int phy_init() {
         const uint8_t *data = file_get_data(ef_phy);
         DEBUG_DATA(data, file_get_size(ef_phy));
         int ret = phy_unserialize_data(data, file_get_size(ef_phy), &phy_data);
-        if (ret != CCID_OK) {
+        if (ret != PICOKEY_OK) {
             return ret;
         }
     }
 
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 #endif

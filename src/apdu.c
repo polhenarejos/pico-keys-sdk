@@ -56,7 +56,7 @@ int process_apdu() {
         }
     }
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
-        if (select_app(apdu.data, apdu.nc) == CCID_OK) {
+        if (select_app(apdu.data, apdu.nc) == PICOKEY_OK) {
             return SW_OK();
         }
         return SW_FILE_NOT_FOUND();

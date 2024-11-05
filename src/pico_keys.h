@@ -139,20 +139,20 @@ extern uint32_t button_timeout;
 
 #define SW_OK()                             set_res_sw(0x90, 0x00)
 
-#define CCID_OK                              0
-#define CCID_ERR_NO_MEMORY                   -1000
-#define CCID_ERR_MEMORY_FATAL                -1001
-#define CCID_ERR_NULL_PARAM                  -1002
-#define CCID_ERR_FILE_NOT_FOUND              -1003
-#define CCID_ERR_BLOCKED                     -1004
-#define CCID_NO_LOGIN                        -1005
-#define CCID_EXEC_ERROR                      -1006
-#define CCID_WRONG_LENGTH                    -1007
-#define CCID_WRONG_DATA                      -1008
-#define CCID_WRONG_DKEK                      -1009
-#define CCID_WRONG_SIGNATURE                 -1010
-#define CCID_WRONG_PADDING                   -1011
-#define CCID_VERIFICATION_FAILED             -1012
+#define PICOKEY_OK                              0
+#define PICOKEY_ERR_NO_MEMORY                   -1000
+#define PICOKEY_ERR_MEMORY_FATAL                -1001
+#define PICOKEY_ERR_NULL_PARAM                  -1002
+#define PICOKEY_ERR_FILE_NOT_FOUND              -1003
+#define PICOKEY_ERR_BLOCKED                     -1004
+#define PICOKEY_NO_LOGIN                        -1005
+#define PICOKEY_EXEC_ERROR                      -1006
+#define PICOKEY_WRONG_LENGTH                    -1007
+#define PICOKEY_WRONG_DATA                      -1008
+#define PICOKEY_WRONG_DKEK                      -1009
+#define PICOKEY_WRONG_SIGNATURE                 -1010
+#define PICOKEY_WRONG_PADDING                   -1011
+#define PICOKEY_VERIFICATION_FAILED             -1012
 
 #if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 #define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8

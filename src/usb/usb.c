@@ -177,7 +177,7 @@ int card_status(uint8_t itf) {
             if (m == EV_EXEC_FINISHED) {
                 timeout_stop();
                 led_set_mode(MODE_MOUNTED);
-                return CCID_OK;
+                return PICOKEY_OK;
             }
 #ifndef ENABLE_EMULATION
             else if (m == EV_PRESS_BUTTON) {
@@ -185,16 +185,16 @@ int card_status(uint8_t itf) {
                 queue_try_add(&usb_to_card_q, &flag);
             }
 #endif
-            return CCID_ERR_FILE_NOT_FOUND;
+            return PICOKEY_ERR_FILE_NOT_FOUND;
         }
         else {
             if (timeout > 0) {
                 if (timeout + timeout_counter[itf] < board_millis()) {
                     timeout = board_millis();
-                    return CCID_ERR_BLOCKED;
+                    return PICOKEY_ERR_BLOCKED;
                 }
             }
         }
     }
-    return CCID_ERR_FILE_NOT_FOUND;
+    return PICOKEY_ERR_FILE_NOT_FOUND;
 }

@@ -36,7 +36,7 @@ int rescue_select(app_t *a, uint8_t force) {
     if (force) {
         scan_flash();
     }
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 INITIALIZER ( rescue_ctor ) {
@@ -44,7 +44,7 @@ INITIALIZER ( rescue_ctor ) {
 }
 
 int rescue_unload() {
-    return CCID_OK;
+    return PICOKEY_OK;
 }
 
 int cmd_write() {
@@ -55,7 +55,7 @@ int cmd_write() {
     if (P1(apdu) == 0x1) { // PHY
 #ifndef ENABLE_EMULATION
         int ret = phy_unserialize_data(apdu.data, apdu.nc, &phy_data);
-        if (ret == CCID_OK) {
+        if (ret == PICOKEY_OK) {
             file_put_data(ef_phy, apdu.data, apdu.nc);
         }
 #endif

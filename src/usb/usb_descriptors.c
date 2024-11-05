@@ -154,14 +154,13 @@ const uint8_t desc_config[] = {
 };
 
 #ifdef USB_ITF_HID
-#include "apdu.h"
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {
     printf("report_cb %d\n", itf);
     DEBUG_DATA(desc_hid_report, sizeof(desc_hid_report));
-    if (itf == ITF_HID) {
+    if (itf == ITF_HID_CTAP) {
         return desc_hid_report;
     }
-    else if (itf == ITF_KEYBOARD) {
+    else if (itf == ITF_HID_KB) {
         return desc_hid_report_kb;
     }
     return NULL;

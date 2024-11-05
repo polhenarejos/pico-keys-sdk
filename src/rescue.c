@@ -17,7 +17,7 @@
 
 #include "pico_keys.h"
 #include "apdu.h"
-#include "version.h"
+#include "pico_keys_version.h"
 
 int rescue_process_apdu();
 int rescue_unload();
@@ -30,8 +30,9 @@ const uint8_t rescue_aid[] = {
 int rescue_select(app_t *a, uint8_t force) {
     a->process_apdu = rescue_process_apdu;
     a->unload = rescue_unload;
-    memcpy(res_APDU, PICO_SDK_VERSION_STRING, strlen(PICO_SDK_VERSION_STRING));
-    res_APDU_size = (uint16_t)strlen((char *) res_APDU);
+    res_APDU_size = 0;
+    res_APDU[res_APDU_size++] = PICO_KEYS_SDK_VERSION_MAJOR;
+    res_APDU[res_APDU_size++] = PICO_KEYS_SDK_VERSION_MINOR;
     apdu.ne = res_APDU_size;
     if (force) {
         scan_flash();

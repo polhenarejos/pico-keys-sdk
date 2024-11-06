@@ -275,7 +275,7 @@ tinyusb_config_t tusb_cfg = {
     .string_descriptor = string_desc_arr,
     .string_descriptor_count = sizeof(string_desc_arr) / sizeof(string_desc_arr[0]),
     .external_phy = false,
-    .configuration_descriptor = desc_config_nowcid,
+    .configuration_descriptor = desc_config,
 };
 #else
 static uint16_t _desc_str[32];

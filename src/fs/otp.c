@@ -26,6 +26,7 @@
 #include "hardware/regs/otp_data.h"
 #endif
 #include "random.h"
+#include "mbedtls/ecdsa.h"
 
 #ifdef PICO_RP2350
 
@@ -87,6 +88,7 @@ static void otp_lock_page(uint8_t page) {
 #ifdef ESP_PLATFORM
 
 uint8_t _otp_key_1[32] = {0};
+uint8_t _otp_key_2[32] = {0};
 
 esp_err_t read_key_from_efuse(esp_efuse_block_t block, uint8_t *key, size_t key_len) {
     const esp_efuse_desc_t **key_desc = esp_efuse_get_key(block);
@@ -101,18 +103,75 @@ esp_err_t read_key_from_efuse(esp_efuse_block_t block, uint8_t *key, size_t key_
 #endif
 
 const uint8_t *otp_key_1 = NULL;
-void init_otp_files() {
+const uint8_t *otp_key_2 = NULL;
 
 #ifdef PICO_RP2350
-    uint8_t page = OTP_KEY_1 >> 6;
-    if (is_empty_otp_buffer(OTP_KEY_1, 32)) {
+typedef int otp_ret_t;
+#define OTP_WRITE(ROW, DATA, LEN) otp_write_data(ROW, DATA, LEN)
+#define OTP_READ(ROW, PTR) do { PTR = otp_buffer(ROW); } while(0)
+#define OTP_EMTPY(ROW, LEN) is_empty_otp_buffer(ROW, LEN)
+#elif defined(ESP_PLATFORM)
+typedef esp_err_t otp_ret_t;
+#define OTP_WRITE(ROW, DATA, LEN) esp_efuse_write_key(ROW, ESP_EFUSE_KEY_PURPOSE_USER, DATA, LEN);
+#define OTP_READ(ROW, PTR) do { \
+    esp_err_t ret = read_key_from_efuse(ROW, _##PTR, sizeof(_##PTR)); \
+    if (ret != ESP_OK) { printf("Error reading OTP key 1 [%d]\n", ret); } \
+    PTR = _##PTR; } while(0)
+#define OTP_EMTPY(ROW, LEN) esp_efuse_key_block_unused(ROW)
+#endif
+
+void init_otp_files() {
+
+#if defined(PICO_RP2350) || defined(ESP_PLATFORM)
+    otp_ret_t ret = 0;
+    uint16_t write_otp[2] = {0xFFFF, 0xFFFF};
+    if (OTP_EMTPY(OTP_KEY_1, 32)) {
         uint8_t mkek[32] = {0};
         random_gen(NULL, mkek, sizeof(mkek));
-        otp_write_data(OTP_KEY_1, mkek, sizeof(mkek));
+        ret = OTP_WRITE(OTP_KEY_1, mkek, sizeof(mkek));
+        if (ret != 0) {
+            printf("Error writing OTP key 1 [%d]\n", ret);
+        }
+        write_otp[0] = OTP_KEY_1;
     }
-    otp_key_1 = otp_buffer(OTP_KEY_1);
+    OTP_READ(OTP_KEY_1, otp_key_1);
 
-    otp_lock_page(page);
+    if (OTP_EMTPY(OTP_KEY_2, 32)) {
+        mbedtls_ecdsa_context ecdsa;
+        size_t olen = 0;
+        uint8_t pkey[MBEDTLS_ECP_MAX_BYTES];
+        while (olen != 32) {
+            mbedtls_ecdsa_init(&ecdsa);
+            mbedtls_ecp_group_id ec_id = MBEDTLS_ECP_DP_SECP256K1;
+            mbedtls_ecdsa_genkey(&ecdsa, ec_id, random_gen, NULL);
+            mbedtls_ecp_write_key_ext(&ecdsa, &olen, pkey, sizeof(pkey));
+            mbedtls_ecdsa_free(&ecdsa);
+        }
+        ret = OTP_WRITE(OTP_KEY_2, pkey, olen);
+        if (ret != 0) {
+            printf("Error writing OTP key 2 [%d]\n", ret);
+        }
+        write_otp[1] = OTP_KEY_2;
+    }
+    OTP_READ(OTP_KEY_2, otp_key_2);
+
+    for (int i = 0; i < sizeof(write_otp)/sizeof(uint16_t); i++) {
+        if (write_otp[i] != 0xFFFF) {
+#if defined(PICO_RP2350)
+            otp_lock_page(write_otp[i] >> 6);
+#elif defined(ESP_PLATFORM)
+            ret = esp_efuse_set_key_dis_write(write_otp[i]);
+            if (ret != ESP_OK) {
+                printf("Error setting OTP key %d to read only [%d]\n", i, ret);
+            }
+            ret = esp_efuse_set_keypurpose_dis_write(write_otp[i]);
+            if (ret != ESP_OK) {
+                printf("Error setting OTP key %d purpose to read only [%d]\n", i, ret);
+            }
+#endif
+        }
+    }
+#ifdef PICO_RP2350
 #ifdef ENABLE_SECURE_BOOT_FIRMWARE
     uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
 #ifndef SECURE_BOOT_BOOTKEY_INDEX
@@ -160,28 +219,7 @@ void init_otp_files() {
 
 #endif
 
-#elif defined(ESP_PLATFORM)
-    if (esp_efuse_key_block_unused(OTP_KEY_1)) {
-        uint8_t mkek[32] = {0};
-        random_gen(NULL, mkek, sizeof(mkek));
-        esp_err_t ret = esp_efuse_write_key(OTP_KEY_1, ESP_EFUSE_KEY_PURPOSE_USER, mkek, sizeof(mkek));
-        if (ret != ESP_OK) {
-            printf("Error writing OTP key 1 [%d]\n", ret);
-        }
-        ret = esp_efuse_set_key_dis_write(OTP_KEY_1);
-        if (ret != ESP_OK) {
-            printf("Error setting OTP key 1 to read only [%d]\n", ret);
-        }
-        ret = esp_efuse_set_keypurpose_dis_write(OTP_KEY_1);
-        if (ret != ESP_OK) {
-            printf("Error setting OTP key 1 purpose to read only [%d]\n", ret);
-        }
-    }
-    esp_err_t ret = read_key_from_efuse(OTP_KEY_1, _otp_key_1, sizeof(_otp_key_1));
-    if (ret != ESP_OK) {
-        printf("Error reading OTP key 1 [%d]\n", ret);
-    }
-    otp_key_1 = _otp_key_1;
-
 #endif
+
+#endif // PICO_RP2350 || ESP_PLATFORM
 }

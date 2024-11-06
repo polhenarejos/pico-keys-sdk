@@ -110,9 +110,6 @@ void init_otp_files() {
         random_gen(NULL, mkek, sizeof(mkek));
         otp_write_data(OTP_KEY_1, mkek, sizeof(mkek));
     }
-    else {
-        DEBUG_DATA(otp_buffer(OTP_KEY_1), 32);
-    }
     otp_key_1 = otp_buffer(OTP_KEY_1);
 
     otp_lock_page(page);
@@ -167,7 +164,6 @@ void init_otp_files() {
     if (esp_efuse_key_block_unused(OTP_KEY_1)) {
         uint8_t mkek[32] = {0};
         random_gen(NULL, mkek, sizeof(mkek));
-        DEBUG_DATA(mkek, 32);
         esp_err_t ret = esp_efuse_write_key(OTP_KEY_1, ESP_EFUSE_KEY_PURPOSE_USER, mkek, sizeof(mkek));
         if (ret != ESP_OK) {
             printf("Error writing OTP key 1 [%d]\n", ret);
@@ -184,9 +180,6 @@ void init_otp_files() {
     esp_err_t ret = read_key_from_efuse(OTP_KEY_1, _otp_key_1, sizeof(_otp_key_1));
     if (ret != ESP_OK) {
         printf("Error reading OTP key 1 [%d]\n", ret);
-    }
-    else {
-        DEBUG_DATA(_otp_key_1, 32);
     }
     otp_key_1 = _otp_key_1;
 

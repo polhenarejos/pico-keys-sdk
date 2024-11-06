@@ -80,21 +80,14 @@ uint8_t const *tud_descriptor_device_cb(void) {
 #define TUSB_SMARTCARD_WCID_DESC_LEN (TUD_INTERFACE_DESC_LEN + TUSB_SMARTCARD_LEN + 2 * TUD_ENDPOINT_DESC_LEN)
 
 enum {
- TUSB_DESC_TOTAL_LEN_NOWCID = TUD_CONFIG_DESC_LEN
+ TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN
 #ifdef USB_ITF_HID
-        + TUD_HID_INOUT_DESC_LEN + TUD_HID_DESC_LEN
+        + TUD_HID_INOUT_DESC_LEN
+        + TUD_HID_DESC_LEN
 #endif
 #ifdef USB_ITF_CCID
         + TUSB_SMARTCARD_CCID_DESC_LEN
-#endif
-};
-
-enum {
- TUSB_DESC_TOTAL_LEN = TUSB_DESC_TOTAL_LEN_NOWCID
-#ifdef USB_ITF_CCID
-#ifdef USB_ITF_WCID
         + TUSB_SMARTCARD_WCID_DESC_LEN
-#endif
 #endif
 };
 
@@ -109,13 +102,11 @@ uint8_t const desc_hid_report_kb[] = {
 #endif
 
 #ifdef USB_ITF_CCID
-#ifdef USB_ITF_WCID
 #define TUD_SMARTCARD_DESCRIPTOR_WEB(_itf, _strix, _epout, _epin, _epsize) \
     9, TUSB_DESC_INTERFACE, _itf, 0, 2, 0xFF, 0, 0, _strix, \
     54, 0x21, U16_TO_U8S_LE(0x0110), 0, 0x1, U32_TO_U8S_LE(0x01|0x2), U32_TO_U8S_LE(0xDFC), U32_TO_U8S_LE(0xDFC), 0, U32_TO_U8S_LE(0x2580), U32_TO_U8S_LE(0x2580), 0, U32_TO_U8S_LE(0xFE), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0x40840), U32_TO_U8S_LE(65544+10), 0xFF, 0xFF, U16_TO_U8S_LE(0x0), 0, 0x1, \
     7, TUSB_DESC_ENDPOINT, _epout, TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0, \
     7, TUSB_DESC_ENDPOINT, _epin,  TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0
-#endif
 #define TUD_SMARTCARD_DESCRIPTOR(_itf, _strix, _epout, _epin, _epint, _epsize) \
     9, TUSB_DESC_INTERFACE, _itf, 0, 3, TUSB_CLASS_SMART_CARD, 0, 0, _strix, \
     54, 0x21, U16_TO_U8S_LE(0x0110), 0, 0x1, U32_TO_U8S_LE(0x01|0x2), U32_TO_U8S_LE(0xDFC), U32_TO_U8S_LE(0xDFC), 0, U32_TO_U8S_LE(0x2580), U32_TO_U8S_LE(0x2580), 0, U32_TO_U8S_LE(0xFE), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0x40840), U32_TO_U8S_LE(65544+10), 0xFF, 0xFF, U16_TO_U8S_LE(0x0), 0, 0x1, \
@@ -123,21 +114,6 @@ uint8_t const desc_hid_report_kb[] = {
     7, TUSB_DESC_ENDPOINT, _epin,  TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0, \
     7, TUSB_DESC_ENDPOINT, _epint,  TUSB_XFER_INTERRUPT, U16_TO_U8S_LE(_epsize), 0
 #endif
-
-const uint8_t desc_config_nowcid[] = {
-#ifdef USB_ITF_CCID
-    TUD_CONFIG_DESCRIPTOR(1, ITF_TOTAL-1, 4, TUSB_DESC_TOTAL_LEN_NOWCID, USB_CONFIG_ATT_ONE | TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, MAX_USB_POWER),
-#else
-    TUD_CONFIG_DESCRIPTOR(1, ITF_TOTAL, 4, TUSB_DESC_TOTAL_LEN_NOWCID, USB_CONFIG_ATT_ONE | TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, MAX_USB_POWER),
-#endif
-#ifdef USB_ITF_HID
-    TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10),
-    TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), TUSB_DIR_IN_MASK | (EPNUM_HID + 1), 16, 5),
-#endif
-#ifdef USB_ITF_CCID
-    TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID+5, 1, TUSB_DIR_IN_MASK | 1, TUSB_DIR_IN_MASK | 2, 64),
-#endif
-};
 
 const uint8_t desc_config[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_TOTAL, 4, TUSB_DESC_TOTAL_LEN, USB_CONFIG_ATT_ONE | TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, MAX_USB_POWER),
@@ -147,16 +123,13 @@ const uint8_t desc_config[] = {
 #endif
 #ifdef USB_ITF_CCID
     TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID+5, 1, TUSB_DIR_IN_MASK | 1, TUSB_DIR_IN_MASK | 2, 64),
-#ifdef USB_ITF_WCID
     TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID+5, 3, TUSB_DIR_IN_MASK | 3, 64),
-#endif
 #endif
 };
 
 #ifdef USB_ITF_HID
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {
     printf("report_cb %d\n", itf);
-    DEBUG_DATA(desc_hid_report, sizeof(desc_hid_report));
     if (itf == ITF_HID_CTAP) {
         return desc_hid_report;
     }
@@ -169,14 +142,10 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {
 #ifndef ESP_PLATFORM
 uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
     (void) index; // for multiple configurations
-    if (phy_data.opts & PHY_OPT_WCID) {
-        return desc_config;
-    }
-    return desc_config_nowcid;
+    return desc_config;
 }
 #endif
 
-#ifdef USB_ITF_WCID
 #define BOS_TOTAL_LEN     (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
 #define MS_OS_20_DESC_LEN  0xB2
 
@@ -276,12 +245,9 @@ uint8_t const desc_bos[] = {
 };
 
 uint8_t const *tud_descriptor_bos_cb(void) {
-    if (phy_data.opts & PHY_OPT_WCID) {
-        return desc_bos;
-    }
-    return NULL;
+    return desc_bos;
 }
-#endif
+
 //--------------------------------------------------------------------+
 // String Descriptors
 //--------------------------------------------------------------------+
@@ -299,9 +265,7 @@ char const *string_desc_arr [] = {
 #endif
 #ifdef USB_ITF_CCID
     , "Pico Key CCID Interface"
-#ifdef USB_ITF_WCID
     , "Pico Key WebCCID Interface"
-#endif
 #endif
 };
 

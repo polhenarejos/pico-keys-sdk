@@ -317,9 +317,8 @@ int main(void) {
     gpio_pulldown_dis(BOOT_PIN);
 
     tusb_cfg.string_descriptor[3] = pico_serial_str;
-    if (phy_data.opts & PHY_OPT_WCID) {
-        tusb_cfg.configuration_descriptor = desc_config;
-    }
+    tusb_cfg.configuration_descriptor = desc_config;
+
     tinyusb_driver_install(&tusb_cfg);
 #else
     tusb_init();

@@ -87,7 +87,6 @@ int phy_init() {
     memset(&phy_data, 0, sizeof(phy_data_t));
     if (file_has_data(ef_phy)) {
         const uint8_t *data = file_get_data(ef_phy);
-        DEBUG_DATA(data, file_get_size(ef_phy));
         int ret = phy_unserialize_data(data, file_get_size(ef_phy), &phy_data);
         if (ret != PICOKEY_OK) {
             return ret;

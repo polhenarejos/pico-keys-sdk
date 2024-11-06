@@ -56,7 +56,6 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
     memset(phy, 0, sizeof(phy_data_t));
     const uint8_t *p = data;
     while (p < data + len) {
-        printf("TAG %x\n",*p);
         switch (*p++) {
             case PHY_VIDPID:
                 memcpy(phy->vidpid, p, 4);

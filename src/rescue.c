@@ -27,10 +27,22 @@ const uint8_t rescue_aid[] = {
     0xA0, 0x58, 0x3F, 0xC1, 0x9B, 0x7E, 0x4F, 0x21
 };
 
+#ifdef PICO_RP2350
+#define PICO_MCU 1
+#elif defined(ESP_PLATFORM)
+#define PICO_MCU 2
+#else
+#define PICO_MCU 0
+#endif
+
+extern uint8_t PICO_PRODUCT;
+
 int rescue_select(app_t *a, uint8_t force) {
     a->process_apdu = rescue_process_apdu;
     a->unload = rescue_unload;
     res_APDU_size = 0;
+    res_APDU[res_APDU_size++] = PICO_MCU;
+    res_APDU[res_APDU_size++] = PICO_PRODUCT;
     res_APDU[res_APDU_size++] = PICO_KEYS_SDK_VERSION_MAJOR;
     res_APDU[res_APDU_size++] = PICO_KEYS_SDK_VERSION_MINOR;
     apdu.ne = res_APDU_size;

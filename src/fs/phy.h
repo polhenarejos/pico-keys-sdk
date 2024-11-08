@@ -28,6 +28,9 @@
 #define PHY_OPT_WCID    0x1
 #define PHY_OPT_DIMM    0x2
 
+#include <stdint.h>
+#include <stdbool.h>
+
 typedef struct phy_data {
     union {
         struct {

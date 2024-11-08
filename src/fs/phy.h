@@ -27,8 +27,6 @@
 
 #define PHY_OPT_WCID    0x1
 #define PHY_OPT_DIMM    0x2
-#define PHY_OPT_SECURE_BOOT 0x4
-#define PHY_OPT_SECURE_LOCK 0x8
 
 typedef struct phy_data {
     union {

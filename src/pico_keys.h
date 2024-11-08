@@ -154,6 +154,8 @@ extern uint32_t button_timeout;
 #define PICOKEY_WRONG_PADDING                   -1011
 #define PICOKEY_VERIFICATION_FAILED             -1012
 
+#define PICOKEY_CHECK(x) do { ret = (x); if (ret != PICOKEY_OK) goto err; } while (0)
+
 #if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 #define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8
 typedef struct { uint8_t id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES]; } pico_unique_board_id_t;

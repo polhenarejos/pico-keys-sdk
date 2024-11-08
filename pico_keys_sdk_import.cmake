@@ -113,28 +113,6 @@ endif()
 
 message(STATUS "USB VID/PID:\t\t\t ${USB_VID}:${USB_PID}")
 
-option(ENABLE_SECURE_BOOT_FIRMWARE "Enable Secure Boot through the firmware" OFF)
-if(ENABLE_SECURE_BOOT_FIRMWARE)
-    add_definitions(-DENABLE_SECURE_BOOT_FIRMWARE)
-    message(STATUS "Secure boot firmware:\t enabled")
-
-    option(SECURE_BOOT_BOOTKEY_INDEX "Enable Secure Boot through the firmware" OFF)
-    if(SECURE_BOOT_BOOTKEY_INDEX)
-        add_definitions(-DSECURE_BOOT_BOOTKEY_INDEX=${SECURE_BOOT_BOOTKEY_INDEX})
-        message(STATUS "Secure boot bootkey index:\t ${SECURE_BOOT_BOOTKEY_INDEX}")
-    endif(SECURE_BOOT_BOOTKEY_INDEX)
-
-    option(ENABLE_SECURE_BOOT_LOCK_FIRMWARE "Enable Secure Boot Lock through the firmware" OFF)
-    if(ENABLE_SECURE_BOOT_LOCK_FIRMWARE)
-        add_definitions(-DENABLE_SECURE_BOOT_LOCK_FIRMWARE)
-        message(STATUS "Secure boot lock firmware:\t enabled")
-    else()
-        message(STATUS "Secure boot lock firmware:\t disabled")
-    endif(ENABLE_SECURE_BOOT_LOCK_FIRMWARE)
-else()
-    message(STATUS "Secure boot firmware:\t disabled")
-endif(ENABLE_SECURE_BOOT_FIRMWARE)
-
 set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c

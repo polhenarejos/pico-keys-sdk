@@ -120,6 +120,63 @@ typedef esp_err_t otp_ret_t;
 #define OTP_EMTPY(ROW, LEN) esp_efuse_key_block_unused(ROW)
 #endif
 
+#ifndef SECURE_BOOT_BOOTKEY_INDEX
+#define SECURE_BOOT_BOOTKEY_INDEX 0
+#endif
+
+int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
+    int ret = 0;
+#ifdef PICO_RP2350
+    uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
+    if (is_empty_otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, 32)) {
+        PICOKEY_CHECK(otp_write_data(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, BOOTKEY, sizeof(BOOTKEY)));
+    }
+
+    uint8_t *boot_flags1 = otp_buffer_raw(OTP_DATA_BOOT_FLAGS1_ROW);
+    uint8_t flagsb1[] = { boot_flags1[0] | (1 << (bootkey + OTP_DATA_BOOT_FLAGS1_KEY_VALID_LSB)), boot_flags1[1], boot_flags1[2], 0x00 };
+    if (secure_lock) {
+        flagsb1[1] |= ((OTP_DATA_BOOT_FLAGS1_KEY_INVALID_BITS >> OTP_DATA_BOOT_FLAGS1_KEY_INVALID_LSB) & (~(1 << bootkey)));
+    }
+
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_ROW, flagsb1, sizeof(flagsb1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R1_ROW, flagsb1, sizeof(flagsb1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R2_ROW, flagsb1, sizeof(flagsb1)));
+
+    uint8_t *crit1 = otp_buffer_raw(OTP_DATA_CRIT1_ROW);
+    uint8_t flagsc1[] = { crit1[0] | (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB), crit1[1], crit1[2], 0x00 };
+    if (secure_lock) {
+        flagsc1[0] |= (1 << OTP_DATA_CRIT1_DEBUG_DISABLE_LSB);
+        flagsc1[0] |= (1 << OTP_DATA_CRIT1_GLITCH_DETECTOR_ENABLE_LSB);
+        flagsc1[0] |= (3 << OTP_DATA_CRIT1_GLITCH_DETECTOR_SENS_LSB);
+    }
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R1_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R2_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R3_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R4_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R5_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R6_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R7_ROW, flagsc1, sizeof(flagsc1)));
+
+    if (secure_lock) {
+        uint8_t *page1 = otp_buffer_raw(OTP_DATA_PAGE1_LOCK1_ROW);
+        uint8_t page1v = page1[0] | (OTP_DATA_PAGE1_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE1_LOCK1_LOCK_BL_LSB);
+        uint8_t flagsp1[] = { page1v, page1v, page1v, 0x00 };
+        PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_PAGE1_LOCK1_ROW, flagsp1, sizeof(flagsp1)));
+        uint8_t *page2 = otp_buffer_raw(OTP_DATA_PAGE2_LOCK1_ROW);
+        uint8_t page2v = page2[0] | (OTP_DATA_PAGE2_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE2_LOCK1_LOCK_BL_LSB);
+        uint8_t flagsp2[] = { page2v, page2v, page2v, 0x00 };
+        PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_PAGE2_LOCK1_ROW, flagsp2, sizeof(flagsp2)));
+    }
+
+#endif // PICO_RP2350
+    err:
+    if (ret != PICOKEY_OK) {
+        return ret;
+    }
+    return PICOKEY_OK;
+}
+
 void init_otp_files() {
 
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
@@ -171,55 +228,5 @@ void init_otp_files() {
 #endif
         }
     }
-#ifdef PICO_RP2350
-#ifdef ENABLE_SECURE_BOOT_FIRMWARE
-    uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
-#ifndef SECURE_BOOT_BOOTKEY_INDEX
-#define SECURE_BOOT_BOOTKEY_INDEX 0
-#endif
-    if (is_empty_otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10*SECURE_BOOT_BOOTKEY_INDEX, 32)) {
-        otp_write_data(OTP_DATA_BOOTKEY0_0_ROW + 0x10*SECURE_BOOT_BOOTKEY_INDEX, BOOTKEY, sizeof(BOOTKEY));
-    }
-
-    uint8_t *boot_flags1 = otp_buffer_raw(OTP_DATA_BOOT_FLAGS1_ROW);
-    uint8_t flagsb1[] = { boot_flags1[0] | (1 << (SECURE_BOOT_BOOTKEY_INDEX + OTP_DATA_BOOT_FLAGS1_KEY_VALID_LSB)), boot_flags1[1], boot_flags1[2], 0x00 };
-#ifdef ENABLE_SECURE_BOOT_LOCK_FIRMWARE
-    flagsb1[1] |= ((OTP_DATA_BOOT_FLAGS1_KEY_INVALID_BITS >> OTP_DATA_BOOT_FLAGS1_KEY_INVALID_LSB) & (~(1 << SECURE_BOOT_BOOTKEY_INDEX)));
-#endif
-    otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_ROW, flagsb1, sizeof(flagsb1));
-    otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R1_ROW, flagsb1, sizeof(flagsb1));
-    otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R2_ROW, flagsb1, sizeof(flagsb1));
-
-    uint8_t *crit1 = otp_buffer_raw(OTP_DATA_CRIT1_ROW);
-    uint8_t flagsc1[] = { crit1[0] | (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB), crit1[1], crit1[2], 0x00 };
-#ifdef ENABLE_SECURE_BOOT_LOCK_FIRMWARE
-    flagsc1[0] |= (1 << OTP_DATA_CRIT1_DEBUG_DISABLE_LSB);
-    flagsc1[0] |= (1 << OTP_DATA_CRIT1_GLITCH_DETECTOR_ENABLE_LSB);
-    flagsc1[0] |= (3 << OTP_DATA_CRIT1_GLITCH_DETECTOR_SENS_LSB);
-#endif
-    otp_write_data_raw(OTP_DATA_CRIT1_ROW, flagsc1, sizeof(flagsc1));
-    otp_write_data_raw(OTP_DATA_CRIT1_R1_ROW, flagsc1, sizeof(flagsc1));
-    otp_write_data_raw(OTP_DATA_CRIT1_R2_ROW, flagsc1, sizeof(flagsc1));
-    otp_write_data_raw(OTP_DATA_CRIT1_R3_ROW, flagsc1, sizeof(flagsc1));
-    otp_write_data_raw(OTP_DATA_CRIT1_R4_ROW, flagsc1, sizeof(flagsc1));
-    otp_write_data_raw(OTP_DATA_CRIT1_R5_ROW, flagsc1, sizeof(flagsc1));
-    otp_write_data_raw(OTP_DATA_CRIT1_R6_ROW, flagsc1, sizeof(flagsc1));
-    otp_write_data_raw(OTP_DATA_CRIT1_R7_ROW, flagsc1, sizeof(flagsc1));
-
-#ifdef ENABLE_SECURE_BOOT_LOCK_FIRMWARE
-    uint8_t *page1 = otp_buffer_raw(OTP_DATA_PAGE1_LOCK1_ROW);
-    uint8_t page1v = page1[0] | (OTP_DATA_PAGE1_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE1_LOCK1_LOCK_BL_LSB);
-    uint8_t flagsp1[] = { page1v, page1v, page1v, 0x00 };
-    otp_write_data_raw(OTP_DATA_PAGE1_LOCK1_ROW, flagsp1, sizeof(flagsp1));
-    uint8_t *page2 = otp_buffer_raw(OTP_DATA_PAGE2_LOCK1_ROW);
-    uint8_t page2v = page2[0] | (OTP_DATA_PAGE2_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE2_LOCK1_LOCK_BL_LSB);
-    uint8_t flagsp2[] = { page2v, page2v, page2v, 0x00 };
-    otp_write_data_raw(OTP_DATA_PAGE2_LOCK1_ROW, flagsp2, sizeof(flagsp2));
-#endif
-
-#endif
-
-#endif
-
 #endif // PICO_RP2350 || ESP_PLATFORM
 }

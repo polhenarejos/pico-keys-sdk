@@ -32,6 +32,8 @@ extern uint8_t* otp_buffer_raw(uint16_t row);
 extern bool is_empty_otp_buffer(uint16_t row, uint16_t len);
 extern int otp_write_data(uint16_t row, uint8_t *data, uint16_t len);
 extern int otp_write_data_raw(uint16_t row, uint8_t *data, uint16_t len);
+extern int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock);
+extern void init_otp_files();
 
 #elif defined(ESP_PLATFORM)
 

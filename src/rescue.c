@@ -18,6 +18,7 @@
 #include "pico_keys.h"
 #include "apdu.h"
 #include "pico_keys_version.h"
+#include "otp.h"
 
 int rescue_process_apdu();
 int rescue_unload();
@@ -77,10 +78,27 @@ int cmd_write() {
     return SW_OK();
 }
 
+int cmd_secure() {
+    if (apdu.nc != 0) {
+        return SW_WRONG_LENGTH();
+    }
+
+    uint8_t bootkey = P1(apdu);
+    bool secure_lock = P2(apdu) == 0x1;
+
+    int ret = otp_enable_secure_boot(bootkey, secure_lock);
+    if (ret != 0) {
+        return SW_EXEC_ERROR();
+    }
+    return SW_OK();
+}
+
 #define INS_WRITE            0x1C
+#define INS_SECURE           0x1D
 
 static const cmd_t cmds[] = {
     { INS_WRITE, cmd_write },
+    { INS_SECURE, cmd_secure },
     { 0x00, 0x0 }
 };
 

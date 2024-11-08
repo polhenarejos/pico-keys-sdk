@@ -78,6 +78,7 @@ int cmd_write() {
     return SW_OK();
 }
 
+#if defined(PICO_RP2350) || defined(ESP_PLATFORM)
 int cmd_secure() {
     if (apdu.nc != 0) {
         return SW_WRONG_LENGTH();
@@ -92,13 +93,16 @@ int cmd_secure() {
     }
     return SW_OK();
 }
+#endif
 
 #define INS_WRITE            0x1C
 #define INS_SECURE           0x1D
 
 static const cmd_t cmds[] = {
     { INS_WRITE, cmd_write },
+#if defined(PICO_RP2350) || defined(ESP_PLATFORM)
     { INS_SECURE, cmd_secure },
+#endif
     { 0x00, 0x0 }
 };
 

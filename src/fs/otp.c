@@ -168,8 +168,10 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
         uint8_t flagsp2[] = { page2v, page2v, page2v, 0x00 };
         PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_PAGE2_LOCK1_ROW, flagsp2, sizeof(flagsp2)));
     }
-
+#elif defined(ESP_PLATFORM)
+    // TODO: Implement secure boot for ESP32-S3
 #endif // PICO_RP2350
+    goto err;
     err:
     if (ret != PICOKEY_OK) {
         return ret;

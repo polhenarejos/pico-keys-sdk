@@ -48,6 +48,8 @@
 #define CCID_DATA_BLOCK_RET     0x80
 #define CCID_SLOT_STATUS_RET    0x81 /* non-ICCD result */
 #define CCID_PARAMS_RET         0x82 /* non-ICCD result */
+#define CCID_SETDATARATEANDCLOCKFREQUENCY 0x73
+#define CCID_SETDATARATEANDCLOCKFREQUENCY_RET 0x84
 
 #define CCID_MSG_SEQ_OFFSET     6
 #define CCID_MSG_STATUS_OFFSET  7
@@ -257,6 +259,16 @@ int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
                 ccid_resp_fast[itf]->abRFU1 = 0x0100;
                 memcpy(&ccid_resp_fast[itf]->apdu, params, sizeof(params));
                 ccid_write_fast(itf, (const uint8_t *)ccid_resp_fast[itf], sizeof(params) + 10);
+            }
+            else if (ccid_header[itf]->bMessageType == CCID_SETDATARATEANDCLOCKFREQUENCY) {
+                ccid_resp_fast[itf]->bMessageType = CCID_SETDATARATEANDCLOCKFREQUENCY_RET;
+                ccid_resp_fast[itf]->dwLength = 8;
+                ccid_resp_fast[itf]->bSlot = 0;
+                ccid_resp_fast[itf]->bSeq = ccid_header[itf]->bSeq;
+                ccid_resp_fast[itf]->abRFU0 = ccid_status;
+                ccid_resp_fast[itf]->abRFU1 = 0;
+                memset(&ccid_resp_fast[itf]->apdu, 0, 8);
+                ccid_write_fast(itf, (const uint8_t *)ccid_resp_fast[itf], 18);
             }
             else if (ccid_header[itf]->bMessageType == CCID_XFR_BLOCK) {
                 apdu.rdata = &ccid_response[itf]->apdu;

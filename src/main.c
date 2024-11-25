@@ -99,7 +99,6 @@ bool is_req_button_pending() {
     return req_button_pending;
 }
 
-uint32_t button_timeout = 15000;
 bool cancel_button = false;
 
 #ifdef ENABLE_EMULATION
@@ -182,6 +181,13 @@ bool button_pressed_state = false;
 uint32_t button_pressed_time = 0;
 uint8_t button_press = 0;
 bool wait_button() {
+    uint32_t button_timeout = 15000;
+    if (phy_data.up_btn_present) {
+        button_timeout = phy_data.up_btn * 1000;
+        if (button_timeout == 0) {
+            return false;
+        }
+    }
     uint32_t start_button = board_millis();
     bool timeout = false;
     cancel_button = false;

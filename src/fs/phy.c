@@ -45,6 +45,11 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     *p++ = PHY_OPTS;
     *p++ = phy->opts >> 8;
     *p++ = phy->opts & 0xff;
+    if (phy->up_btn_present) {
+        *p++ = PHY_UP_BTN;
+        *p++ = phy->up_btn;
+    }
+
     *len = p - data;
     return PICOKEY_OK;
 }
@@ -76,6 +81,10 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
             case PHY_OPTS:
                 phy->opts = (*p << 8) | *(p + 1);
                 p += 2;
+                break;
+            case PHY_UP_BTN:
+                phy->up_btn = *p++;
+                phy->up_btn_present = true;
                 break;
         }
     }

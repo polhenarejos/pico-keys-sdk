@@ -329,7 +329,6 @@ if(NOT TARGET pico_keys_sdk)
         add_impl_library(pico_keys_sdk)
     else()
         pico_add_library(pico_keys_sdk)
-        pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
 
         target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBRARIES})
     endif()

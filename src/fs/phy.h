@@ -28,6 +28,7 @@
 
 #define PHY_OPT_WCID    0x1
 #define PHY_OPT_DIMM    0x2
+#define PHY_OPT_DISABLE_POWER_RESET 0x4
 
 #include <stdint.h>
 #include <stdbool.h>

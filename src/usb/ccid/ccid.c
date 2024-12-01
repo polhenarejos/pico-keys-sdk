@@ -135,11 +135,7 @@ int driver_init_ccid(uint8_t itf) {
     return PICOKEY_OK;
 }
 
-#ifdef ESP_PLATFORM
-void tud_vendor_rx_cb(uint8_t itf) {
-#else
 void tud_vendor_rx_cb(uint8_t itf, const uint8_t *buffer, uint16_t bufsize) {
-#endif
     uint32_t len = tud_vendor_n_available(itf);
     do {
         uint16_t tlen = 0;

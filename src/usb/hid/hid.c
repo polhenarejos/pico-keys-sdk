@@ -513,6 +513,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             msg_packet.len = msg_packet.current_len = 0;
             last_packet_time = 0;
             cancel_button = true;
+            hid_tx[ITF_HID_CTAP].r_ptr = hid_tx[ITF_HID_CTAP].w_ptr = 0;
         }
         else {
             if (msg_packet.len == 0) {

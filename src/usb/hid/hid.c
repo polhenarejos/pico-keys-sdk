@@ -538,6 +538,9 @@ int driver_process_usb_packet_hid(uint16_t read) {
 }
 
 void send_keepalive() {
+    if (thread_type == 1) {
+        return;
+    }
     CTAPHID_FRAME *resp = (CTAPHID_FRAME *) (hid_tx[ITF_HID_CTAP].buffer + sizeof(hid_tx[ITF_HID_CTAP].buffer) - 64);
     //memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
     resp->cid = ctap_req->cid;

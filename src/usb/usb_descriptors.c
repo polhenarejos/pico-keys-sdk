@@ -76,7 +76,8 @@ uint8_t const *tud_descriptor_device_cb(void) {
 #define TUD_INTERFACE_DESC_LEN 9
 #define TUD_ENDPOINT_DESC_LEN 7
 #define TUSB_SMARTCARD_LEN 54
-#define TUSB_SMARTCARD_CCID_DESC_LEN (TUD_INTERFACE_DESC_LEN + TUSB_SMARTCARD_LEN + 3 * TUD_ENDPOINT_DESC_LEN)
+
+#define TUSB_SMARTCARD_CCID_DESC_LEN (TUD_INTERFACE_DESC_LEN + TUSB_SMARTCARD_LEN + TUSB_SMARTCARD_CCID_EPS * TUD_ENDPOINT_DESC_LEN)
 #define TUSB_SMARTCARD_WCID_DESC_LEN (TUD_INTERFACE_DESC_LEN + TUSB_SMARTCARD_LEN + 2 * TUD_ENDPOINT_DESC_LEN)
 
 enum {
@@ -107,12 +108,19 @@ uint8_t const desc_hid_report_kb[] = {
     54, 0x21, U16_TO_U8S_LE(0x0110), 0, 0x1, U32_TO_U8S_LE(0x01|0x2), U32_TO_U8S_LE(0xDFC), U32_TO_U8S_LE(0xDFC), 0, U32_TO_U8S_LE(0x2580), U32_TO_U8S_LE(0x2580), 0, U32_TO_U8S_LE(0xFE), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0x40840), U32_TO_U8S_LE(65544+10), 0xFF, 0xFF, U16_TO_U8S_LE(0x0), 0, 0x1, \
     7, TUSB_DESC_ENDPOINT, _epout, TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0, \
     7, TUSB_DESC_ENDPOINT, _epin,  TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0
-#define TUD_SMARTCARD_DESCRIPTOR(_itf, _strix, _epout, _epin, _epint, _epsize) \
-    9, TUSB_DESC_INTERFACE, _itf, 0, 3, TUSB_CLASS_SMART_CARD, 0, 0, _strix, \
+#define TUD_SMARTCARD_DESCRIPTOR_2EP(_itf, _strix, _epout, _epin, _epsize) \
+    9, TUSB_DESC_INTERFACE, _itf, 0, TUSB_SMARTCARD_CCID_EPS, TUSB_CLASS_SMART_CARD, 0, 0, _strix, \
     54, 0x21, U16_TO_U8S_LE(0x0110), 0, 0x1, U32_TO_U8S_LE(0x01|0x2), U32_TO_U8S_LE(0xDFC), U32_TO_U8S_LE(0xDFC), 0, U32_TO_U8S_LE(0x2580), U32_TO_U8S_LE(0x2580), 0, U32_TO_U8S_LE(0xFE), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0), U32_TO_U8S_LE(0x40840), U32_TO_U8S_LE(65544+10), 0xFF, 0xFF, U16_TO_U8S_LE(0x0), 0, 0x1, \
     7, TUSB_DESC_ENDPOINT, _epout, TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0, \
-    7, TUSB_DESC_ENDPOINT, _epin,  TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0, \
+    7, TUSB_DESC_ENDPOINT, _epin,  TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0
+#if TUSB_SMARTCARD_CCID_EPS == 3
+#define TUD_SMARTCARD_DESCRIPTOR(_itf, _strix, _epout, _epin, _epint, _epsize) \
+    TUD_SMARTCARD_DESCRIPTOR_2EP(_itf, _strix, _epout, _epin, _epsize), \
     7, TUSB_DESC_ENDPOINT, _epint,  TUSB_XFER_INTERRUPT, U16_TO_U8S_LE(_epsize), 0
+#else
+#define TUD_SMARTCARD_DESCRIPTOR(_itf, _strix, _epout, _epin, _epint, _epsize) \
+    TUD_SMARTCARD_DESCRIPTOR_2EP(_itf, _strix, _epout, _epin, _epsize)
+#endif
 #endif
 
 const uint8_t desc_config[] = {
@@ -273,7 +281,7 @@ char const *string_desc_arr [] = {
 tinyusb_config_t tusb_cfg = {
     .device_descriptor = &desc_device,
     .string_descriptor = string_desc_arr,
-    .string_descriptor_count = sizeof(string_desc_arr) / sizeof(string_desc_arr[0]),
+    .string_descriptor_count = (sizeof(string_desc_arr) / sizeof(string_desc_arr[0])) > 8 ? 8 : (sizeof(string_desc_arr) / sizeof(string_desc_arr[0])),
     .external_phy = false,
     .configuration_descriptor = desc_config,
 };

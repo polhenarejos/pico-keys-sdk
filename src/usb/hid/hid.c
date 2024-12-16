@@ -246,7 +246,6 @@ int driver_write_hid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
         return 0;
     }
     bool r = tud_hid_n_report(itf, 0, buffer, buffer_size);
-    DEBUG_PAYLOAD(buffer, buffer_size);
     last_write_result[itf] = r ? WRITE_PENDING : WRITE_FAILED;
     if (last_write_result[itf] == WRITE_FAILED) {
         return 0;

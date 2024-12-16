@@ -19,14 +19,19 @@
 
 #if defined(PICO_DEFAULT_LED_PIN) && !defined(PICO_DEFAULT_WS2812_PIN)
 
+uint8_t gpio = PICO_DEFAULT_LED_PIN;
+
 void led_driver_init() {
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    if (phy_data.led_gpio_present) {
+        gpio = phy_data.led_gpio;
+    }
+    gpio_init(gpio);
+    gpio_set_dir(gpio, GPIO_OUT);
 }
 
 void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
     (void)led_brightness;
-    gpio_put(PICO_DEFAULT_LED_PIN, progress >= 0.5);
+    gpio_put(gpio, progress >= 0.5);
 }
 
 #endif

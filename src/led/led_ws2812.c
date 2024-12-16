@@ -64,8 +64,11 @@ void led_driver_init() {
     PIO pio = pio0;
     int sm = 0;
     uint offset = pio_add_program(pio, &ws2812_program);
-
-    ws2812_program_init(pio, sm, offset, PICO_DEFAULT_WS2812_PIN, 800000, true);
+    uint8_t gpio = PICO_DEFAULT_WS2812_PIN;
+    if (phy_data.led_gpio_present) {
+        gpio = phy_data.led_gpio;
+    }
+    ws2812_program_init(pio, sm, offset, gpio, 800000, true);
 }
 
 uint32_t pixel[] = {

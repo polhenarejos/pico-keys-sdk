@@ -27,7 +27,11 @@ void led_driver_init() {
 
 void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
     (void)led_brightness;
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, progress >= 0.5);
+    uint8_t gpio = CYW43_WL_GPIO_LED_PIN;
+    if (phy_data.led_gpio_present) {
+        gpio = phy_data.led_gpio;
+    }
+    cyw43_arch_gpio_put(gpio, progress >= 0.5);
 }
 
 #endif

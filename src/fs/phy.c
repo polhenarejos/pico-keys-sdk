@@ -53,6 +53,7 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
         *p++ = PHY_USB_PRODUCT;
         strcpy((char *)p, phy->usb_product);
         p += strlen(phy->usb_product);
+        *p++ = '\0';
     }
 
     *len = p - data;
@@ -95,7 +96,7 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
                 memset(phy->usb_product, 0, sizeof(phy->usb_product));
                 strlcpy(phy->usb_product, (const char *)p, sizeof(phy->usb_product));
                 phy->usb_product_present = true;
-                p += strlen(phy->usb_product);
+                p += strlen(phy->usb_product) + 1;
                 break;
         }
     }

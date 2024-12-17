@@ -49,6 +49,11 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
         *p++ = PHY_UP_BTN;
         *p++ = phy->up_btn;
     }
+    if (phy->usb_product_present) {
+        *p++ = PHY_USB_PRODUCT;
+        strcpy((char *)p, phy->usb_product);
+        p += strlen(phy->usb_product);
+    }
 
     *len = p - data;
     return PICOKEY_OK;
@@ -85,6 +90,12 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
             case PHY_UP_BTN:
                 phy->up_btn = *p++;
                 phy->up_btn_present = true;
+                break;
+            case PHY_USB_PRODUCT:
+                memset(phy->usb_product, 0, sizeof(phy->usb_product));
+                strlcpy(phy->usb_product, (const char *)p, sizeof(phy->usb_product));
+                phy->usb_product_present = true;
+                p += strlen(phy->usb_product);
                 break;
         }
     }

@@ -25,6 +25,8 @@
 #define PHY_LED_BTNESS  0x5
 #define PHY_OPTS        0x6
 #define PHY_UP_BTN      0x8
+#define PHY_USB_PRODUCT 0x9
+
 
 #define PHY_OPT_WCID    0x1
 #define PHY_OPT_DIMM    0x2
@@ -45,10 +47,12 @@ typedef struct phy_data {
     uint8_t led_brightness;
     uint16_t opts;
     uint8_t up_btn;
+    char usb_product[32];
     bool vidpid_present;
     bool led_gpio_present;
     bool led_brightness_present;
     bool up_btn_present;
+    bool usb_product_present;
 } phy_data_t;
 
 #define PHY_OPT_MASK    (PHY_UP_BTN | PHY_OPT_SECURE_LOCK | PHY_OPT_SECURE_BOOT | PHY_OPT_DIMM | PHY_OPT_WCID)

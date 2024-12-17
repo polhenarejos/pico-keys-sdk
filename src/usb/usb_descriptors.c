@@ -266,14 +266,14 @@ char const *string_desc_arr [] = {
     "Pol Henarejos",                     // 1: Manufacturer
     "Pico Key",                       // 2: Product
     "11223344",                      // 3: Serials, should use chip ID
-    "Pico Key Config"               // 4: Vendor Interface
+    "Config"               // 4: Vendor Interface
 #ifdef USB_ITF_HID
-    , "Pico Key HID Interface"
-    , "Pico Key HID Keyboard Interface"
+    , "HID Interface"
+    , "HID Keyboard Interface"
 #endif
 #ifdef USB_ITF_CCID
-    , "Pico Key CCID Interface"
-    , "Pico Key WebCCID Interface"
+    , "CCID OTP FIDO Interface"
+    , "WebCCID Interface"
 #endif
 };
 
@@ -291,7 +291,7 @@ static uint16_t _desc_str[32];
 uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
     (void) langid;
 
-    uint8_t chr_count;
+    uint8_t chr_count = 0;
 
     if (index == 0) {
         memcpy(&_desc_str[1], string_desc_arr[0], 2);
@@ -309,15 +309,27 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
         if (index == 3) {
             str = pico_serial_str;
         }
-
-        chr_count = strlen(str);
-        if (chr_count > 31) {
-            chr_count = 31;
+        else if (index == 2) {
+            if (phy_data.usb_product_present) {
+                str = phy_data.usb_product;
+            }
         }
 
-        // Convert ASCII string into UTF-16
-        for (uint8_t i = 0; i < chr_count; i++) {
-            _desc_str[1 + i] = str[i];
+        uint8_t buff_avail = sizeof(_desc_str) / sizeof(_desc_str[0]) - 1;
+        if (index >= 4) {
+            const char *product = phy_data.usb_product_present ? phy_data.usb_product : string_desc_arr[2];
+            uint8_t len = MIN(strlen(product), buff_avail);
+            for (int ix = 0; ix < len; chr_count++, ix++) {
+                _desc_str[1 + chr_count] = product[ix];
+            }
+            buff_avail -= len;
+            if (buff_avail > 0) {
+                _desc_str[1 + chr_count++] = ' ';
+                buff_avail--;
+            }
+        }
+        for (int ix = 0; ix < MIN(strlen(str), buff_avail); chr_count++, ix++) {
+            _desc_str[1 + chr_count] = str[ix];
         }
     }
 

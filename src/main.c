@@ -323,6 +323,16 @@ int main(void) {
     gpio_pulldown_dis(BOOT_PIN);
 
     tusb_cfg.string_descriptor[3] = pico_serial_str;
+    if (phy_data.usb_product_present) {
+        tusb_cfg.string_descriptor[2] = phy_data.usb_product;
+    }
+    static char tmps[4][32];
+    for (int i = 4; i < tusb_cfg.string_descriptor_count; i++) {
+        strlcpy(tmps[i-4], tusb_cfg.string_descriptor[2], sizeof(tmps[0]));
+        strlcat(tmps[i-4], " ", sizeof(tmps[0]));
+        strlcat(tmps[i-4], tusb_cfg.string_descriptor[i], sizeof(tmps[0]));
+        tusb_cfg.string_descriptor[i] = tmps[i-4];
+    }
     tusb_cfg.configuration_descriptor = desc_config;
 
     tinyusb_driver_install(&tusb_cfg);

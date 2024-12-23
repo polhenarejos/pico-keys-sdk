@@ -75,6 +75,36 @@ static inline void put_uint16_t(uint16_t n, uint8_t *b) {
     *b = n & 0xff;
 }
 
+static inline uint32_t make_uint32_t(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4) {
+    return (b1 << 24) | (b2 << 16) | (b3 << 8) | b4;
+}
+static inline uint32_t get_uint32_t(const uint8_t *b, uint16_t offset) {
+    return make_uint32_t(b[offset], b[offset + 1], b[offset + 2], b[offset + 3]);
+}
+static inline void put_uint32_t(uint32_t n, uint8_t *b) {
+    *b++ = (n >> 24) & 0xff;
+    *b++ = (n >> 16) & 0xff;
+    *b++ = (n >> 8) & 0xff;
+    *b = n & 0xff;
+}
+
+static inline uint64_t make_uint64_t(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4, uint8_t b5, uint8_t b6, uint8_t b7, uint8_t b8) {
+    return ((uint64_t) b1 << 56) | ((uint64_t) b2 << 48) | ((uint64_t) b3 << 40) | ((uint64_t) b4 << 32) | ((uint64_t) b5 << 24) | ((uint64_t) b6 << 16) | ((uint64_t) b7 << 8) | b8;
+}
+static inline uint64_t get_uint64_t(const uint8_t *b, uint16_t offset) {
+    return make_uint64_t(b[offset], b[offset + 1], b[offset + 2], b[offset + 3], b[offset + 4], b[offset + 5], b[offset + 6], b[offset + 7]);
+}
+static inline void put_uint64_t(uint64_t n, uint8_t *b) {
+    *b++ = (n >> 56) & 0xff;
+    *b++ = (n >> 48) & 0xff;
+    *b++ = (n >> 40) & 0xff;
+    *b++ = (n >> 32) & 0xff;
+    *b++ = (n >> 24) & 0xff;
+    *b++ = (n >> 16) & 0xff;
+    *b++ = (n >> 8) & 0xff;
+    *b = n & 0xff;
+}
+
 extern void low_flash_available();
 extern int flash_clear_file(file_t *file);
 

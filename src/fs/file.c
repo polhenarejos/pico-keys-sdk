@@ -56,13 +56,13 @@ void process_fci(const file_t *pe, int fmd) {
     if (pe->data) {
         if ((pe->type & FILE_DATA_FUNC) == FILE_DATA_FUNC) {
             uint16_t len = (uint16_t)((int (*)(const file_t *, int))(pe->data))(pe, 0);
-            res_APDU[res_APDU_size++] = (len >> 8) & 0xff;
-            res_APDU[res_APDU_size++] = len & 0xff;
+            put_uint16_t_be(len, res_APDU + res_APDU_size);
+            res_APDU_size += 2;
         }
         else {
             uint16_t v = file_get_size(pe);
-            res_APDU[res_APDU_size++] = v >> 8;
-            res_APDU[res_APDU_size++] = v & 0xff;
+            put_uint16_t_be(v, res_APDU + res_APDU_size);
+            res_APDU_size += 2;
         }
     }
     else {
@@ -493,8 +493,8 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 uint8_t *f = fdata + meta_offset;
                 *f++ = fid & 0xff;
                 f += format_tlv_len(len + 2, f);
-                *f++ = fid >> 8;
-                *f++ = fid & 0xff;
+                put_uint16_t_be(fid, f);
+                f += 2;
                 memcpy(f, data, len);
                 r = file_put_data(ef, fdata, ef_size);
                 free(fdata);
@@ -509,8 +509,8 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     uint8_t *f = fdata + ef_size;
     *f++ = fid & 0x1f;
     f += format_tlv_len(len + 2, f);
-    *f++ = fid >> 8;
-    *f++ = fid & 0xff;
+    put_uint16_t_be(fid, f);
+    f += 2;
     memcpy(f, data, len);
     r = file_put_data(ef, fdata, ef_size + (uint16_t)asn1_len_tag(fid & 0x1f, len + 2));
     free(fdata);

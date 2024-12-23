@@ -181,16 +181,15 @@ int sm_wrap() {
         else {
             memmove(res_APDU + 4, res_APDU, res_APDU_size);
             res_APDU[1] = 0x82;
-            res_APDU[2] = (uint8_t)(res_APDU_size >> 8);
-            res_APDU[3] = (uint8_t)(res_APDU_size & 0xff);
+            put_uint16_t_be(res_APDU_size, res_APDU + 2);
             res_APDU_size += 4;
         }
         res_APDU[0] = 0x87;
     }
     res_APDU[res_APDU_size++] = 0x99;
     res_APDU[res_APDU_size++] = 2;
-    res_APDU[res_APDU_size++] = apdu.sw >> 8;
-    res_APDU[res_APDU_size++] = apdu.sw & 0xff;
+    put_uint16_t_be(apdu.sw, res_APDU + res_APDU_size);
+    res_APDU_size += 2;
     memcpy(input + input_len, res_APDU, res_APDU_size);
     input_len += res_APDU_size;
     input[input_len++] = 0x80;

@@ -558,8 +558,7 @@ void driver_exec_finished_hid(uint16_t size_next) {
         else {
             if (is_nitrokey) {
                 memmove(apdu.rdata + 2, apdu.rdata, size_next - 2);
-                apdu.rdata[0] = apdu.sw >> 8;
-                apdu.rdata[1] = apdu.sw & 0xff;
+                put_uint16_t_be(apdu.sw, apdu.rdata);
             }
             driver_exec_finished_cont_hid(ITF_HID_CTAP, size_next, 7);
         }

@@ -73,8 +73,7 @@ uint8_t format_tlv_len(uint16_t len, uint8_t *out) {
     }
     if (out) {
         *out++ = 0x82;
-        *out++ = (len >> 8) & 0xff;
-        *out++ = len & 0xff;
+        put_uint16_t_be(len, out);
     }
     return 3;
 }

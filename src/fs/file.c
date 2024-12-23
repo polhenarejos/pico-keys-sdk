@@ -113,7 +113,6 @@ void process_fci(const file_t *pe, int fmd) {
     }
 }
 
-#define MAX_DYNAMIC_FILES 128
 uint16_t dynamic_files = 0;
 file_t dynamic_file[MAX_DYNAMIC_FILES];
 

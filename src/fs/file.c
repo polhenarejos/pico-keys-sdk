@@ -245,11 +245,18 @@ void initialize_flash(bool hard) {
     dynamic_files = 0;
 }
 
-void scan_region(bool persistent) {
+extern uintptr_t last_base;
+extern uint32_t num_files;
+void scan_region(bool persistent)
+{
     uintptr_t endp = end_data_pool, startp = start_data_pool;
     if (persistent) {
         endp = end_rom_pool;
         startp = start_rom_pool;
+    }
+    else {
+        last_base = endp;
+        num_files = 0;
     }
     for (uintptr_t base = flash_read_uintptr(endp); base >= startp; base = flash_read_uintptr(base)) {
         if (base == 0x0) { //all is empty
@@ -257,17 +264,21 @@ void scan_region(bool persistent) {
         }
 
         uint16_t fid = flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t));
-        printf("[%x] scan fid %x, len %d\n", (unsigned int) base, fid,
-               flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t)));
+        printf("[%x] scan fid %x, len %d\n", (unsigned int) base, fid, flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t)));
         file_t *file = (file_t *) search_by_fid(fid, NULL, SPECIFY_EF);
         if (!file) {
             file = file_new(fid);
         }
         if (file) {
-            file->data =
-                (uint8_t *) (base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t));
+            file->data = (uint8_t *) (base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t));
+        }
+        if (!persistent) {
+            num_files++;
         }
         if (flash_read_uintptr(base) == 0x0) {
+            if (base < last_base) {
+                last_base = base;
+            }
             break;
         }
     }

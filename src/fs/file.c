@@ -88,7 +88,7 @@ void process_fci(const file_t *pe, int fmd) {
 
     res_APDU[res_APDU_size++] = 0x83;
     res_APDU[res_APDU_size++] = 2;
-    put_uint16_t(pe->fid, res_APDU + res_APDU_size);
+    put_uint16_t_be(pe->fid, res_APDU + res_APDU_size);
     res_APDU_size += 2;
     if (pe->name) {
         res_APDU[res_APDU_size++] = 0x84;
@@ -176,13 +176,13 @@ uint8_t make_path_buf(const file_t *pe, uint8_t *buf, uint8_t buflen, const file
     if (pe == top) { //MF or relative DF
         return 0;
     }
-    put_uint16_t(pe->fid, buf);
+    put_uint16_t_be(pe->fid, buf);
     return make_path_buf(&file_entries[pe->parent], buf + 2, buflen - 2, top) + 2;
 }
 
 uint8_t make_path(const file_t *pe, const file_t *top, uint8_t *path) {
     uint8_t buf[MAX_DEPTH * 2], *p = path;
-    put_uint16_t(pe->fid, buf);
+    put_uint16_t_be(pe->fid, buf);
     uint8_t depth = make_path_buf(&file_entries[pe->parent], buf + 2, sizeof(buf) - 2, top) + 2;
     for (int d = depth - 2; d >= 0; d -= 2) {
         memcpy(p, buf + d, 2);

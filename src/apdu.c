@@ -179,7 +179,7 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
     if (sw1 != 0x90) {
         res_APDU_size = 0;
     }
-    return make_uint16_t(sw1, sw2);
+    return make_uint16_t_be(sw1, sw2);
 }
 
 void apdu_thread(void) {

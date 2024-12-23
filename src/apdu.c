@@ -85,17 +85,17 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
     }
     else if (apdu.header[4] == 0x0 && buffer_size >= 7) {
         if (buffer_size == 7) {
-            apdu.ne = (apdu.header[5] << 8) | apdu.header[6];
+            apdu.ne = get_uint16_t_be(apdu.header + 5);
             if (apdu.ne == 0) {
                 apdu.ne = 65536;
             }
         }
         else {
             apdu.ne = 0;
-            apdu.nc = (apdu.header[5] << 8) | apdu.header[6];
+            apdu.nc = get_uint16_t_be(apdu.header + 5);
             apdu.data = apdu.header + 7;
             if (apdu.nc + 7 + 2 == buffer_size) {
-                apdu.ne = (apdu.header[buffer_size - 2] << 8) | apdu.header[buffer_size - 1];
+                apdu.ne = get_uint16_t_be(apdu.header + buffer_size - 2);
                 if (apdu.ne == 0) {
                     apdu.ne = 65536;
                 }
@@ -175,7 +175,7 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 }
 
 uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
-    apdu.sw = (sw1 << 8) | sw2;
+    apdu.sw = make_uint16_t_be(sw1, sw2);
     if (sw1 != 0x90) {
         res_APDU_size = 0;
     }

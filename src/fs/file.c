@@ -56,13 +56,11 @@ void process_fci(const file_t *pe, int fmd) {
     if (pe->data) {
         if ((pe->type & FILE_DATA_FUNC) == FILE_DATA_FUNC) {
             uint16_t len = (uint16_t)((int (*)(const file_t *, int))(pe->data))(pe, 0);
-            put_uint16_t_be(len, res_APDU + res_APDU_size);
-            res_APDU_size += 2;
+            res_APDU_size += put_uint16_t_be(len, res_APDU + res_APDU_size);
         }
         else {
             uint16_t v = file_get_size(pe);
-            put_uint16_t_be(v, res_APDU + res_APDU_size);
-            res_APDU_size += 2;
+            res_APDU_size += put_uint16_t_be(v, res_APDU + res_APDU_size);
         }
     }
     else {
@@ -88,8 +86,7 @@ void process_fci(const file_t *pe, int fmd) {
 
     res_APDU[res_APDU_size++] = 0x83;
     res_APDU[res_APDU_size++] = 2;
-    put_uint16_t_be(pe->fid, res_APDU + res_APDU_size);
-    res_APDU_size += 2;
+    res_APDU_size += put_uint16_t_be(pe->fid, res_APDU + res_APDU_size);
     if (pe->name) {
         res_APDU[res_APDU_size++] = 0x84;
         res_APDU[res_APDU_size++] = MIN(pe->name[0], 16);
@@ -393,7 +390,7 @@ uint16_t meta_find(uint16_t fid, uint8_t **out) {
         if (tag_len < 2) {
             continue;
         }
-        uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
+        uint16_t cfid = get_uint16_t_be(tag_data);
         if (cfid == fid) {
             if (out) {
                 *out = tag_data + 2;
@@ -419,7 +416,7 @@ int meta_delete(uint16_t fid) {
         if (tag_len < 2) {
             continue;
         }
-        uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
+        uint16_t cfid = get_uint16_t_be(tag_data);
         if (cfid == fid) {
             uint16_t new_len = ctxi.len - 1 - tag_len - format_tlv_len(tag_len, NULL);
             if (new_len == 0) {
@@ -463,7 +460,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
         if (tag_len < 2) {
             continue;
         }
-        uint16_t cfid = (tag_data[0] << 8 | tag_data[1]);
+        uint16_t cfid = get_uint16_t_be(tag_data);
         if (cfid == fid) {
             if (tag_len - 2 == len) { //an update
                 memcpy(p - tag_len + 2, data, len);
@@ -493,8 +490,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 uint8_t *f = fdata + meta_offset;
                 *f++ = fid & 0xff;
                 f += format_tlv_len(len + 2, f);
-                put_uint16_t_be(fid, f);
-                f += 2;
+                f += put_uint16_t_be(fid, f);
                 memcpy(f, data, len);
                 r = file_put_data(ef, fdata, ef_size);
                 free(fdata);
@@ -509,8 +505,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     uint8_t *f = fdata + ef_size;
     *f++ = fid & 0x1f;
     f += format_tlv_len(len + 2, f);
-    put_uint16_t_be(fid, f);
-    f += 2;
+    f += put_uint16_t_be(fid, f);
     memcpy(f, data, len);
     r = file_put_data(ef, fdata, ef_size + (uint16_t)asn1_len_tag(fid & 0x1f, len + 2));
     free(fdata);

@@ -43,8 +43,7 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
         *p++ = phy->led_brightness;
     }
     *p++ = PHY_OPTS;
-    put_uint16_t_be(phy->opts, p);
-    p += 2;
+    p += put_uint16_t_be(phy->opts, p);
     if (phy->up_btn_present) {
         *p++ = PHY_UP_BTN;
         *p++ = phy->up_btn;
@@ -85,7 +84,7 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
                 phy->led_brightness_present = true;
                 break;
             case PHY_OPTS:
-                phy->opts = (*p << 8) | *(p + 1);
+                phy->opts = get_uint16_t_be(p);
                 p += 2;
                 break;
             case PHY_UP_BTN:

@@ -99,7 +99,7 @@ extern "C" {
 #endif
 
 #define CFG_TUD_VENDOR_RX_BUFSIZE (TUD_OPT_HIGH_SPEED ? 512 : 64)
-#define CFG_TUD_VENDOR_TX_BUFSIZE 4096
+#define CFG_TUD_VENDOR_TX_BUFSIZE 2048
 
 //------------- CLASS -------------//
 #define CFG_TUD_CDC               0

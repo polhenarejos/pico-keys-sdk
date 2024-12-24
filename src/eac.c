@@ -144,7 +144,7 @@ int sm_wrap() {
     if (sm_indicator == 0) {
         return PICOKEY_OK;
     }
-    uint8_t input[4096];
+    uint8_t input[2048];
     size_t input_len = 0;
     memset(input, 0, sizeof(input));
     mbedtls_mpi ssc;
@@ -232,7 +232,7 @@ void sm_update_iv() {
 }
 
 int sm_verify() {
-    uint8_t input[4096];
+    uint8_t input[2048];
     memset(input, 0, sizeof(input));
     uint16_t input_len = 0;
     int r = 0;
@@ -241,7 +241,7 @@ int sm_verify() {
     if (data_len % sm_blocksize) {
         data_len += sm_blocksize;
     }
-    if (data_len + (add_header ? sm_blocksize : 0) > 4096) {
+    if (data_len + (add_header ? sm_blocksize : 0) > sizeof(input)) {
         return PICOKEY_WRONG_LENGTH;
     }
     mbedtls_mpi ssc;

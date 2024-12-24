@@ -30,7 +30,7 @@ typedef QueueHandle_t queue_t;
 #define queue_is_empty(a) (uxQueueMessagesWaiting(*(a)) == 0)
 #define queue_try_remove(a,b) xQueueReceive(*(a), b, 0)
 extern TaskHandle_t hcore0, hcore1;
-#define multicore_launch_core1(a) xTaskCreatePinnedToCore((void(*)(void *))a, "core1", 4096*5, NULL, CONFIG_TINYUSB_TASK_PRIORITY - 2, &hcore1, 1)
+#define multicore_launch_core1(a) xTaskCreatePinnedToCore((void(*)(void *))a, "core1", 4096*ITF_TOTAL*2, NULL, CONFIG_TINYUSB_TASK_PRIORITY - 2, &hcore1, 1)
 #define multicore_reset_core1() do { if (hcore1) { eTaskState e = eTaskGetState(hcore1); if (e <= eSuspended) { vTaskDelete(hcore1); }} }while(0)
 #define sleep_ms(a) vTaskDelay(a / portTICK_PERIOD_MS)
 static inline uint32_t board_millis(void) {

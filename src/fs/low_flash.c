@@ -29,6 +29,8 @@
  #include "pico/mutex.h"
  #include "pico/sem.h"
  #include "pico/multicore.h"
+ #include "pico/bootrom.h"
+ #include "boot/picobin.h"
 #else
  #ifdef _MSC_VER
   #include <windows.h>
@@ -56,7 +58,11 @@
   #endif
  #endif
  #define FLASH_SECTOR_SIZE       4096
+ #ifdef ESP_PLATFORM
+ extern uint32_t PICO_FLASH_SIZE_BYTES;
+ #else
  #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
+ #endif
  #define XIP_BASE 0
  int fd_map = 0;
  uint8_t *map = NULL;
@@ -65,9 +71,10 @@
 
 #define TOTAL_FLASH_PAGES 6
 
+extern void flash_set_bounds(uintptr_t start, uintptr_t end);
+
 extern const uintptr_t start_data_pool;
 extern const uintptr_t end_rom_pool;
-
 
 typedef struct page_flash {
     uint8_t page[FLASH_SECTOR_SIZE];
@@ -126,10 +133,7 @@ void do_flash() {
                         ;
                     }
                     //printf("WRITTING\n");
-                    flash_range_erase(flash_pages[r].address - XIP_BASE,
-                                    flash_pages[r].page_size ? ((int) (flash_pages[r].page_size /
-                                                                        FLASH_SECTOR_SIZE)) *
-                                    FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
+                    flash_range_erase(flash_pages[r].address - XIP_BASE, flash_pages[r].page_size ? ((int) (flash_pages[r].page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
                     while (multicore_lockout_end_timeout_us(1000) == false) {
                         ;
                     }
@@ -162,17 +166,48 @@ void low_flash_init() {
     memset(flash_pages, 0, sizeof(page_flash_t) * TOTAL_FLASH_PAGES);
     mutex_init(&mtx_flash);
     sem_init(&sem_flash, 0, 1);
+
+    uint32_t data_start_addr;
+    uint32_t data_end_addr;
 #if defined(ENABLE_EMULATION)
     fd_map = open("memory.flash", O_RDWR | O_CREAT, (mode_t) 0600);
     lseek(fd_map, PICO_FLASH_SIZE_BYTES - 1, SEEK_SET);
     write(fd_map, "", 1);
     map = mmap(0, PICO_FLASH_SIZE_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fd_map, 0);
-#else
-#if defined(ESP_PLATFORM)
+    data_start_addr = 0;
+    data_end_addr = PICO_FLASH_SIZE_BYTES;
+#elif defined(ESP_PLATFORM)
     part0 = esp_partition_find_first(0x40, 0x1, "part0");
     esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
+    data_start_addr = 0;
+    data_end_addr = part0->size;
+    PICO_FLASH_SIZE_BYTES = part0->size;
+#elif defined(PICO_PLATFORM)
+    __attribute__((aligned(4))) uint8_t workarea[4 * 1024];
+    int rc = rom_load_partition_table(workarea, sizeof(workarea), false);
+    if (rc) {
+        reset_usb_boot(0, 0);
+    }
+
+    uint8_t boot_partition = 1;
+    rc = rom_get_partition_table_info((uint32_t*)workarea, 0x8, PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (boot_partition << 24));
+
+    if (rc != 3) {
+        data_start_addr = (PICO_FLASH_SIZE_BYTES >> 1);
+        data_end_addr = PICO_FLASH_SIZE_BYTES;
+    } else {
+        uint16_t first_sector_number = (((uint32_t*)workarea)[1] & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB;
+        uint16_t last_sector_number = (((uint32_t*)workarea)[1] & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
+        data_start_addr = first_sector_number * FLASH_SECTOR_SIZE;
+        data_end_addr = (last_sector_number + 1) * FLASH_SECTOR_SIZE;
+    }
+#ifdef PICO_RP2350 // For compatibility with RP2040
+    data_end_addr -= 2 * FLASH_SECTOR_SIZE;
 #endif
+    data_start_addr += XIP_BASE;
+    data_end_addr += XIP_BASE;
 #endif
+    flash_set_bounds(data_start_addr, data_end_addr);
 }
 
 void low_flash_init_core1() {
@@ -205,10 +240,7 @@ page_flash_t *find_free_page(uintptr_t addr) {
 #ifdef PICO_PLATFORM
                 memcpy(p->page, (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
 #else
-                memcpy(p->page,
-                       (addr >= start_data_pool &&
-                        addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg,
-                       FLASH_SECTOR_SIZE);
+                memcpy(p->page, (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
 #endif
                 ready_pages++;
                 p->address = addr_alg;

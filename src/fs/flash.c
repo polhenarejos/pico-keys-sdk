@@ -23,7 +23,7 @@
 #define XIP_BASE                0
 #define FLASH_SECTOR_SIZE       4096
 #ifdef ESP_PLATFORM
-#define PICO_FLASH_SIZE_BYTES   (1 * 1024 * 1024)
+uint32_t PICO_FLASH_SIZE_BYTES = (1 * 1024 * 1024);
 #else
 #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
 #endif
@@ -42,27 +42,12 @@
  * |                                                    |
  * ------------------------------------------------------
  */
-#ifdef ESP_PLATFORM
-#define FLASH_TARGET_OFFSET 0
-#else
-#define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES >> 1) // DATA starts at the mid of flash
-#endif
+
 #define FLASH_DATA_HEADER_SIZE (sizeof(uintptr_t) + sizeof(uint32_t))
 #define FLASH_PERMANENT_REGION (4 * FLASH_SECTOR_SIZE) // 4 sectors (16kb) of permanent memory
 
 //To avoid possible future allocations, data region starts at the end of flash and goes upwards to the center region
-
-#ifdef PICO_RP2350
-// Table partition for RP2350 needs 8kb
-const uintptr_t end_flash = (XIP_BASE + PICO_FLASH_SIZE_BYTES - 2 * FLASH_SECTOR_SIZE);
-#else
-const uintptr_t end_flash = (XIP_BASE + PICO_FLASH_SIZE_BYTES);
-#endif
-
-const uintptr_t end_rom_pool = end_flash - FLASH_DATA_HEADER_SIZE - 4; //This is a fixed value. DO NOT CHANGE
-const uintptr_t start_rom_pool = end_rom_pool - FLASH_PERMANENT_REGION; //This is a fixed value. DO NOT CHANGE
-const uintptr_t end_data_pool = start_rom_pool - FLASH_DATA_HEADER_SIZE;  //This is a fixed value. DO NOT CHANGE
-const uintptr_t start_data_pool = (XIP_BASE + FLASH_TARGET_OFFSET);
+uintptr_t end_flash, end_rom_pool, start_rom_pool, end_data_pool, start_data_pool;
 
 extern int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len);
 extern int flash_program_halfword(uintptr_t addr, uint16_t data);
@@ -73,8 +58,18 @@ extern uint8_t *flash_read(uintptr_t addr);
 
 extern void low_flash_available();
 
-uintptr_t last_base = end_data_pool;
+uintptr_t last_base;
 uint32_t num_files = 0;
+
+void flash_set_bounds(uintptr_t start, uintptr_t end) {
+    end_flash = end;
+    end_rom_pool = end_flash - FLASH_DATA_HEADER_SIZE - 4;
+    start_rom_pool = end_rom_pool - FLASH_PERMANENT_REGION;
+    end_data_pool = start_rom_pool - FLASH_DATA_HEADER_SIZE;
+    start_data_pool = start;
+
+    last_base = end_data_pool;
+}
 
 uintptr_t allocate_free_addr(uint16_t size, bool persistent) {
     if (size > FLASH_SECTOR_SIZE) {

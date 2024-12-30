@@ -79,6 +79,9 @@ typedef struct file {
     const uint8_t parent;       //entry number in the whole table!!
     const uint8_t type;
     const uint8_t ef_structure;
+#ifdef ENABLE_EMULATION
+    uint32_t _padding;
+#endif
 } __attribute__ ((packed)) file_t;
 
 extern bool file_has_data(file_t *);

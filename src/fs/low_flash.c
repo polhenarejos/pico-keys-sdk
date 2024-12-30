@@ -183,6 +183,7 @@ void low_flash_init() {
     data_end_addr = part0->size;
     PICO_FLASH_SIZE_BYTES = part0->size;
 #elif defined(PICO_PLATFORM)
+#ifdef PICO_RP2350
     __attribute__((aligned(4))) uint8_t workarea[4 * 1024];
     int rc = rom_load_partition_table(workarea, sizeof(workarea), false);
     if (rc) {
@@ -201,9 +202,12 @@ void low_flash_init() {
         data_start_addr = first_sector_number * FLASH_SECTOR_SIZE;
         data_end_addr = (last_sector_number + 1) * FLASH_SECTOR_SIZE;
     }
-#ifdef PICO_RP2350 // For compatibility with RP2040
     data_end_addr -= 2 * FLASH_SECTOR_SIZE;
+#else
+    data_start_addr = (PICO_FLASH_SIZE_BYTES >> 1);
+    data_end_addr = PICO_FLASH_SIZE_BYTES;
 #endif
+
     data_start_addr += XIP_BASE;
     data_end_addr += XIP_BASE;
 #endif

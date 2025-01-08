@@ -231,4 +231,11 @@ void init_otp_files() {
         }
     }
 #endif // PICO_RP2350 || ESP_PLATFORM
+#ifdef ENABLE_EMULATION
+    static uint8_t _otp1[32] = {0}, _otp2[32] = {0};
+    memset(_otp1, 0xAC, sizeof(_otp1));
+    memset(_otp2, 0xBE, sizeof(_otp2));
+    otp_key_1 = _otp1;
+    otp_key_2 = _otp2;
+#endif
 }

@@ -70,11 +70,12 @@ int cmd_write() {
 #ifndef ENABLE_EMULATION
         int ret = phy_unserialize_data(apdu.data, apdu.nc, &phy_data);
         if (ret == PICOKEY_OK) {
-            file_put_data(ef_phy, apdu.data, apdu.nc);
+            if (phy_save() != PICOKEY_OK) {
+                return SW_EXEC_ERROR();
+            }
         }
 #endif
     }
-    low_flash_available();
     return SW_OK();
 }
 

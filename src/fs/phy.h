@@ -62,6 +62,8 @@ typedef struct phy_data {
 extern int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len);
 extern int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy);
 extern int phy_init();
+extern int phy_save();
+extern int phy_load();
 extern phy_data_t phy_data;
 #endif
 

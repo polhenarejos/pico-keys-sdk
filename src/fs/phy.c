@@ -58,7 +58,7 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     *len = p - data;
     return PICOKEY_OK;
 }
-#include <stdio.h>
+
 int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
     if (!phy || !data || !len) {
         return PICOKEY_ERR_NULL_PARAM;
@@ -103,14 +103,25 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
 
 int phy_init() {
     memset(&phy_data, 0, sizeof(phy_data_t));
-    if (file_has_data(ef_phy)) {
-        const uint8_t *data = file_get_data(ef_phy);
-        int ret = phy_unserialize_data(data, file_get_size(ef_phy), &phy_data);
-        if (ret != PICOKEY_OK) {
-            return ret;
-        }
-    }
+    return phy_load();
+}
 
+int phy_save() {
+    uint8_t tmp[PHY_MAX_SIZE] = {0};
+    uint16_t tmp_len = 0;
+    int ret = phy_serialize_data(&phy_data, tmp, &tmp_len);
+    if (ret != PICOKEY_OK) {
+        return ret;
+    }
+    file_put_data(ef_phy, tmp, tmp_len);
+    low_flash_available();
+    return PICOKEY_OK;
+}
+
+int phy_load() {
+    if (file_has_data(ef_phy)) {
+        return phy_unserialize_data(file_get_data(ef_phy), file_get_size(ef_phy), &phy_data);
+    }
     return PICOKEY_OK;
 }
 #endif

@@ -63,7 +63,6 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
     if (!phy || !data || !len) {
         return PICOKEY_ERR_NULL_PARAM;
     }
-    memset(phy, 0, sizeof(phy_data_t));
     const uint8_t *p = data;
     while (p < data + len) {
         switch (*p++) {

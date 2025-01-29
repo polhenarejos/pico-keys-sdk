@@ -55,9 +55,7 @@ typedef struct phy_data {
     bool usb_product_present;
 } phy_data_t;
 
-#define PHY_OPT_MASK    (PHY_UP_BTN | PHY_OPT_SECURE_LOCK | PHY_OPT_SECURE_BOOT | PHY_OPT_DIMM | PHY_OPT_WCID)
-
-#define PHY_MAX_SIZE    9
+#define PHY_MAX_SIZE    47
 
 #ifndef ENABLE_EMULATION
 extern int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len);

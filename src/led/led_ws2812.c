@@ -21,23 +21,32 @@
 
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
+
 #define ws2812_wrap_target 0
 #define ws2812_wrap 3
-#define ws2812_T1 2
-#define ws2812_T2 5
-#define ws2812_T3 3
+#define ws2812_pio_version 0
+
+#define ws2812_T1 3
+#define ws2812_T2 3
+#define ws2812_T3 4
+
 static const uint16_t ws2812_program_instructions[] = {
-    //     .wrap_target
-    0x6221, //  0: out    x, 1            side 0 [2]
-    0x1123, //  1: jmp    !x, 3           side 1 [1]
-    0x1400, //  2: jmp    0               side 1 [4]
-    0xa442, //  3: nop                    side 0 [4]
+            //     .wrap_target
+    0x6321, //  0: out    x, 1            side 0 [3]
+    0x1223, //  1: jmp    !x, 3           side 1 [2]
+    0x1200, //  2: jmp    0               side 1 [2]
+    0xa242, //  3: nop                    side 0 [2]
             //     .wrap
 };
+
 static const struct pio_program ws2812_program = {
     .instructions = ws2812_program_instructions,
     .length = 4,
     .origin = -1,
+    .pio_version = ws2812_pio_version,
+#if PICO_PIO_VERSION > 0
+    .used_gpio_ranges = 0x0
+#endif
 };
 
 static inline pio_sm_config ws2812_program_get_default_config(uint offset) {
@@ -46,6 +55,7 @@ static inline pio_sm_config ws2812_program_get_default_config(uint offset) {
     sm_config_set_sideset(&c, 1, false, false);
     return c;
 }
+
 static inline void ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, float freq, bool rgbw) {
     pio_gpio_init(pio, pin);
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
@@ -68,19 +78,40 @@ void led_driver_init() {
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;
     }
-    ws2812_program_init(pio, sm, offset, gpio, 800000, true);
+    ws2812_program_init(pio, sm, offset, gpio, 800000, false);
 }
 
-uint32_t pixel[] = {
-    0x00000000, // 0: off
-    0x00ff0000, // 1: red
-    0xff000000, // 2: green
-    0x0000ff00, // 3: blue
-    0xffff0000, // 4: yellow
-    0x00ffff00, // 5: magenta
-    0xff00ff00, // 6: cyan
-    0xffffff00  // 7: white
+struct urgb_color {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
 };
+
+static struct urgb_color urgb_color_table[] = {
+    {0x00, 0x00, 0x00}, // 0: off       LED_COLOR_OFF
+    {0xff, 0x00, 0x00}, // 1: red       LED_COLOR_RED
+    {0x00, 0xff, 0x00}, // 2: green     LED_COLOR_GREEN
+    {0x00, 0x00, 0xff}, // 3: blue      LED_COLOR_BLUE
+    {0xff, 0xff, 0x00}, // 4: yellow    LED_COLOR_YELLOW
+    {0xff, 0x00, 0xff}, // 5: magenta   LED_COLOR_MAGENTA
+    {0x00, 0xff, 0xff}, // 6: cyan      LED_COLOR_CYAN
+    {0xff, 0xff, 0xff}  // 7: white     LED_COLOR_WHITE
+};
+
+static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
+    return ((uint32_t) (r) << 8) |  // For GRB data ordering WS2812
+           ((uint32_t) (g) << 16) |
+           (uint32_t) (b);
+#if 0   // TODO: How to adapt WS2812 with different data ordering ?
+    return ((uint32_t)(r) << 16) |  // For RGB data ordering WS2812
+           ((uint32_t)(g) << 8) |
+           (uint32_t)(b);
+#endif
+}
+
+static inline void ws2812_put_pixel(uint32_t u32_pixel) {
+    pio_sm_put_blocking(pio0, 0, u32_pixel << 8u);
+}
 
 void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
     if (!(phy_data.opts & PHY_OPT_DIMM)) {
@@ -89,16 +120,12 @@ void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
     uint32_t led_phy_btness = phy_data.led_brightness_present ? phy_data.led_brightness : MAX_BTNESS;
 
     float brightness = ((float)led_brightness / MAX_BTNESS) * ((float)led_phy_btness / MAX_BTNESS) * progress;
-    uint32_t pixel_color = pixel[color];
-    uint8_t r = (pixel_color >> 16) & 0xFF;
-    uint8_t g = (pixel_color >> 24) & 0xFF;
-    uint8_t b = (pixel_color >>  8) & 0xFF;
+    struct urgb_color pixel_color = urgb_color_table[color];
+    pixel_color.r = (uint8_t)(pixel_color.r * brightness);
+    pixel_color.g = (uint8_t)(pixel_color.g * brightness);
+    pixel_color.b = (uint8_t)(pixel_color.b * brightness);
 
-    r = (uint8_t)(r * brightness);
-    g = (uint8_t)(g * brightness);
-    b = (uint8_t)(b * brightness);
-
-    pio_sm_put_blocking(pio0, 0, (g << 24) | (r << 16) | (b << 8));
+    ws2812_put_pixel(urgb_u32(pixel_color.r, pixel_color.g, pixel_color.b));
 }
 
 #endif

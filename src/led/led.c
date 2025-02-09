@@ -39,6 +39,7 @@ void led_blinking_task() {
 #ifndef ENABLE_EMULATION
     static uint32_t start_ms = 0;
     static uint32_t stop_ms = 0;
+    static uint32_t last_led_update_ms = 0;
     static uint8_t led_state = false;
     uint8_t state = led_state;
 #ifdef PICO_DEFAULT_LED_PIN_INVERTED
@@ -62,7 +63,11 @@ void led_blinking_task() {
         progress = 1;
     }
 
-    led_driver_color(led_color, led_brightness, progress);
+    // limit the frequency of LED status updates
+    if (board_millis() - last_led_update_ms > 2) {
+        led_driver_color(led_color, led_brightness, progress);
+        last_led_update_ms = board_millis();
+    }
 
     if (board_millis() >= stop_ms){
         start_ms = stop_ms;

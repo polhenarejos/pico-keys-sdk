@@ -36,7 +36,13 @@ tNeopixel pixel[] = {
 };
 
 void led_driver_init() {
+#ifdef GPIO_NUM_48
+    // ESP32-S3 uses GPIO48
     uint8_t gpio = GPIO_NUM_48;
+#else
+    // Other ESP32 (ESP32-S2) may use another GPIO. GPIO15 is used by Mini S2
+    uint8_t gpio = GPIO_NUM_15;
+#endif
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;
     }

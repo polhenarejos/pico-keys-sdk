@@ -20,7 +20,7 @@
 
 #if defined(DEBUG_APDU) && DEBUG_APDU == 1
 #define DEBUG_PAYLOAD(_p, _s) { \
-        printf("Payload %s (%d bytes):\n", #_p, (int) (_s)); \
+        printf("Payload %s (%d bytes) [%s:%d]:\n", #_p, (int) (_s), __FILE__, __LINE__); \
         for (int _i = 0; _i < _s; _i += 16) { \
             printf("%" PRIxPTR "h : ", (uintptr_t) (_i + _p)); \
             for (int _j = 0; _j < 16; _j++) { \
@@ -37,7 +37,7 @@
         } printf("\n"); \
 }
 #define DEBUG_DATA(_p, _s) {                                                    \
-        printf("Data %s (%d bytes):\n", #_p, (int) (_s));      \
+        printf("Data %s (%d bytes) [%s:%d]:\n", #_p, (int) (_s), __FILE__, __LINE__);      \
         char *_tmp = (char *) calloc(1, 2 * _s + 1); \
         for (int _i = 0; _i < _s; _i++) {    \
             sprintf(&_tmp[2 * _i], "%02X", (_p)[_i]);       \

@@ -17,7 +17,7 @@
 
 #include "pico_keys.h"
 
-#if defined(PICO_DEFAULT_LED_PIN) && !defined(PICO_DEFAULT_WS2812_PIN)
+#if defined(PICO_DEFAULT_LED_PIN) && !defined(PICO_DEFAULT_WS2812_PIN) && !defined(PIMORONI_TINY2040) && !defined(PIMORONI_TINY2350)
 
 uint8_t gpio = PICO_DEFAULT_LED_PIN;
 

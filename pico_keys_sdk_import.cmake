@@ -224,11 +224,8 @@ set(LIBRARIES
     tinyusb_device
     tinyusb_board
     hardware_pio
+    pico_cyw43_arch_none
 )
-
-if(PICO_BOARD STREQUAL "pico_w")
-    set(LIBRARIES ${LIBRARIES} pico_cyw43_arch_none)
-endif()
 
 function(add_impl_library target)
     add_library(${target} INTERFACE)

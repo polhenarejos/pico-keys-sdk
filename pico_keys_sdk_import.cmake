@@ -108,6 +108,44 @@ endif()
 
 message(STATUS "USB VID/PID:\t\t\t ${USB_VID}:${USB_PID}")
 
+if(NOT ESP_PLATFORM)
+    option(ENABLE_EDDSA "Enable/disable EdDSA support" OFF)
+    if(ENABLE_EDDSA)
+        message(STATUS "EdDSA support:\t\t enabled")
+    else()
+        message(STATUS "EdDSA support:\t\t disabled")
+    endif(ENABLE_EDDSA)
+
+    set(MBEDTLS_PATH "${CMAKE_SOURCE_DIR}/pico-keys-sdk/mbedtls")
+
+    if(ENABLE_EDDSA)
+        set(MBEDTLS_ORIGIN "https://github.com/polhenarejos/mbedtls.git") # Canvia-ho pel teu fork
+        set(MBEDTLS_CHECKOUT "origin/mbedtls-3.6-eddsa") # Canvia-ho pel tag correcte
+        add_definitions(-DMBEDTLS_ECP_DP_ED25519_ENABLED=1 -DMBEDTLS_ECP_DP_ED448_ENABLED=1 -DMBEDTLS_EDDSA_C=1 -DMBEDTLS_SHA3_C=1)
+    else()
+        set(MBEDTLS_ORIGIN "https://github.com/Mbed-TLS/mbedtls.git") # Repo oficial
+        set(MBEDTLS_CHECKOUT "tags/v3.6.2") # Canvia-ho pel tag correcte
+    endif()
+
+    execute_process(
+        COMMAND git -C ${MBEDTLS_PATH} remote set-url origin ${MBEDTLS_ORIGIN}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_QUIET ERROR_QUIET
+    )
+
+    execute_process(
+        COMMAND git -C ${MBEDTLS_PATH} fetch --tags
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_QUIET ERROR_QUIET
+    )
+
+    execute_process(
+        COMMAND git -C ${MBEDTLS_PATH} checkout ${MBEDTLS_CHECKOUT}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_QUIET ERROR_QUIET
+    )
+endif(NOT ESP_PLATFORM)
+
 set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c
@@ -147,6 +185,13 @@ set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
 )
+
+if (ENABLE_EDDSA)
+    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/eddsa.c
+        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha3.c
+    )
+endif()
 
 set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c

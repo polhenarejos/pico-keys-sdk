@@ -119,37 +119,69 @@ if(NOT ESP_PLATFORM)
     set(MBEDTLS_PATH "${CMAKE_SOURCE_DIR}/pico-keys-sdk/mbedtls")
 
     if(ENABLE_EDDSA)
-        set(MBEDTLS_ORIGIN "https://github.com/polhenarejos/mbedtls.git") # Canvia-ho pel teu fork
-        set(MBEDTLS_CHECKOUT "origin/mbedtls-3.6-eddsa") # Canvia-ho pel tag correcte
+        set(MBEDTLS_ORIGIN "https://github.com/polhenarejos/mbedtls.git")
+        set(MBEDTLS_REF "mbedtls-3.6-eddsa")
         add_definitions(-DMBEDTLS_ECP_DP_ED25519_ENABLED=1 -DMBEDTLS_ECP_DP_ED448_ENABLED=1 -DMBEDTLS_EDDSA_C=1 -DMBEDTLS_SHA3_C=1)
     else()
-        set(MBEDTLS_ORIGIN "https://github.com/Mbed-TLS/mbedtls.git") # Repo oficial
-        set(MBEDTLS_CHECKOUT "tags/v3.6.2") # Canvia-ho pel tag correcte
+        set(MBEDTLS_ORIGIN "https://github.com/Mbed-TLS/mbedtls.git")
+        set(MBEDTLS_REF "v3.6.2")
     endif()
 
     execute_process(
-        COMMAND git -C ${MBEDTLS_PATH} remote set-url origin ${MBEDTLS_ORIGIN}
+        COMMAND git config --global --add safe.directory ${MBEDTLS_PATH}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         OUTPUT_QUIET ERROR_QUIET
     )
 
     execute_process(
-        COMMAND git -C ${MBEDTLS_PATH} fetch --tags
+        COMMAND git submodule update --init --recursive pico-keys-sdk
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         OUTPUT_QUIET ERROR_QUIET
     )
 
     execute_process(
-        COMMAND git -C ${MBEDTLS_PATH} checkout ${MBEDTLS_CHECKOUT}
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_QUIET ERROR_QUIET
+        COMMAND git -C ${MBEDTLS_PATH} remote get-url origin
+        OUTPUT_VARIABLE CURRENT_ORIGIN
+        OUTPUT_STRIP_TRAILING_WHITESPACE
     )
 
+    if(NOT "${CURRENT_ORIGIN}" STREQUAL "${MBEDTLS_ORIGIN}")
+        execute_process(
+            COMMAND git -C ${MBEDTLS_PATH} remote set-url origin ${MBEDTLS_ORIGIN}
+            OUTPUT_QUIET ERROR_QUIET
+        )
+    endif()
+
     execute_process(
-        COMMAND git -C ${MBEDTLS_PATH} pull
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_QUIET ERROR_QUIET
+        COMMAND git -C ${MBEDTLS_PATH} rev-parse --verify ${MBEDTLS_REF}
+        OUTPUT_VARIABLE CURRENT_REF
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE REF_EXISTS
     )
+
+    if(NOT REF_EXISTS EQUAL 0 OR NOT CURRENT_REF STREQUAL "${MBEDTLS_REF}")
+
+        execute_process(
+            COMMAND git -C ${MBEDTLS_PATH} fetch origin +refs/heads/*:refs/remotes/origin/* --tags --force
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            OUTPUT_QUIET ERROR_QUIET
+        )
+
+        if(ENABLE_EDDSA)
+            execute_process(
+                COMMAND git -C ${MBEDTLS_PATH} checkout -B ${MBEDTLS_REF} --track origin/${MBEDTLS_REF}
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_QUIET ERROR_QUIET
+            )
+        else()
+            execute_process(
+                COMMAND git -C ${MBEDTLS_PATH} checkout ${MBEDTLS_REF}
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_QUIET ERROR_QUIET
+            )
+        endif()
+    endif()
+
 endif(NOT ESP_PLATFORM)
 
 set(MBEDTLS_SOURCES

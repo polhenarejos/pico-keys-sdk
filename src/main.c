@@ -294,7 +294,6 @@ int main(void) {
     board_init();
     stdio_init_all();
 #endif
-    led_init();
 
 #else
     emul_init("127.0.0.1", 35963);
@@ -313,6 +312,8 @@ int main(void) {
 #ifndef ENABLE_EMULATION
     phy_init();
 #endif
+
+    led_init();
 
     usb_init();
 

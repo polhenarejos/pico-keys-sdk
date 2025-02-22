@@ -35,14 +35,18 @@ tNeopixel pixel[] = {
     { 0, NP_RGB(255, 255,  255) }, /* white */
 };
 
-void led_driver_init() {
-#ifdef GPIO_NUM_48
-    // ESP32-S3 uses GPIO48
-    uint8_t gpio = GPIO_NUM_48;
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+    #define NEOPIXEL_PIN GPIO_NUM_48
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+    #define NEOPIXEL_PIN GPIO_NUM_15
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+    #define NEOPIXEL_PIN GPIO_NUM_8
 #else
-    // Other ESP32 (ESP32-S2) may use another GPIO. GPIO15 is used by Mini S2
-    uint8_t gpio = GPIO_NUM_15;
+    #define NEOPIXEL_PIN GPIO_NUM_27
 #endif
+
+void led_driver_init() {
+    uint8_t gpio = NEOPIXEL_PIN;
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;
     }

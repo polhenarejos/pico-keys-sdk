@@ -54,6 +54,10 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
         p += strlen(phy->usb_product);
         *p++ = '\0';
     }
+    if (phy->enabled_curves_present) {
+        *p++ = PHY_ENABLED_CURVES;
+        p += put_uint32_t_be(phy->enabled_curves, p);
+    }
 
     *len = p - data;
     return PICOKEY_OK;
@@ -95,6 +99,11 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
                 strlcpy(phy->usb_product, (const char *)p, sizeof(phy->usb_product));
                 phy->usb_product_present = true;
                 p += strlen(phy->usb_product) + 1;
+                break;
+            case PHY_ENABLED_CURVES:
+                phy->enabled_curves = get_uint32_t_be(p);
+                p += sizeof(uint32_t);
+                phy->enabled_curves_present = true;
                 break;
         }
     }

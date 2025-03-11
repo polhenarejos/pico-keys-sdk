@@ -26,12 +26,24 @@
 #define PHY_OPTS        0x6
 #define PHY_UP_BTN      0x8
 #define PHY_USB_PRODUCT 0x9
-
+#define PHY_ENABLED_CURVES 0xA
 
 #define PHY_OPT_WCID    0x1
 #define PHY_OPT_DIMM    0x2
 #define PHY_OPT_DISABLE_POWER_RESET 0x4
 #define PHY_OPT_LED_STEADY 0x8
+
+#define PHY_CURVE_SECP256R1  0x1
+#define PHY_CURVE_SECP384R1  0x2
+#define PHY_CURVE_SECP521R1  0x4
+#define PHY_CURVE_SECP256K1 0x8
+#define PHY_CURVE_BP256R1 0x10
+#define PHY_CURVE_BP384R1 0x20
+#define PHY_CURVE_BP512R1 0x40
+#define PHY_CURVE_ED25519 0x80
+#define PHY_CURVE_ED448 0x100
+#define PHY_CURVE_CURVE25519 0x200
+#define PHY_CURVE_CURVE448 0x400
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -44,19 +56,27 @@ typedef struct phy_data {
         };
         uint8_t vidpid[4];
     };
+
+    uint32_t enabled_curves;
+
+    char usb_product[32];
+
+    uint16_t opts;
+
     uint8_t led_gpio;
     uint8_t led_brightness;
-    uint16_t opts;
     uint8_t up_btn;
-    char usb_product[32];
+
     bool vidpid_present;
     bool led_gpio_present;
     bool led_brightness_present;
     bool up_btn_present;
     bool usb_product_present;
+    bool enabled_curves_present;
+
 } phy_data_t;
 
-#define PHY_MAX_SIZE    47
+#define PHY_MAX_SIZE    sizeof(phy_data_t)
 
 #ifndef ENABLE_EMULATION
 extern int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len);

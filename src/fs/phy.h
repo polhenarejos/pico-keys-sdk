@@ -76,7 +76,7 @@ typedef struct phy_data {
 
 } phy_data_t;
 
-#define PHY_MAX_SIZE    sizeof(phy_data_t)
+#define PHY_MAX_SIZE    ((2+4)+(2+4)+(2+32)+(2+2)+(2+1)+(2+1)+(2+1))
 
 #ifndef ENABLE_EMULATION
 extern int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len);

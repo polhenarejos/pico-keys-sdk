@@ -191,6 +191,7 @@ bool wait_button() {
     uint32_t start_button = board_millis();
     bool timeout = false;
     cancel_button = false;
+    uint32_t led_mode = led_get_mode();
     led_set_mode(MODE_BUTTON);
     req_button_pending = true;
     while (picok_board_button_read() == false && cancel_button == false) {
@@ -211,7 +212,7 @@ bool wait_button() {
             }
         }
     }
-    led_set_mode(MODE_PROCESSING);
+    led_set_mode(led_mode);
     req_button_pending = false;
     return timeout || cancel_button;
 }

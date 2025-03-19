@@ -62,6 +62,7 @@ enum  {
 };
 
 extern void led_set_mode(uint32_t mode);
+extern uint32_t led_get_mode();
 extern void led_blinking_task();
 extern void led_off_all();
 extern void led_init();

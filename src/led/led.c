@@ -35,6 +35,10 @@ void led_set_mode(uint32_t mode) {
     led_mode = mode;
 }
 
+uint32_t led_get_mode() {
+    return led_mode;
+}
+
 void led_blinking_task() {
 #ifndef ENABLE_EMULATION
     static uint32_t start_ms = 0;

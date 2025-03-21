@@ -94,7 +94,7 @@ uint8_t ccid_status = 1;
 static uint8_t itf_num;
 #endif
 
-static usb_buffer_t ccid_rx[ITF_SC_TOTAL] = {0}, ccid_tx[ITF_SC_TOTAL] = {0};
+static usb_buffer_t *ccid_rx = NULL, *ccid_tx = NULL;
 
 int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read);
 
@@ -107,9 +107,9 @@ void ccid_write(uint8_t itf, uint16_t size) {
     ccid_write_offset(itf, size, 0);
 }
 
-ccid_header_t *ccid_response[ITF_SC_TOTAL];
-ccid_header_t *ccid_resp_fast[ITF_SC_TOTAL];
-ccid_header_t *ccid_header[ITF_SC_TOTAL];
+ccid_header_t **ccid_response = NULL;
+ccid_header_t **ccid_resp_fast = NULL;
+ccid_header_t **ccid_header = NULL;
 
 uint8_t sc_itf_to_usb_itf(uint8_t itf) {
     if (itf == ITF_SC_CCID) {
@@ -119,6 +119,24 @@ uint8_t sc_itf_to_usb_itf(uint8_t itf) {
         return ITF_WCID;
     }
     return itf;
+}
+
+void ccid_init_buffers() {
+    if (ccid_rx == NULL) {
+        ccid_rx = (usb_buffer_t *)calloc(ITF_SC_TOTAL, sizeof(usb_buffer_t));
+    }
+    if (ccid_tx == NULL) {
+        ccid_tx = (usb_buffer_t *)calloc(ITF_SC_TOTAL, sizeof(usb_buffer_t));
+    }
+    if (ccid_header == NULL) {
+        ccid_header = (ccid_header_t **)calloc(ITF_SC_TOTAL, sizeof(ccid_header_t *));
+    }
+    if (ccid_response == NULL) {
+        ccid_response = (ccid_header_t **)calloc(ITF_SC_TOTAL, sizeof(ccid_header_t *));
+    }
+    if (ccid_resp_fast == NULL) {
+        ccid_resp_fast = (ccid_header_t **)calloc(ITF_SC_TOTAL, sizeof(ccid_header_t *));
+    }
 }
 
 int driver_init_ccid(uint8_t itf) {
@@ -333,6 +351,10 @@ void ccid_task() {
 #define USB_CONFIG_ATT_ONE TU_BIT(7)
 
 #define MAX_USB_POWER       1
+
+void ccid_init() {
+    ccid_init_buffers();
+}
 
 static void ccid_init_cb(void) {
     vendord_init();

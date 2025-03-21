@@ -37,12 +37,27 @@
 #include <stdlib.h>
 
 // Device specific functions
-static uint32_t timeout_counter[ITF_TOTAL] = { 0 };
-static uint8_t card_locked_itf = ITF_TOTAL; // no locked
+static uint32_t *timeout_counter = NULL;
+static uint8_t card_locked_itf = 0; // no locked
 static void (*card_locked_func)(void) = NULL;
 #ifndef ENABLE_EMULATION
 static mutex_t mutex;
 #endif
+
+#ifdef USB_ITF_HID
+    uint8_t ITF_HID_CTAP = 0, ITF_HID_KB = 0;
+    uint8_t ITF_HID = 0, ITF_KEYBOARD = 0;
+    uint8_t ITF_HID_TOTAL = 0;
+    extern void hid_init();
+#endif
+
+#ifdef USB_ITF_CCID
+    uint8_t ITF_SC_CCID = 0, ITF_SC_WCID = 0;
+    uint8_t ITF_CCID = 0, ITF_WCID = 0;
+    uint8_t ITF_SC_TOTAL = 0;
+    extern void ccid_init();
+#endif
+uint8_t ITF_TOTAL = 0;
 
 void usb_set_timeout_counter(uint8_t itf, uint32_t v) {
     timeout_counter[itf] = v;
@@ -64,6 +79,44 @@ void usb_init() {
 #endif
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
+
+#ifdef USB_ITF_HID
+    ITF_HID_TOTAL = 0;
+#endif
+#ifdef USB_ITF_CCID
+    ITF_SC_TOTAL = 0;
+#endif
+    ITF_TOTAL = 0;
+#ifdef USB_ITF_HID
+    if (1) {
+        ITF_HID_CTAP = ITF_HID_TOTAL++;
+        ITF_HID = ITF_TOTAL++;
+    }
+    if (1) {
+        ITF_HID_KB = ITF_HID_TOTAL++;
+        ITF_KEYBOARD = ITF_TOTAL++;
+    }
+#endif
+#ifdef USB_ITF_CCID
+    if (1) {
+        ITF_SC_CCID = ITF_SC_TOTAL++;
+        ITF_CCID = ITF_TOTAL++;
+    }
+    if (1) {
+        ITF_SC_WCID = ITF_SC_TOTAL++;
+        ITF_WCID = ITF_TOTAL++;
+    }
+#endif
+    card_locked_itf = ITF_TOTAL;
+    if (timeout_counter == NULL) {
+        timeout_counter = (uint32_t *)calloc(ITF_TOTAL, sizeof(uint32_t));
+    }
+#ifdef USB_ITF_HID
+    hid_init();
+#endif
+#ifdef USB_ITF_CCID
+    ccid_init();
+#endif
 }
 
 uint32_t timeout = 0;

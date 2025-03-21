@@ -37,7 +37,7 @@ bool is_nitrokey = false;
 uint8_t (*get_version_major)() = NULL;
 uint8_t (*get_version_minor)() = NULL;
 
-static usb_buffer_t hid_rx[ITF_HID_TOTAL] = {0}, hid_tx[ITF_HID_TOTAL] = {0};
+static usb_buffer_t *hid_rx = NULL, *hid_tx = NULL;
 
 PACK(
 typedef struct msg_packet {
@@ -56,14 +56,29 @@ bool driver_mounted_hid() {
     return mounted;
 }
 
-static uint16_t send_buffer_size[ITF_HID_TOTAL] = {0};
-static write_status_t last_write_result[ITF_HID_TOTAL] = {0};
+static uint16_t *send_buffer_size = NULL;
+static write_status_t *last_write_result = NULL;
 
 CTAPHID_FRAME *ctap_req = NULL, *ctap_resp = NULL;
 void send_keepalive();
 int driver_process_usb_packet_hid(uint16_t read);
 int driver_write_hid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size);
 int driver_process_usb_nopacket_hid();
+
+void hid_init() {
+    if (send_buffer_size == NULL) {
+        send_buffer_size = (uint16_t *)calloc(ITF_HID_TOTAL, sizeof(uint16_t));
+    }
+    if (last_write_result == NULL) {
+        last_write_result = (write_status_t *)calloc(ITF_HID_TOTAL, sizeof(write_status_t));
+    }
+    if (hid_rx == NULL) {
+        hid_rx = (usb_buffer_t *)calloc(ITF_HID_TOTAL, sizeof(usb_buffer_t));
+    }
+    if (hid_tx == NULL) {
+        hid_tx = (usb_buffer_t *)calloc(ITF_HID_TOTAL, sizeof(usb_buffer_t));
+    }
+}
 
 int driver_init_hid() {
 #ifndef ENABLE_EMULATION

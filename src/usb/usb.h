@@ -44,32 +44,18 @@
 #define EV_BUTTON_TIMEOUT        16
 #define EV_BUTTON_PRESSED        32
 
-enum {
 #ifdef USB_ITF_HID
-    ITF_HID_CTAP = 0,
-    ITF_HID_KB,
+    extern uint8_t ITF_HID_CTAP, ITF_HID_KB;
+    extern uint8_t ITF_HID, ITF_KEYBOARD;
+    extern uint8_t ITF_HID_TOTAL;
 #endif
-    ITF_HID_TOTAL
-};
-enum {
-#ifdef USB_ITF_CCID
-    ITF_SC_CCID = 0,
-    ITF_SC_WCID,
-#endif
-    ITF_SC_TOTAL
-};
 
-enum {
-#ifdef USB_ITF_HID
-    ITF_HID = ITF_HID_CTAP,
-    ITF_KEYBOARD = ITF_HID_KB,
-#endif
 #ifdef USB_ITF_CCID
-    ITF_CCID = ITF_SC_CCID + ITF_HID_TOTAL,
-    ITF_WCID = ITF_SC_WCID + ITF_HID_TOTAL,
+    extern uint8_t ITF_SC_CCID, ITF_SC_WCID;
+    extern uint8_t ITF_CCID, ITF_WCID;
+    extern uint8_t ITF_SC_TOTAL;
 #endif
-    ITF_TOTAL = ITF_HID_TOTAL + ITF_SC_TOTAL
-};
+extern uint8_t ITF_TOTAL;
 
 enum {
     REPORT_ID_KEYBOARD = 0,

@@ -66,6 +66,9 @@ int driver_write_hid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size);
 int driver_process_usb_nopacket_hid();
 
 void hid_init() {
+    if (ITF_HID_TOTAL == 0) {
+        return;
+    }
     if (send_buffer_size == NULL) {
         send_buffer_size = (uint16_t *)calloc(ITF_HID_TOTAL, sizeof(uint16_t));
     }

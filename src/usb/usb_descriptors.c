@@ -147,38 +147,38 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
     TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN;
     uint8_t *p = desc_config + TUD_CONFIG_DESC_LEN;
 #ifdef USB_ITF_HID
-    if (1) {
+    if (ITF_HID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_INOUT_DESC_LEN;
         const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(0, 0, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
         memcpy(p, desc, sizeof(desc));
         p[2] = ITF_HID;
-        p[8] = ITF_HID + 5;
+        p[8] = 5;
         p += sizeof(desc);
     }
-    if (1) {
+    if (ITF_KEYBOARD != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_DESC_LEN;
         const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), TUSB_DIR_IN_MASK | (EPNUM_HID + 1), 16, 5) };
         memcpy(p, desc_kb, sizeof(desc_kb));
         p[2] = ITF_KEYBOARD;
-        p[8] = ITF_KEYBOARD + 5;
+        p[8] = 6;
         p += sizeof(desc_kb);
     }
 #endif
 #ifdef USB_ITF_CCID
-    if (1) {
+    if (ITF_CCID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUSB_SMARTCARD_CCID_DESC_LEN;
         const uint8_t desc_ccid[] = { TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID+5, 1, TUSB_DIR_IN_MASK | 1, TUSB_DIR_IN_MASK | 2, 64) };
         memcpy(p, desc_ccid, sizeof(desc_ccid));
         p[2] = ITF_CCID;
-        p[8] = ITF_CCID + 5;
+        p[8] = 7;
         p += sizeof(desc_ccid);
     }
-    if (1) {
+    if (ITF_WCID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUSB_SMARTCARD_WCID_DESC_LEN;
         const uint8_t desc_wcid[] = { TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID+5, 3, TUSB_DIR_IN_MASK | 3, 64) };
         memcpy(p, desc_wcid, sizeof(desc_wcid));
         p[2] = ITF_WCID;
-        p[8] = ITF_WCID + 5;
+        p[8] = 8;
         p += sizeof(desc_wcid);
     }
 #endif
@@ -302,14 +302,10 @@ char const *string_desc_arr [] = {
     "Pico Key",                       // 2: Product
     "11223344",                      // 3: Serials, should use chip ID
     "Config"               // 4: Vendor Interface
-#ifdef USB_ITF_HID
     , "HID Interface"
     , "HID Keyboard Interface"
-#endif
-#ifdef USB_ITF_CCID
     , "CCID OTP FIDO Interface"
     , "WebCCID Interface"
-#endif
 };
 
 #ifdef ESP_PLATFORM

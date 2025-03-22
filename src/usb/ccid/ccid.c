@@ -122,6 +122,9 @@ uint8_t sc_itf_to_usb_itf(uint8_t itf) {
 }
 
 void ccid_init_buffers() {
+    if (ITF_SC_TOTAL == 0) {
+        return;
+    }
     if (ccid_rx == NULL) {
         ccid_rx = (usb_buffer_t *)calloc(ITF_SC_TOTAL, sizeof(usb_buffer_t));
     }
@@ -168,11 +171,6 @@ void tud_vendor_rx_cb(uint8_t itf, const uint8_t *buffer, uint16_t bufsize) {
         driver_process_usb_packet_ccid(itf, tlen);
         len -= tlen;
     } while (len > 0);
-}
-
-void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
-    (void) sent_bytes;
-    tud_vendor_n_write_flush(itf);
 }
 
 int driver_write_ccid(uint8_t itf, const uint8_t *tx_buffer, uint16_t buffer_size) {
@@ -346,14 +344,15 @@ void ccid_task() {
     }
 }
 
-#ifndef ENABLE_EMULATION
-
-#define USB_CONFIG_ATT_ONE TU_BIT(7)
-
-#define MAX_USB_POWER       1
-
 void ccid_init() {
     ccid_init_buffers();
+}
+
+#ifndef ENABLE_EMULATION
+
+void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
+    (void) sent_bytes;
+    tud_vendor_n_write_flush(itf);
 }
 
 static void ccid_init_cb(void) {

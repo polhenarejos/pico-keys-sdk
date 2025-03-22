@@ -44,6 +44,8 @@
 #define EV_BUTTON_TIMEOUT        16
 #define EV_BUTTON_PRESSED        32
 
+static const uint8_t ITF_INVALID = 0xFF;
+
 #ifdef USB_ITF_HID
     extern uint8_t ITF_HID_CTAP, ITF_HID_KB;
     extern uint8_t ITF_HID, ITF_KEYBOARD;

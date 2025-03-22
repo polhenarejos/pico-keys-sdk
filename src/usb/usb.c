@@ -45,15 +45,15 @@ static mutex_t mutex;
 #endif
 
 #ifdef USB_ITF_HID
-    uint8_t ITF_HID_CTAP = 0, ITF_HID_KB = 0;
-    uint8_t ITF_HID = 0, ITF_KEYBOARD = 0;
+    uint8_t ITF_HID_CTAP = ITF_INVALID, ITF_HID_KB = ITF_INVALID;
+    uint8_t ITF_HID = ITF_INVALID, ITF_KEYBOARD = ITF_INVALID;
     uint8_t ITF_HID_TOTAL = 0;
     extern void hid_init();
 #endif
 
 #ifdef USB_ITF_CCID
-    uint8_t ITF_SC_CCID = 0, ITF_SC_WCID = 0;
-    uint8_t ITF_CCID = 0, ITF_WCID = 0;
+    uint8_t ITF_SC_CCID = ITF_INVALID, ITF_SC_WCID = ITF_INVALID;
+    uint8_t ITF_CCID = ITF_INVALID, ITF_WCID = ITF_INVALID;
     uint8_t ITF_SC_TOTAL = 0;
     extern void ccid_init();
 #endif
@@ -80,6 +80,13 @@ void usb_init() {
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
 
+    uint8_t enabled_usb_itf = PHY_USB_ITF_CCID | PHY_USB_ITF_WCID | PHY_USB_ITF_HID | PHY_USB_ITF_KB;
+#ifndef ENABLE_EMULATION
+    if (phy_data.enabled_usb_itf_present) {
+        enabled_usb_itf = phy_data.enabled_usb_itf;
+    }
+#endif
+
 #ifdef USB_ITF_HID
     ITF_HID_TOTAL = 0;
 #endif
@@ -88,21 +95,21 @@ void usb_init() {
 #endif
     ITF_TOTAL = 0;
 #ifdef USB_ITF_HID
-    if (1) {
+    if (enabled_usb_itf & PHY_USB_ITF_HID) {
         ITF_HID_CTAP = ITF_HID_TOTAL++;
         ITF_HID = ITF_TOTAL++;
     }
-    if (1) {
+    if (enabled_usb_itf & PHY_USB_ITF_KB) {
         ITF_HID_KB = ITF_HID_TOTAL++;
         ITF_KEYBOARD = ITF_TOTAL++;
     }
 #endif
 #ifdef USB_ITF_CCID
-    if (1) {
+    if (enabled_usb_itf & PHY_USB_ITF_CCID) {
         ITF_SC_CCID = ITF_SC_TOTAL++;
         ITF_CCID = ITF_TOTAL++;
     }
-    if (1) {
+    if (enabled_usb_itf & PHY_USB_ITF_WCID) {
         ITF_SC_WCID = ITF_SC_TOTAL++;
         ITF_WCID = ITF_TOTAL++;
     }
@@ -112,10 +119,14 @@ void usb_init() {
         timeout_counter = (uint32_t *)calloc(ITF_TOTAL, sizeof(uint32_t));
     }
 #ifdef USB_ITF_HID
-    hid_init();
+    if (ITF_HID_TOTAL > 0) {
+        hid_init();
+    }
 #endif
 #ifdef USB_ITF_CCID
-    ccid_init();
+    if (ITF_SC_TOTAL > 0) {
+        ccid_init();
+    }
 #endif
 }
 

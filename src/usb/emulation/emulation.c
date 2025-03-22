@@ -303,28 +303,24 @@ uint16_t emul_read(uint8_t itf) {
                             driver_write_emul(itf, ccid_atr ? ccid_atr + 1 : NULL, ccid_atr ? ccid_atr[0] : 0);
                         }
                     }
-                    else {
-                        switch(itf) {
 #ifdef USB_ITF_CCID
-                        case ITF_CCID: {
-                            uint16_t sent = 0;
-                            DEBUG_PAYLOAD(emul_rx, len);
-                            apdu.rdata = emul_tx;
-                            if ((sent = apdu_process(itf, emul_rx, len)) > 0) {
-                                process_apdu();
-                                apdu_finish();
-                            }
-                            if (sent > 0) {
-                                uint16_t ret = apdu_next();
-                                DEBUG_PAYLOAD(apdu.rdata, ret);
-                                driver_write_emul(itf, apdu.rdata, ret);
-                            }
-                            break;
+                    else if (itf == ITF_CCID) {
+                        uint16_t sent = 0;
+                        DEBUG_PAYLOAD(emul_rx, len);
+                        apdu.rdata = emul_tx;
+                        if ((sent = apdu_process(itf, emul_rx, len)) > 0) {
+                            process_apdu();
+                            apdu_finish();
                         }
+                        if (sent > 0) {
+                            uint16_t ret = apdu_next();
+                            DEBUG_PAYLOAD(apdu.rdata, ret);
+                            driver_write_emul(itf, apdu.rdata, ret);
+                        }
+                    }
 #endif
-                        default:
-                            emul_rx_size += valread;
-                        }
+                    else {
+                        emul_rx_size += valread;
                     }
                     return (uint16_t)emul_rx_size;
                 }

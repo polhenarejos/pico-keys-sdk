@@ -324,12 +324,21 @@ function(add_impl_library target)
     target_compile_definitions(${target} INTERFACE LIB_${TARGET_UPPER}=1)
 endfunction()
 
-if(${USB_ITF_HID})
+if(USB_ITF_HID)
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
     )
     set(INCLUDES ${INCLUDES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid
+    )
+endif()
+
+if(USB_ITF_CCID)
+    set(SOURCES ${SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
+    )
+    set(INCLUDES ${INCLUDES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid
     )
 endif()
 
@@ -354,14 +363,6 @@ if(ENABLE_EMULATION)
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
     )
 else()
-    if(USB_ITF_CCID)
-        set(SOURCES ${SOURCES}
-            ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
-        )
-        set(INCLUDES ${INCLUDES}
-            ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid
-        )
-    endif()
     set(SOURCES ${SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )

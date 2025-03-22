@@ -65,6 +65,11 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
         *p++ = 4;
         p += put_uint32_t_be(phy->enabled_curves, p);
     }
+    if (phy->enabled_usb_itf_present) {
+        *p++ = PHY_ENABLED_USB_ITF;
+        *p++ = 1;
+        *p++ = phy->enabled_usb_itf;
+    }
 
     *len = p - data;
     return PICOKEY_OK;
@@ -129,10 +134,21 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
                     phy->enabled_curves_present = true;
                 }
                 break;
+
+            case PHY_ENABLED_USB_ITF:
+                if (tlen == 1) {
+                    phy->enabled_usb_itf = *p++;
+                    phy->enabled_usb_itf_present = true;
+                }
+                break;
             default:
                 p += tlen;
                 break;
         }
+    }
+    if (!phy_data.enabled_usb_itf_present) {
+        phy_data.enabled_usb_itf = PHY_USB_ITF_CCID | PHY_USB_ITF_WCID | PHY_USB_ITF_HID | PHY_USB_ITF_KB;
+        phy_data.enabled_usb_itf_present = true;
     }
     return PICOKEY_OK;
 }

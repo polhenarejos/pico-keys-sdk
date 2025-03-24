@@ -124,7 +124,7 @@ if(NOT ESP_PLATFORM)
         add_definitions(-DMBEDTLS_ECP_DP_ED25519_ENABLED=1 -DMBEDTLS_ECP_DP_ED448_ENABLED=1 -DMBEDTLS_EDDSA_C=1 -DMBEDTLS_SHA3_C=1)
     else()
         set(MBEDTLS_ORIGIN "https://github.com/Mbed-TLS/mbedtls.git")
-        set(MBEDTLS_REF "v3.6.2")
+        set(MBEDTLS_REF "v3.6.3")
     endif()
 
     execute_process(
@@ -134,7 +134,7 @@ if(NOT ESP_PLATFORM)
     )
 
     execute_process(
-        COMMAND git submodule update --init --recursive pico-keys-sdk
+        COMMAND git -C ${MBEDTLS_PATH} submodule update --init --recursive pico-keys-sdk
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         OUTPUT_QUIET ERROR_QUIET
     )
@@ -163,6 +163,12 @@ if(NOT ESP_PLATFORM)
 
         execute_process(
             COMMAND git -C ${MBEDTLS_PATH} fetch origin +refs/heads/*:refs/remotes/origin/* --tags --force
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            OUTPUT_QUIET ERROR_QUIET
+        )
+
+        execute_process(
+            COMMAND rm -rf ${MBEDTLS_PATH}/framework
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
             OUTPUT_QUIET ERROR_QUIET
         )

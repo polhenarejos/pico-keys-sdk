@@ -140,9 +140,8 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {
     return NULL;
 }
 #endif
-#ifndef ESP_PLATFORM
-uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
-    (void) index; // for multiple configurations
+
+void usb_desc_setup() {
     desc_config[4] = ITF_TOTAL;
     TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN;
     uint8_t *p = desc_config + TUD_CONFIG_DESC_LEN;
@@ -184,6 +183,12 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
 #endif
     desc_config[2] = TUSB_DESC_TOTAL_LEN & 0xFF;
     desc_config[3] = TUSB_DESC_TOTAL_LEN >> 8;
+}
+
+#ifndef ESP_PLATFORM
+uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
+    (void) index; // for multiple configurations
+    usb_desc_setup();
     return desc_config;
 }
 #endif

@@ -42,6 +42,7 @@ static uint8_t card_locked_itf = 0; // no locked
 static void (*card_locked_func)(void) = NULL;
 #ifndef ENABLE_EMULATION
 static mutex_t mutex;
+extern void usb_desc_setup();
 #endif
 
 #ifdef USB_ITF_HID
@@ -127,6 +128,9 @@ void usb_init() {
     if (ITF_SC_TOTAL > 0) {
         ccid_init();
     }
+#endif
+#ifdef ESP_PLATFORM
+    usb_desc_setup();
 #endif
 }
 

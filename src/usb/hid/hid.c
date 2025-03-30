@@ -96,7 +96,7 @@ int driver_init_hid() {
 
     ctap_resp = (CTAPHID_FRAME *) (hid_tx[ITF_HID_CTAP].buffer);
     apdu.rdata = ctap_resp->init.data;
-    //memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
+    memset(ctap_resp, 0, sizeof(CTAPHID_FRAME));
 
     usb_set_timeout_counter(ITF_HID, 200);
 

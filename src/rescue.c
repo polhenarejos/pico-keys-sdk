@@ -32,6 +32,8 @@ const uint8_t rescue_aid[] = {
 #define PICO_MCU 1
 #elif defined(ESP_PLATFORM)
 #define PICO_MCU 2
+#elif defined(ENABLE_EMULATION)
+#define PICO_MCU 3
 #else
 #define PICO_MCU 0
 #endif

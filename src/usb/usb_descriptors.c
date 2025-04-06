@@ -100,8 +100,22 @@ uint8_t const desc_hid_report[] = {
 uint8_t const desc_hid_report_kb[] = {
     TUD_HID_REPORT_DESC_KEYBOARD(HID_USAGE_PAGE(HID_USAGE_DESKTOP_KEYBOARD), HID_USAGE_MIN(0), HID_USAGE_MAX_N(255,2), HID_LOGICAL_MIN(0), HID_LOGICAL_MAX_N(255, 2), HID_REPORT_COUNT(8), HID_REPORT_SIZE(8), HID_FEATURE( HID_DATA | HID_VARIABLE | HID_ABSOLUTE),)
 };
-#define EPNUM_HID   0x04
 #endif
+
+enum {
+#ifdef USB_ITF_CCID
+    EPNUM_CCID = 1,
+#if TUSB_SMARTCARD_CCID_EPS == 3
+    EPNUM_CCID_INT,
+#endif
+    EPNUM_WCID,
+#endif
+#ifdef USB_ITF_HID
+    EPNUM_HID,
+    EPNUM_HID_KB,
+#endif
+    EPNUM_TOTAL
+};
 
 #ifdef USB_ITF_CCID
 #define TUD_SMARTCARD_DESCRIPTOR_WEB(_itf, _strix, _epout, _epin, _epsize) \
@@ -148,36 +162,28 @@ void usb_desc_setup() {
 #ifdef USB_ITF_HID
     if (ITF_HID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_INOUT_DESC_LEN;
-        const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(0, 0, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
+        const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
         memcpy(p, desc, sizeof(desc));
-        p[2] = ITF_HID;
-        p[8] = 5;
         p += sizeof(desc);
     }
     if (ITF_KEYBOARD != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_DESC_LEN;
-        const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), TUSB_DIR_IN_MASK | (EPNUM_HID + 1), 16, 5) };
+        const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), TUSB_DIR_IN_MASK | EPNUM_HID_KB, 16, 5) };
         memcpy(p, desc_kb, sizeof(desc_kb));
-        p[2] = ITF_KEYBOARD;
-        p[8] = 6;
         p += sizeof(desc_kb);
     }
 #endif
 #ifdef USB_ITF_CCID
     if (ITF_CCID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUSB_SMARTCARD_CCID_DESC_LEN;
-        const uint8_t desc_ccid[] = { TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID+5, 1, TUSB_DIR_IN_MASK | 1, TUSB_DIR_IN_MASK | 2, 64) };
+        const uint8_t desc_ccid[] = { TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID + 5, EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID_INT, 64) };
         memcpy(p, desc_ccid, sizeof(desc_ccid));
-        p[2] = ITF_CCID;
-        p[8] = 7;
         p += sizeof(desc_ccid);
     }
     if (ITF_WCID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUSB_SMARTCARD_WCID_DESC_LEN;
-        const uint8_t desc_wcid[] = { TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID+5, 3, TUSB_DIR_IN_MASK | 3, 64) };
+        const uint8_t desc_wcid[] = { TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID + 5, EPNUM_WCID, TUSB_DIR_IN_MASK | EPNUM_WCID, 64) };
         memcpy(p, desc_wcid, sizeof(desc_wcid));
-        p[2] = ITF_WCID;
-        p[8] = 8;
         p += sizeof(desc_wcid);
     }
 #endif

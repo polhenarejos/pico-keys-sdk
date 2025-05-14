@@ -50,6 +50,19 @@ enum {
 // steady on
 #define LED_ON_NO_BLINK     ((1000 << LED_ON_SHIFT) | (0 << LED_OFF_SHIFT))
 
+#if defined(PICO_DEFAULT_LED_PIN) && !defined(PICO_DEFAULT_WS2812_PIN) && !defined(PIMORONI_TINY2040) && !defined(PIMORONI_TINY2350)
+// boards with plain old monochrome LED
+enum  {
+    MODE_NOT_MOUNTED = (MAX_BTNESS << LED_BTNESS_SHIFT) | (LED_COLOR_WHITE << LED_COLOR_SHIFT) | (500 << LED_ON_SHIFT) | (500 << LED_OFF_SHIFT),
+    MODE_MOUNTED     = 0, // no distraction when idle
+    MODE_SUSPENDED   = 0, // no distraction when idle
+    MODE_PROCESSING  = (MAX_BTNESS << LED_BTNESS_SHIFT) | (LED_COLOR_WHITE << LED_COLOR_SHIFT) | (50 << LED_ON_SHIFT)  | (50 << LED_OFF_SHIFT),
+    MODE_BUTTON      = (MAX_BTNESS << LED_BTNESS_SHIFT) | (LED_COLOR_WHITE << LED_COLOR_SHIFT) | (250 << LED_ON_SHIFT) | (250 << LED_OFF_SHIFT),
+    MODE_ALWAYS_ON   = UINT32_MAX,
+    MODE_ALWAYS_OFF  = 0
+};
+#else
+// boards with Neopixel or something similar
 enum  {
     MODE_NOT_MOUNTED = (MAX_BTNESS << LED_BTNESS_SHIFT) | (LED_COLOR_RED << LED_COLOR_SHIFT) | (500 << LED_ON_SHIFT) | (500 << LED_OFF_SHIFT),
     MODE_MOUNTED     = (MAX_BTNESS << LED_BTNESS_SHIFT) | (LED_COLOR_GREEN << LED_COLOR_SHIFT) | (500 << LED_ON_SHIFT) | (500 << LED_OFF_SHIFT),
@@ -60,6 +73,7 @@ enum  {
     MODE_ALWAYS_ON   = UINT32_MAX,
     MODE_ALWAYS_OFF  = 0
 };
+#endif
 
 extern void led_set_mode(uint32_t mode);
 extern uint32_t led_get_mode();

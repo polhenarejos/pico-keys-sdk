@@ -49,6 +49,15 @@ void led_blinking_task() {
 #ifdef PICO_DEFAULT_LED_PIN_INVERTED
     state = !state;
 #endif
+    if (!led_mode) {
+        // in this mode the LED shall be off, not blinking
+        if (board_millis() - last_led_update_ms > 2) {
+            led_driver_color(0, 0, 0);
+            last_led_update_ms = board_millis();
+        }
+        return;
+    }
+
     uint32_t led_brightness = (led_mode & LED_BTNESS_MASK) >> LED_BTNESS_SHIFT;
     uint32_t led_color = (led_mode & LED_COLOR_MASK) >> LED_COLOR_SHIFT;
     uint32_t led_off = (led_mode & LED_OFF_MASK) >> LED_OFF_SHIFT;

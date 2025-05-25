@@ -25,6 +25,7 @@
 #include "compat.h"
 #include <stdio.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
 typedef struct app {
     const uint8_t *aid;

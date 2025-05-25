@@ -54,7 +54,22 @@ app_t *current_app = NULL;
 
 const uint8_t *ccid_atr = NULL;
 
+bool app_exists(const uint8_t *aid, size_t aid_len) {
+    if (current_app && current_app->aid && (current_app->aid + 1 == aid || !memcmp(current_app->aid + 1, aid, aid_len))) {
+        return true;
+    }
+    for (int a = 0; a < num_apps; a++) {
+        if (!memcmp(apps[a].aid + 1, aid, MIN(aid_len, apps[a].aid[0]))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int register_app(int (*select_aid)(app_t *, uint8_t), const uint8_t *aid) {
+    if (app_exists(aid + 1, aid[0])) {
+        return 1;
+    }
     if (num_apps < sizeof(apps) / sizeof(app_t)) {
         apps[num_apps].select_aid = select_aid;
         apps[num_apps].aid = aid;

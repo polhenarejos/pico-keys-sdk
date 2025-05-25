@@ -33,6 +33,7 @@ typedef struct app {
     int (*unload)();
 } app_t;
 
+extern bool app_exists(const uint8_t *aid, size_t aid_len);
 extern int register_app(int (*)(app_t *, uint8_t), const uint8_t *);
 extern int select_app(const uint8_t *aid, size_t aid_len);
 

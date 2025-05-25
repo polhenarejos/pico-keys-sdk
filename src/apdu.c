@@ -224,9 +224,10 @@ void apdu_finish() {
     put_uint16_t_be(apdu.sw, apdu.rdata + apdu.rlen);
     // timeout_stop();
 #ifndef ENABLE_EMULATION
-    if ((apdu.rlen + 2 + 10) % 64 == 0) {     // FIX for strange behaviour with PSCS and multiple of 64
-        apdu.ne = apdu.rlen - 2;
-    }
+    /* It was fixed in the USB handling. Keep it just in case */
+    //if ((apdu.rlen + 2 + 10) % 64 == 0) {     // FIX for strange behaviour with PSCS and multiple of 64
+    //    apdu.ne = apdu.rlen - 2;
+    //}
 #endif
 }
 

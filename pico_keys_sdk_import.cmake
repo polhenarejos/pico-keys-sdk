@@ -237,7 +237,7 @@ if (ENABLE_EDDSA)
     )
 endif()
 
-set(SOURCES ${SOURCES}
+set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
@@ -260,7 +260,7 @@ set(SOURCES ${SOURCES}
 )
 
 if(ESP_PLATFORM)
-    set(SOURCES ${SOURCES} ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c)
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES} ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c)
 endif()
 
 ## mbedTLS reports an stringop overflow for cmac.c
@@ -331,7 +331,7 @@ function(add_impl_library target)
 endfunction()
 
 if(USB_ITF_HID)
-    set(SOURCES ${SOURCES}
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
     )
     set(INCLUDES ${INCLUDES}
@@ -340,7 +340,7 @@ if(USB_ITF_HID)
 endif()
 
 if(USB_ITF_CCID)
-    set(SOURCES ${SOURCES}
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
     )
     set(INCLUDES ${INCLUDES}
@@ -354,12 +354,12 @@ if(ENABLE_EMULATION)
     if(APPLE)
         add_definitions("-Wno-deprecated-declarations")
     elseif(MSVC)
-        set(SOURCES ${SOURCES}
+        set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
             ${CMAKE_CURRENT_LIST_DIR}/src/fs/mman.c
         )
     endif()
     add_definitions(-DENABLE_EMULATION)
-    set(SOURCES ${SOURCES}
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
     )
     set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
@@ -369,7 +369,7 @@ if(ENABLE_EMULATION)
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
     )
 else()
-    set(SOURCES ${SOURCES}
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )
 endif()
@@ -415,13 +415,13 @@ if(PICO_RP2350)
     set(INCLUDES ${INCLUDES}
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt
     )
-    set(SOURCES ${SOURCES}
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt/sha256_alt.c
     )
     set(LIBRARIES ${LIBRARIES} pico_sha256)
 endif()
-set(INTERNAL_SOURCES ${SOURCES})
-set(SOURCES ${SOURCES} ${EXTERNAL_SOURCES})
+set(INTERNAL_SOURCES ${PICO_KEYS_SOURCES})
+set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES} ${EXTERNAL_SOURCES})
 if(NOT TARGET pico_keys_sdk)
     if(ENABLE_EMULATION OR ESP_PLATFORM)
         add_impl_library(pico_keys_sdk)
@@ -430,7 +430,7 @@ if(NOT TARGET pico_keys_sdk)
 
         target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBRARIES})
     endif()
-    target_sources(pico_keys_sdk INTERFACE ${SOURCES})
+    target_sources(pico_keys_sdk INTERFACE ${PICO_KEYS_SOURCES})
     target_include_directories(pico_keys_sdk INTERFACE ${INCLUDES})
     target_link_libraries(pico_keys_sdk INTERFACE ${LIBRARIES})
 endif()

@@ -23,11 +23,12 @@
 #define XIP_BASE                0
 #define FLASH_SECTOR_SIZE       4096
 #ifdef ESP_PLATFORM
-uint32_t PICO_FLASH_SIZE_BYTES = (1 * 1024 * 1024);
+uint32_t FLASH_SIZE_BYTES = (1 * 1024 * 1024);
 #else
-#define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
+#define FLASH_SIZE_BYTES   (8 * 1024 * 1024)
 #endif
 #else
+uint32_t FLASH_SIZE_BYTES = (2 * 1024 * 1024);
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 #endif
@@ -210,5 +211,5 @@ uint32_t flash_num_files() {
 }
 
 uint32_t flash_size() {
-    return PICO_FLASH_SIZE_BYTES;
+    return FLASH_SIZE_BYTES;
 }

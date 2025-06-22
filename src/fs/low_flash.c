@@ -58,15 +58,15 @@
   #endif
  #endif
  #define FLASH_SECTOR_SIZE       4096
- #ifdef ESP_PLATFORM
- extern uint32_t PICO_FLASH_SIZE_BYTES;
- #else
- #define PICO_FLASH_SIZE_BYTES   (8 * 1024 * 1024)
- #endif
  #define XIP_BASE 0
  int fd_map = 0;
  uint8_t *map = NULL;
  #include <fcntl.h>
+#endif
+#ifndef ENABLE_EMULATION
+extern uint32_t FLASH_SIZE_BYTES;
+#else
+#define FLASH_SIZE_BYTES   (8 * 1024 * 1024)
 #endif
 
 #define TOTAL_FLASH_PAGES 6
@@ -145,7 +145,7 @@ void do_flash() {
                 }
             }
 #ifdef ENABLE_EMULATION
-            msync(map, PICO_FLASH_SIZE_BYTES, MS_SYNC);
+            msync(map, FLASH_SIZE_BYTES, MS_SYNC);
 #endif
             if (ready_pages != 0) {
                 printf("ERROR: DO FLASH DOES NOT HAVE ZERO PAGES\n");
@@ -171,18 +171,23 @@ void low_flash_init() {
     uint32_t data_end_addr;
 #if defined(ENABLE_EMULATION)
     fd_map = open("memory.flash", O_RDWR | O_CREAT, (mode_t) 0600);
-    lseek(fd_map, PICO_FLASH_SIZE_BYTES - 1, SEEK_SET);
+    lseek(fd_map, FLASH_SIZE_BYTES - 1, SEEK_SET);
     write(fd_map, "", 1);
-    map = mmap(0, PICO_FLASH_SIZE_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fd_map, 0);
+    map = mmap(0, FLASH_SIZE_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fd_map, 0);
     data_start_addr = 0;
-    data_end_addr = PICO_FLASH_SIZE_BYTES;
+    data_end_addr = FLASH_SIZE_BYTES;
 #elif defined(ESP_PLATFORM)
     part0 = esp_partition_find_first(0x40, 0x1, "part0");
     esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
     data_start_addr = 0;
     data_end_addr = part0->size;
-    PICO_FLASH_SIZE_BYTES = part0->size;
+    FLASH_SIZE_BYTES = part0->size;
 #elif defined(PICO_PLATFORM)
+    uint8_t txbuf[6] = {0x9f};
+    uint8_t rxbuf[6] = {0};
+    flash_do_cmd(txbuf, rxbuf, 4);
+
+    FLASH_SIZE_BYTES = (1 << rxbuf[3]);
 #ifdef PICO_RP2350
     __attribute__((aligned(4))) uint8_t workarea[4 * 1024];
     int rc = rom_load_partition_table(workarea, sizeof(workarea), false);
@@ -194,8 +199,8 @@ void low_flash_init() {
     rc = rom_get_partition_table_info((uint32_t*)workarea, 0x8, PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (boot_partition << 24));
 
     if (rc != 3) {
-        data_start_addr = (PICO_FLASH_SIZE_BYTES >> 1);
-        data_end_addr = PICO_FLASH_SIZE_BYTES;
+        data_start_addr = (FLASH_SIZE_BYTES >> 1);
+        data_end_addr = FLASH_SIZE_BYTES;
     } else {
         uint16_t first_sector_number = (((uint32_t*)workarea)[1] & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB;
         uint16_t last_sector_number = (((uint32_t*)workarea)[1] & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
@@ -204,8 +209,8 @@ void low_flash_init() {
     }
     data_end_addr -= 2 * FLASH_SECTOR_SIZE;
 #else
-    data_start_addr = (PICO_FLASH_SIZE_BYTES >> 1);
-    data_end_addr = PICO_FLASH_SIZE_BYTES;
+    data_start_addr = (FLASH_SIZE_BYTES >> 1);
+    data_end_addr = FLASH_SIZE_BYTES;
 #endif
 
     data_start_addr += XIP_BASE;

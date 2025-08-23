@@ -238,7 +238,7 @@ uint16_t apdu_next() {
         }
         else {
             rdata_gr = apdu.rdata + apdu.ne;
-            rdata_bk = *(uint16_t *) rdata_gr;
+            rdata_bk = (rdata_gr[0] << 8) | rdata_gr[1];
             rdata_gr[0] = 0x61;
             if (apdu.rlen - apdu.ne >= 256) {
                 rdata_gr[1] = 0;

@@ -399,6 +399,11 @@ if(MSVC)
         COMPILE_FLAGS " -W3 -wd4242 -wd4065"
     )
 endif()
+
+if(NOT ENABLE_EMULATION AND NOT ESP_PLATFORM)
+pico_sdk_init()
+endif()
+
 if(PICO_RP2350)
     pico_set_uf2_family(${CMAKE_PROJECT_NAME} "rp2350-arm-s")
     pico_embed_pt_in_binary(${CMAKE_PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/config/rp2350/pt.json")
@@ -422,10 +427,6 @@ if(PICO_RP2350)
 endif()
 set(INTERNAL_SOURCES ${PICO_KEYS_SOURCES})
 set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES} ${EXTERNAL_SOURCES})
-
-if(NOT ENABLE_EMULATION AND NOT ESP_PLATFORM)
-pico_sdk_init()
-endif()
 
 if(NOT TARGET pico_keys_sdk)
     if(ENABLE_EMULATION OR ESP_PLATFORM)

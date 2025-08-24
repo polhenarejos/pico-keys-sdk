@@ -422,6 +422,11 @@ if(PICO_RP2350)
 endif()
 set(INTERNAL_SOURCES ${PICO_KEYS_SOURCES})
 set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES} ${EXTERNAL_SOURCES})
+
+if(NOT ENABLE_EMULATION AND NOT ESP_PLATFORM)
+pico_sdk_init()
+endif()
+
 if(NOT TARGET pico_keys_sdk)
     if(ENABLE_EMULATION OR ESP_PLATFORM)
         add_impl_library(pico_keys_sdk)

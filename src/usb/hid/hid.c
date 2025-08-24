@@ -33,7 +33,7 @@ static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 
 static bool mounted = false;
 extern void init_fido();
-bool is_nitrokey = false;
+bool is_nk = false;
 uint8_t (*get_version_major)() = NULL;
 uint8_t (*get_version_minor)() = NULL;
 
@@ -100,7 +100,7 @@ int driver_init_hid() {
 
     usb_set_timeout_counter(ITF_HID, 200);
 
-    is_nitrokey = false;
+    is_nk = false;
 
     hid_tx[ITF_HID_CTAP].w_ptr = hid_tx[ITF_HID_CTAP].r_ptr = 0;
     send_buffer_size[ITF_HID_CTAP] = 0;
@@ -325,7 +325,7 @@ int driver_process_usb_nopacket_hid() {
     return 0;
 }
 
-extern const uint8_t fido_aid[], u2f_aid[];
+extern const uint8_t fido_aid[], u2f_aid[], oath_aid[];
 extern void apdu_thread(void), cbor_thread(void);
 
 int driver_process_usb_packet_hid(uint16_t read) {
@@ -490,8 +490,8 @@ int driver_process_usb_packet_hid(uint16_t read) {
                  (msg_packet.len == 0 ||
                   (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
             if (last_cmd == CTAPHID_OTP) {
-                is_nitrokey = true;
-                select_app(fido_aid + 1, fido_aid[0]);
+                is_nk = true;
+                select_app(oath_aid + 1, oath_aid[0]);
             }
             else {
                 select_app(u2f_aid + 1, u2f_aid[0]);
@@ -574,7 +574,7 @@ void driver_exec_finished_hid(uint16_t size_next) {
             ctap_error(apdu.sw & 0xff);
         }
         else {
-            if (is_nitrokey) {
+            if (is_nk) {
                 memmove(apdu.rdata + 2, apdu.rdata, size_next - 2);
                 put_uint16_t_be(apdu.sw, apdu.rdata);
             }

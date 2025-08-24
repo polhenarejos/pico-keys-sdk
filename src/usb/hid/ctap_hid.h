@@ -159,7 +159,7 @@ typedef struct {
 extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
 extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
 
-extern bool is_nitrokey;
+extern bool is_nk;
 
 #ifdef __cplusplus
 }

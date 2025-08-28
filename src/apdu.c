@@ -113,11 +113,12 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
             }
         }
     }
-    //printf("apdu.nc %ld, apdu.ne %ld\n",apdu.nc,apdu.ne);
+    //printf("apdu.nc %u, apdu.ne %u\n",apdu.nc,apdu.ne);
     if (apdu.header[1] == 0xc0) {
         //printf("apdu.ne %u, apdu.rlen %d, bk %x\n",apdu.ne,apdu.rlen,rdata_bk);
         timeout_stop();
-        *(uint16_t *) rdata_gr = rdata_bk;
+        rdata_gr[0] = rdata_bk >> 8;
+        rdata_gr[1] = rdata_bk & 0xff;
         if (apdu.rlen <= apdu.ne) {
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
@@ -140,7 +141,7 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
         }
         else {
             rdata_gr += apdu.ne;
-            rdata_bk = *(uint16_t *) rdata_gr;
+            rdata_bk = (rdata_gr[0] << 8) | rdata_gr[1];
             rdata_gr[0] = 0x61;
             if (apdu.rlen - apdu.ne >= 256) {
                 rdata_gr[1] = 0;

@@ -92,7 +92,24 @@ extern led_driver_t led_driver_ws2812;
 extern led_driver_t led_driver_neopixel;
 extern led_driver_t led_driver_pimoroni;
 
+void led_driver_init_dummy() {
+    // Do nothing
+}
+
+void led_driver_color_dummy(uint8_t color, uint32_t led_brightness, float progress) {
+    (void)color;
+    (void)led_brightness;
+    (void)progress;
+    // Do nothing
+}
+
+led_driver_t led_driver_dummy = {
+    .init = led_driver_init_dummy,
+    .set_color = led_driver_color_dummy,
+};
+
 void led_init() {
+    led_driver = &led_driver_dummy;
 #ifndef ENABLE_EMULATION
 #   // Guess default driver
 #ifdef PICO_DEFAULT_LED_PIN

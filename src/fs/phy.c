@@ -70,6 +70,11 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
         *p++ = 1;
         *p++ = phy->enabled_usb_itf;
     }
+    if (phy->led_driver_present) {
+        *p++ = PHY_LED_DRIVER;
+        *p++ = 1;
+        *p++ = phy->led_driver;
+    }
 
     *len = p - data;
     return PICOKEY_OK;
@@ -139,6 +144,12 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
                 if (tlen == 1) {
                     phy->enabled_usb_itf = *p++;
                     phy->enabled_usb_itf_present = true;
+                }
+                break;
+            case PHY_LED_DRIVER:
+                if (tlen == 1) {
+                    phy->led_driver = *p++;
+                    phy->led_driver_present = true;
                 }
                 break;
             default:

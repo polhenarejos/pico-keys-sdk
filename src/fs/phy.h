@@ -28,6 +28,7 @@
 #define PHY_USB_PRODUCT 0x9
 #define PHY_ENABLED_CURVES 0xA
 #define PHY_ENABLED_USB_ITF 0xB
+#define PHY_LED_DRIVER  0xC
 
 #define PHY_OPT_WCID    0x1
 #define PHY_OPT_DIMM    0x2
@@ -51,6 +52,18 @@
 #define PHY_USB_ITF_HID 0x4
 #define PHY_USB_ITF_KB 0x8
 
+#define PHY_LED_DRIVER_PICO     0x1
+#define PHY_LED_DRIVER_PIMORONI 0x2
+#define PHY_LED_DRIVER_WS2812   0x3
+#ifdef CYW43_WL_GPIO_LED_PIN
+#define PHY_LED_DRIVER_CYW43    0x4
+#endif
+#ifdef ESP_PLATFORM
+#define PHY_LED_DRIVER_NEOPIXEL  0x5
+#endif
+
+#define PHY_LED_DRIVER_NONE     0xFF
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -73,6 +86,7 @@ typedef struct phy_data {
     uint8_t led_brightness;
     uint8_t up_btn;
     uint8_t enabled_usb_itf;
+    uint8_t led_driver;
 
     bool vidpid_present;
     bool led_gpio_present;
@@ -81,10 +95,11 @@ typedef struct phy_data {
     bool usb_product_present;
     bool enabled_curves_present;
     bool enabled_usb_itf_present;
+    bool led_driver_present;
 
 } phy_data_t;
 
-#define PHY_MAX_SIZE    ((2+4)+(2+4)+(2+32)+(2+2)+(2+1)+(2+1)+(2+1)+(2+1))
+#define PHY_MAX_SIZE    ((2+4)+(2+4)+(2+32)+(2+2)+(2+1)+(2+1)+(2+1)+(2+1)+(2+1))
 
 #ifndef ENABLE_EMULATION
 extern int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len);

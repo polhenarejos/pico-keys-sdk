@@ -360,6 +360,21 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
                 str = phy_data.usb_product;
             }
         }
+        else if (index >= 5) {
+            uint8_t itf_index = index - 5;
+            if (itf_index == ITF_HID) {
+                str = string_desc_arr[5];
+            }
+            else if (itf_index == ITF_HID_KB) {
+                str = string_desc_arr[6];
+            }
+            else if (itf_index == ITF_CCID) {
+                str = string_desc_arr[7];
+            }
+            else if (itf_index == ITF_WCID) {
+                str = string_desc_arr[8];
+            }
+        }
 
         uint8_t buff_avail = sizeof(_desc_str) / sizeof(_desc_str[0]) - 1;
         if (index >= 4) {

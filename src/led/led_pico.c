@@ -17,11 +17,13 @@
 
 #include "pico_keys.h"
 
-#if defined(PICO_DEFAULT_LED_PIN) && !defined(PICO_DEFAULT_WS2812_PIN) && !defined(PIMORONI_TINY2040) && !defined(PIMORONI_TINY2350)
-
+#ifdef PICO_DEFAULT_LED_PIN
 uint8_t gpio = PICO_DEFAULT_LED_PIN;
+#else
+uint8_t gpio = 0;
+#endif
 
-void led_driver_init() {
+void led_driver_init_pico() {
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;
     }
@@ -29,9 +31,12 @@ void led_driver_init() {
     gpio_set_dir(gpio, GPIO_OUT);
 }
 
-void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
+void led_driver_color_pico(uint8_t color, uint32_t led_brightness, float progress) {
     (void)led_brightness;
     gpio_put(gpio, progress >= 0.5);
 }
 
-#endif
+led_driver_t led_driver_pico = {
+    .init = led_driver_init_pico,
+    .set_color = led_driver_color_pico,
+};

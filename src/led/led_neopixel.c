@@ -45,7 +45,7 @@ tNeopixel pixel[] = {
     #define NEOPIXEL_PIN GPIO_NUM_27
 #endif
 
-void led_driver_init() {
+void led_driver_init_neopixel() {
     uint8_t gpio = NEOPIXEL_PIN;
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;
@@ -53,7 +53,7 @@ void led_driver_init() {
     neopixel = neopixel_Init(1, gpio);
 }
 
-void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
+void led_driver_color_neopixel(uint8_t color, uint32_t led_brightness, float progress) {
     static tNeopixel spx = {.index = 0, .rgb = 0};
     if (!(phy_data.opts & PHY_OPT_DIMM)) {
         progress = progress >= 0.5 ? 1 : 0;
@@ -71,5 +71,10 @@ void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
     spx.rgb = NP_RGB(r, g, b);
     neopixel_SetPixel(neopixel, &spx, 1);
 }
+
+led_driver_t led_driver_neopixel = {
+    .init = led_driver_init_neopixel,
+    .set_color = led_driver_color_neopixel,
+};
 
 #endif

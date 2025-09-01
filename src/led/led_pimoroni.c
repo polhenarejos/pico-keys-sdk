@@ -17,8 +17,6 @@
 
 #include "pico_keys.h"
 
-#if defined(PIMORONI_TINY2040) || defined(PIMORONI_TINY2350)
-
 #ifdef PIMORONI_TINY2040
 #define LED_R_PIN TINY2040_LED_R_PIN
 #define LED_G_PIN TINY2040_LED_G_PIN
@@ -27,6 +25,10 @@
 #define LED_R_PIN TINY2350_LED_R_PIN
 #define LED_G_PIN TINY2350_LED_G_PIN
 #define LED_B_PIN TINY2350_LED_B_PIN
+#else
+#define LED_R_PIN 0
+#define LED_G_PIN 0
+#define LED_B_PIN 0
 #endif
 
 uint8_t pixel[][3] = {
@@ -40,7 +42,7 @@ uint8_t pixel[][3] = {
     {0, 0, 0}  // 7: white
 };
 
-void led_driver_init() {
+void led_driver_init_pimoroni() {
     gpio_init(LED_R_PIN);
     gpio_set_dir(LED_R_PIN, GPIO_OUT);
     gpio_init(LED_G_PIN);
@@ -49,7 +51,7 @@ void led_driver_init() {
     gpio_set_dir(LED_B_PIN, GPIO_OUT);
 }
 
-void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
+void led_driver_color_pimoroni(uint8_t color, uint32_t led_brightness, float progress) {
     if (progress < 0.5) {
         color = LED_COLOR_OFF;
     }
@@ -58,4 +60,7 @@ void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
     gpio_put(LED_B_PIN, pixel[color][2]);
 }
 
-#endif
+led_driver_t led_driver_pimoroni = {
+    .init = led_driver_init_pimoroni,
+    .set_color = led_driver_color_pimoroni,
+};

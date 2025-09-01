@@ -16,9 +16,6 @@
  */
 
 #include "pico_keys.h"
-
-#ifdef PICO_DEFAULT_WS2812_PIN
-
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 
@@ -70,11 +67,14 @@ static inline void ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, 
     pio_sm_set_enabled(pio, sm, true);
 }
 
-void led_driver_init() {
+void led_driver_init_ws2812() {
     PIO pio = pio0;
     int sm = 0;
     uint offset = pio_add_program(pio, &ws2812_program);
-    uint8_t gpio = PICO_DEFAULT_WS2812_PIN;
+    uint8_t gpio = 0;
+#ifdef PICO_DEFAULT_WS2812_PIN
+    gpio = PICO_DEFAULT_WS2812_PIN;
+#endif
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;
     }
@@ -113,7 +113,7 @@ static inline void ws2812_put_pixel(uint32_t u32_pixel) {
     pio_sm_put_blocking(pio0, 0, u32_pixel << 8u);
 }
 
-void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
+void led_driver_color_ws2812(uint8_t color, uint32_t led_brightness, float progress) {
     if (!(phy_data.opts & PHY_OPT_DIMM)) {
         progress = progress >= 0.5 ? 1 : 0;
     }
@@ -128,4 +128,7 @@ void led_driver_color(uint8_t color, uint32_t led_brightness, float progress) {
     ws2812_put_pixel(urgb_u32(pixel_color.r, pixel_color.g, pixel_color.b));
 }
 
-#endif
+led_driver_t led_driver_ws2812 = {
+    .init = led_driver_init_ws2812,
+    .set_color = led_driver_color_ws2812,
+};

@@ -253,14 +253,19 @@ set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/apdu.c
     ${CMAKE_CURRENT_LIST_DIR}/src/rescue.c
     ${CMAKE_CURRENT_LIST_DIR}/src/led/led.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/led/led_cyw43.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pimoroni.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/led/led_ws2812.c
 )
 
 if(ESP_PLATFORM)
     set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES} ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c)
+else()
+  if (NOT ENABLE_EMULATION)
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_cyw43.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pimoroni.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_ws2812.c
+    )
+  endif()
 endif()
 
 ## mbedTLS reports an stringop overflow for cmac.c

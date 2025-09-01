@@ -67,4 +67,11 @@ extern void led_blinking_task();
 extern void led_off_all();
 extern void led_init();
 
+typedef struct {
+    void (*init)();
+    void (*set_color)(uint8_t color, uint32_t led_brightness, float progress);
+} led_driver_t;
+
+extern led_driver_t *led_driver;
+
 #endif // _LED_H_

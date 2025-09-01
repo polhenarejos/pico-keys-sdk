@@ -26,8 +26,7 @@
 #include "emulation.h"
 #endif
 
-extern void led_driver_init();
-extern void led_driver_color(uint8_t, uint32_t, float);
+led_driver_t *led_driver = NULL;
 
 static uint32_t led_mode = MODE_NOT_MOUNTED;
 
@@ -69,7 +68,7 @@ void led_blinking_task() {
 
     // limit the frequency of LED status updates
     if (board_millis() - last_led_update_ms > 2) {
-        led_driver_color(led_color, led_brightness, progress);
+        led_driver->set_color(led_color, led_brightness, progress);
         last_led_update_ms = board_millis();
     }
 
@@ -83,13 +82,57 @@ void led_blinking_task() {
 
 void led_off_all() {
 #ifndef ENABLE_EMULATION
-    led_driver_color(LED_COLOR_OFF, 0, 0);
+    led_driver->set_color(LED_COLOR_OFF, 0, 0);
 #endif
 }
 
+extern led_driver_t led_driver_pico;
+extern led_driver_t led_driver_cyw43;
+extern led_driver_t led_driver_ws2812;
+extern led_driver_t led_driver_neopixel;
+extern led_driver_t led_driver_pimoroni;
+
 void led_init() {
 #ifndef ENABLE_EMULATION
-    led_driver_init();
+#   // Guess default driver
+#ifdef PICO_DEFAULT_LED_PIN
+    led_driver = &led_driver_pico;
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    led_driver = &led_driver_cyw43;
+#elif defined(PICO_DEFAULT_WS2812_PIN)
+    led_driver = &led_driver_ws2812;
+#elif defined(ESP_PLATFORM)
+    led_driver = &led_driver_neopixel;
+#elif defined(PIMORONI_TINY2040) || defined(PIMORONI_TINY2350)
+    led_driver = &led_driver_pimoroni;
+#endif
+    if (phy_data.led_driver_present) {
+        switch (phy_data.led_driver) {
+#ifdef ESP_PLATFORM
+            case PHY_LED_DRIVER_NEOPIXEL:
+                led_driver = &led_driver_neopixel;
+                break;
+#else
+            case PHY_LED_DRIVER_PICO:
+                led_driver = &led_driver_pico;
+                break;
+#ifdef CYW43_WL_GPIO_LED_PIN
+            case PHY_LED_DRIVER_CYW43:
+                led_driver = &led_driver_cyw43;
+                break;
+#endif
+            case PHY_LED_DRIVER_WS2812:
+                led_driver = &led_driver_ws2812;
+                break;
+            case PHY_LED_DRIVER_PIMORONI:
+                led_driver = &led_driver_pimoroni;
+                break;
+#endif
+            default:
+                break;
+        }
+    }
+    led_driver->init();
     led_set_mode(MODE_NOT_MOUNTED);
 #endif
 }

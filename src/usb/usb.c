@@ -42,6 +42,9 @@ static void (*card_locked_func)(void) = NULL;
 static mutex_t mutex;
 extern void usb_desc_setup();
 #endif
+#if !defined(PICO_PLATFORM) && !defined(ENABLE_EMULATION)
+pthread_t hcore0, hcore1;
+#endif
 
 #ifdef USB_ITF_HID
     uint8_t ITF_HID_CTAP = ITF_INVALID, ITF_HID_KB = ITF_INVALID;

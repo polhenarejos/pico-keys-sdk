@@ -319,7 +319,7 @@ set(LIBRARIES
 )
 
 set(IS_CYW43 0)
-if (NOT ENABLE_EMULATION AND NOT ESP_PLATFORM)
+if (PICO_PLATFORM)
     file(READ ${PICO_SDK_PATH}/src/boards/include/boards/${PICO_BOARD}.h content)
     string(REGEX MATCHALL "CYW43_WL_GPIO_LED_PIN" _ ${content})
     if (CMAKE_MATCH_0)

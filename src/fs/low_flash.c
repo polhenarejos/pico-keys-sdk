@@ -32,29 +32,29 @@
  #include "pico/bootrom.h"
  #include "boot/picobin.h"
 #else
- #ifdef _MSC_VER
-  #include <windows.h>
-  #include <io.h>
-  #define O_RDWR _O_RDWR
-  #define O_CREAT _O_CREAT
-  #define open _open
-  #define write _write
-  #define mode_t unsigned short
-  #define lseek _lseek
-  #include "mman.h"
+ #ifdef ESP_PLATFORM
+  #include "esp_compat.h"
+  #include "esp_partition.h"
+  const esp_partition_t *part0;
+  #define save_and_disable_interrupts() 1
+  #define flash_range_erase(a,b) esp_partition_erase_range(part0, a, b)
+  #define flash_range_program(a,b,c) esp_partition_write(part0, a, b, c);
+  #define restore_interrupts(a) (void)a
  #else
-  #ifdef ESP_PLATFORM
-   #include "esp_compat.h"
-   #include "esp_partition.h"
-   const esp_partition_t *part0;
-   #define save_and_disable_interrupts() 1
-   #define flash_range_erase(a,b) esp_partition_erase_range(part0, a, b)
-   #define flash_range_program(a,b,c) esp_partition_write(part0, a, b, c);
-   #define restore_interrupts(a) (void)a
+  #ifdef _MSC_VER
+   #include <windows.h>
+   #include <io.h>
+   #define O_RDWR _O_RDWR
+   #define O_CREAT _O_CREAT
+   #define open _open
+   #define write _write
+   #define mode_t unsigned short
+   #define lseek _lseek
+   #include "mman.h"
   #else
    #include <unistd.h>
    #include <sys/mman.h>
-   #include "emulation.h"
+   #include "queue.h"
   #endif
  #endif
  #define FLASH_SECTOR_SIZE       4096
@@ -63,7 +63,7 @@
  uint8_t *map = NULL;
  #include <fcntl.h>
 #endif
-#ifndef ENABLE_EMULATION
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
 extern uint32_t FLASH_SIZE_BYTES;
 #else
 #define FLASH_SIZE_BYTES   (8 * 1024 * 1024)
@@ -107,7 +107,7 @@ void do_flash() {
             //printf(" DO_FLASH AVAILABLE\n");
             for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
                 if (flash_pages[r].ready == true) {
-#ifndef ENABLE_EMULATION
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
                     //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
                     while (multicore_lockout_start_timeout_us(1000) == false) {
                         ;
@@ -128,7 +128,7 @@ void do_flash() {
                     ready_pages--;
                 }
                 else if (flash_pages[r].erase == true) {
-#ifndef ENABLE_EMULATION
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
                     while (multicore_lockout_start_timeout_us(1000) == false) {
                         ;
                     }
@@ -144,7 +144,7 @@ void do_flash() {
                     ready_pages--;
                 }
             }
-#ifdef ENABLE_EMULATION
+#if !defined(PICO_PLATFORM) && !defined(ESP_PLATFORM)
             msync(map, FLASH_SIZE_BYTES, MS_SYNC);
 #endif
             if (ready_pages != 0) {
@@ -169,14 +169,7 @@ void low_flash_init() {
 
     uint32_t data_start_addr;
     uint32_t data_end_addr;
-#if defined(ENABLE_EMULATION)
-    fd_map = open("memory.flash", O_RDWR | O_CREAT, (mode_t) 0600);
-    lseek(fd_map, FLASH_SIZE_BYTES - 1, SEEK_SET);
-    write(fd_map, "", 1);
-    map = mmap(0, FLASH_SIZE_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fd_map, 0);
-    data_start_addr = 0;
-    data_end_addr = FLASH_SIZE_BYTES;
-#elif defined(ESP_PLATFORM)
+#if defined(ESP_PLATFORM)
     part0 = esp_partition_find_first(0x40, 0x1, "part0");
     esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
     data_start_addr = 0;
@@ -215,6 +208,13 @@ void low_flash_init() {
 
     data_start_addr += XIP_BASE;
     data_end_addr += XIP_BASE;
+#else
+    fd_map = open("memory.flash", O_RDWR | O_CREAT, (mode_t) 0600);
+    lseek(fd_map, FLASH_SIZE_BYTES - 1, SEEK_SET);
+    write(fd_map, "", 1);
+    map = mmap(0, FLASH_SIZE_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fd_map, 0);
+    data_start_addr = 0;
+    data_end_addr = FLASH_SIZE_BYTES;
 #endif
     flash_set_bounds(data_start_addr, data_end_addr);
 }

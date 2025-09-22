@@ -16,14 +16,12 @@
  */
 
 #include <stdio.h>
-
-// Pico
-#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
+#include "pico_keys.h"
+#if defined(PICO_PLATFORM)
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "bsp/board.h"
 #endif
-#include "pico_keys.h"
 #include "usb.h"
 #include "apdu.h"
 #ifndef ENABLE_EMULATION

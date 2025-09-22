@@ -15,9 +15,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "pico_keys.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
-#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
+#if defined(PICO_PLATFORM)
 #include "pico/unique_id.h"
 #endif
 #ifdef ESP_PLATFORM
@@ -25,7 +26,6 @@
 #endif
 #include "pico_keys_version.h"
 #include "usb.h"
-#include "pico_keys.h"
 
 #ifndef USB_VID
 #define USB_VID   0xFEFF

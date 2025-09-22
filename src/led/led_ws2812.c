@@ -16,6 +16,8 @@
  */
 
 #include "pico_keys.h"
+
+#ifdef PICO_PLATFORM
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 
@@ -132,3 +134,5 @@ led_driver_t led_driver_ws2812 = {
     .init = led_driver_init_ws2812,
     .set_color = led_driver_color_ws2812,
 };
+
+#endif

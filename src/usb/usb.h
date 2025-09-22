@@ -22,8 +22,11 @@
 #include "emulation.h"
 #elif defined(ESP_PLATFORM)
 #include "esp_compat.h"
-#else
+#elif defined(PICO_PLATFORM)
 #include "pico/util/queue.h"
+#else
+#include "queue.h"
+#include "board.h"
 #endif
 
 #include "compat.h"

@@ -24,7 +24,6 @@
 
 #include "file.h"
 #include "led/led.h"
-#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
 #include <stdint.h>
 #if !defined(MIN)
 #if defined(_MSC_VER)
@@ -46,7 +45,7 @@
        _a > _b ? _a : _b; })
 #endif
 #endif
-#else
+#if defined(PICO_PLATFORM)
 #include "pico/unique_id.h"
 #endif
 #include <string.h>
@@ -56,7 +55,7 @@
 #include <stdbool.h>
 #elif defined(ESP_PLATFORM)
 #include "esp_compat.h"
-#else
+#elif defined(PICO_PLATFORM)
 #include "pico/util/queue.h"
 #endif
 
@@ -230,7 +229,7 @@ extern uint32_t button_timeout;
 
 #define PICOKEY_CHECK(x) do { ret = (x); if (ret != PICOKEY_OK) goto err; } while (0)
 
-#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
+#if !defined (PICO_PLATFORM)
 #define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8
 typedef struct { uint8_t id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES]; } pico_unique_board_id_t;
 #endif

@@ -18,20 +18,21 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#if defined(ENABLE_EMULATION)
-#include <stdbool.h>
-#include <stdlib.h>
-#include <time.h>
-#include "emulation.h"
+
+#if defined(PICO_PLATFORM)
+#include "pico/stdlib.h"
+#include "hwrng.h"
+#include "bsp/board.h"
+#include "pico/rand.h"
 #elif (ESP_PLATFORM)
 #include "bootloader_random.h"
 #include "esp_random.h"
 #include "esp_compat.h"
 #else
-#include "pico/stdlib.h"
-#include "hwrng.h"
-#include "bsp/board.h"
-#include "pico/rand.h"
+#include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
+#include "board.h"
 #endif
 
 void hwrng_start() {
@@ -57,14 +58,14 @@ static int ep_process() {
     }
     uint64_t word = 0x0;
 
-#if defined(ENABLE_EMULATION)
-    word = rand();
-    word <<= 32;
-    word |= rand();
+#if defined(PICO_PLATFORM)
+    word = get_rand_64();
 #elif defined(ESP_PLATFORM)
     esp_fill_random((uint8_t *)&word, sizeof(word));
 #else
-    word = get_rand_64();
+    word = rand();
+    word <<= 32;
+    word |= rand();
 #endif
     random_word ^= word ^ board_millis();
     random_word *= 0x00000100000001B3;
@@ -169,15 +170,13 @@ uint32_t neug_get() {
 
 void neug_wait_full() {
     struct rng_rb *rb = &the_ring_buffer;
-#ifndef ENABLE_EMULATION
 #ifdef ESP_PLATFORM
     uint8_t core = xTaskGetCurrentTaskHandle() == hcore1 ? 1 : 0;
-#else
+#elif defined(PICO_PLATFORM)
     uint core = get_core_num();
 #endif
-#endif
     while (!rb->full) {
-#ifndef ENABLE_EMULATION
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
         if (core == 1) {
             sleep_ms(1);
         }

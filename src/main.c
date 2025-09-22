@@ -17,19 +17,20 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "pico_keys.h"
 
-// Pico
-
+#if !defined(ENABLE_EMULATION)
+#include "tusb.h"
+#endif
 #if defined(ENABLE_EMULATION)
 #include "emulation.h"
 #elif defined(ESP_PLATFORM)
-#include "tusb.h"
 #include "driver/gpio.h"
 #include "rom/gpio.h"
 #include "tinyusb.h"
 #include "esp_efuse.h"
 #define BOOT_PIN GPIO_NUM_0
-#else
+#elif defined(PICO_PLATFORM)
 #include "pico/stdlib.h"
 #include "bsp/board.h"
 #include "pico/aon_timer.h"
@@ -40,7 +41,6 @@
 #endif
 
 #include "random.h"
-#include "pico_keys.h"
 #include "apdu.h"
 #include "usb.h"
 extern void do_flash();
@@ -152,7 +152,7 @@ bool picok_board_button_read() {
     int boot_state = gpio_get_level(BOOT_PIN);
     return boot_state == 0;
 }
-#else
+#elif defined(PICO_PLATFORM)
 bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
     const uint CS_PIN_INDEX = 1;
 
@@ -187,9 +187,12 @@ bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
 
     return button_state;
 }
-uint32_t picok_board_button_read(void)
-{
+bool picok_board_button_read(void) {
   return picok_get_bootsel_button();
+}
+#else
+bool picok_board_button_read(void) {
+    return true; // always unpressed
 }
 #endif
 bool button_pressed_state = false;
@@ -294,7 +297,7 @@ extern const uint8_t desc_config[];
 TaskHandle_t hcore0 = NULL, hcore1 = NULL;
 int app_main() {
 #else
-#ifdef ENABLE_EMULATION
+#ifndef PICO_PLATFORM
 #define pico_get_unique_board_id(a) memset(a, 0, sizeof(*(a)))
 #endif
 int main(void) {
@@ -306,7 +309,7 @@ int main(void) {
     }
 
 #ifndef ENABLE_EMULATION
-#ifndef ESP_PLATFORM
+#ifdef PICO_PLATFORM
     board_init();
     stdio_init_all();
 #endif

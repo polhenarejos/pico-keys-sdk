@@ -17,6 +17,7 @@
 
 #include "pico_keys.h"
 
+#ifdef PICO_PLATFORM
 #ifdef PIMORONI_TINY2040
 #define LED_R_PIN TINY2040_LED_R_PIN
 #define LED_G_PIN TINY2040_LED_G_PIN
@@ -64,3 +65,5 @@ led_driver_t led_driver_pimoroni = {
     .init = led_driver_init_pimoroni,
     .set_color = led_driver_color_pimoroni,
 };
+
+#endif

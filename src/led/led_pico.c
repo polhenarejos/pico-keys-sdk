@@ -23,6 +23,7 @@ uint8_t gpio = PICO_DEFAULT_LED_PIN;
 uint8_t gpio = 0;
 #endif
 
+#ifdef PICO_PLATFORM
 void led_driver_init_pico() {
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;
@@ -40,3 +41,5 @@ led_driver_t led_driver_pico = {
     .init = led_driver_init_pico,
     .set_color = led_driver_color_pico,
 };
+
+#endif

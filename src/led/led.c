@@ -39,7 +39,7 @@ uint32_t led_get_mode() {
 }
 
 void led_blinking_task() {
-#ifndef ENABLE_EMULATION
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
     static uint32_t start_ms = 0;
     static uint32_t stop_ms = 0;
     static uint32_t last_led_update_ms = 0;
@@ -81,7 +81,7 @@ void led_blinking_task() {
 }
 
 void led_off_all() {
-#ifndef ENABLE_EMULATION
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
     led_driver->set_color(LED_COLOR_OFF, 0, 0);
 #endif
 }
@@ -110,8 +110,8 @@ led_driver_t led_driver_dummy = {
 
 void led_init() {
     led_driver = &led_driver_dummy;
-#ifndef ENABLE_EMULATION
-#   // Guess default driver
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+    // Guess default driver
 #ifdef PICO_DEFAULT_LED_PIN
     led_driver = &led_driver_pico;
 #elif defined(CYW43_WL_GPIO_LED_PIN)

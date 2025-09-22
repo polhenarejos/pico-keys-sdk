@@ -18,8 +18,9 @@
 
 #include <stdint.h>
 #include <string.h>
+#include "pico_keys.h"
 
-#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
+#if !defined(PICO_PLATFORM)
 #define XIP_BASE                0
 #define FLASH_SECTOR_SIZE       4096
 #ifdef ESP_PLATFORM
@@ -32,7 +33,6 @@ uint32_t FLASH_SIZE_BYTES = (2 * 1024 * 1024);
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 #endif
-#include "pico_keys.h"
 #include "file.h"
 #include <stdio.h>
 

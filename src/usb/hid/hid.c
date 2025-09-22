@@ -15,18 +15,18 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "pico_keys.h"
 #ifndef ENABLE_EMULATION
 #include "tusb.h"
-#ifndef ESP_PLATFORM
+#if defined(PICO_PLATFORM)
 #include "bsp/board.h"
-#else
+#elif defined(ESP_PLATFORM)
 static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 #endif
 #else
 #include "emulation.h"
 #endif
 #include "ctap_hid.h"
-#include "pico_keys.h"
 #include "pico_keys_version.h"
 #include "apdu.h"
 #include "usb.h"
@@ -418,7 +418,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             }
             last_packet_time = 0;
             memcpy(ctap_resp, ctap_req, sizeof(CTAPHID_FRAME));
-#ifndef ENABLE_EMULATION
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
             sleep_ms(1000); //For blinking the device during 1 seg
 #endif
             driver_write_hid(ITF_HID_CTAP, (const uint8_t *)ctap_resp, 64);

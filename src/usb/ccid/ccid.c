@@ -378,7 +378,11 @@ static uint16_t ccid_open(uint8_t rhport, tusb_desc_interface_t const *itf_desc,
     tusb_desc_endpoint_t const *desc_ep = (tusb_desc_endpoint_t const *)((uint8_t *)itf_desc + drv_len - sizeof(tusb_desc_endpoint_t));
     TU_ASSERT(usbd_edpt_open(rhport, desc_ep), 0);
     uint8_t msg[] = { 0x50, 0x03 };
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
     usbd_edpt_xfer(rhport, desc_ep->bEndpointAddress, msg, sizeof(msg));
+#else
+    usbd_edpt_xfer(rhport, desc_ep->bEndpointAddress, msg, sizeof(msg), sizeof(msg));
+#endif
 #else
     vendord_open(rhport, (tusb_desc_interface_t *)itf_vendor, max_len);
 #endif

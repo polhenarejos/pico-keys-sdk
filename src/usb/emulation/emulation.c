@@ -15,6 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "pico_keys.h"
 #include "emulation.h"
 #include <stdio.h>
 #ifndef _MSC_VER
@@ -41,7 +42,6 @@ typedef int socklen_t;
 #include <errno.h>
 #include <time.h>
 
-#include "pico_keys.h"
 #include "apdu.h"
 #include "usb.h"
 #include "ccid/ccid.h"

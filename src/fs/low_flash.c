@@ -311,7 +311,7 @@ uint8_t *flash_read(uintptr_t addr) {
     }
     uint8_t *v = (uint8_t *) addr;
     mutex_exit(&mtx_flash);
-#if defined(ENABLE_EMULATION) || defined(ESP_PLATFORM)
+#if !defined(PICO_PLATFORM)
     if (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) {
         v += (uintptr_t) map;
     }

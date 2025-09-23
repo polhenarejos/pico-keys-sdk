@@ -267,3 +267,11 @@ int card_status(uint8_t itf) {
     }
     return PICOKEY_ERR_FILE_NOT_FOUND;
 }
+
+#ifndef USB_ITF_CCID
+#include "device/usbd_pvt.h"
+usbd_class_driver_t const *usbd_app_driver_get_cb(uint8_t *driver_count) {
+    *driver_count = 0;
+    return NULL;
+}
+#endif

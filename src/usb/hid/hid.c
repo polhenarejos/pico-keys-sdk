@@ -491,7 +491,9 @@ int driver_process_usb_packet_hid(uint16_t read) {
                   (msg_packet.len == msg_packet.current_len && msg_packet.len > 0))) {
             if (last_cmd == CTAPHID_OTP) {
                 is_nk = true;
+#ifdef ENABLE_OATH_APP
                 select_app(oath_aid + 1, oath_aid[0]);
+#endif
             }
             else {
                 select_app(u2f_aid + 1, u2f_aid[0]);

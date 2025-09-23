@@ -103,8 +103,9 @@ uint8_t const desc_hid_report_kb[] = {
 #endif
 
 enum {
+    EPNUM_DUMMY = 1,
 #ifdef USB_ITF_CCID
-    EPNUM_CCID = 1,
+    EPNUM_CCID,
 #if TUSB_SMARTCARD_CCID_EPS == 3
     EPNUM_CCID_INT,
 #endif
@@ -198,6 +199,8 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
     return desc_config;
 }
 #endif
+
+#ifdef USB_ITF_WCID
 
 #define BOS_TOTAL_LEN     (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
 #define MS_OS_20_DESC_LEN  0xB2
@@ -302,6 +305,8 @@ uint8_t const *tud_descriptor_bos_cb(void) {
     return desc_bos;
 }
 
+#endif
+
 //--------------------------------------------------------------------+
 // String Descriptors
 //--------------------------------------------------------------------+
@@ -368,12 +373,16 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
             else if (itf_index == ITF_HID_KB) {
                 str = string_desc_arr[6];
             }
+#ifdef USB_ITF_CCID
             else if (itf_index == ITF_CCID) {
                 str = string_desc_arr[7];
             }
+#endif
+#ifdef USB_ITF_WCID
             else if (itf_index == ITF_WCID) {
                 str = string_desc_arr[8];
             }
+#endif
         }
 
         uint8_t buff_avail = sizeof(_desc_str) / sizeof(_desc_str[0]) - 1;

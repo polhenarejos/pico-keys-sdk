@@ -34,7 +34,11 @@
 #define USB_PID   0xFCFD
 #endif
 
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
 #define USB_BCD   0x0200
+#else
+#define USB_BCD   0x0110
+#endif
 
 #define USB_CONFIG_ATT_ONE TU_BIT(7)
 

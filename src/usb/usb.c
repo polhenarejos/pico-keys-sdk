@@ -42,7 +42,8 @@ static void (*card_locked_func)(void) = NULL;
 static mutex_t mutex;
 extern void usb_desc_setup();
 #endif
-#if !defined(PICO_PLATFORM) && !defined(ENABLE_EMULATION)
+#if !defined(PICO_PLATFORM) && !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
+#include <pthread.h>
 pthread_t hcore0, hcore1;
 #endif
 

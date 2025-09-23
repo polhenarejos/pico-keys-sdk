@@ -286,11 +286,13 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
     printf("set_report %d %d %d\n", itf, report_id, report_type);
     if (!hid_set_report_cb || hid_set_report_cb(itf, report_id, report_type, buffer, bufsize) == 0) {
         //usb_rx(itf, buffer, bufsize);
-        memcpy(hid_rx[itf].buffer + hid_rx[itf].w_ptr, buffer, bufsize);
-        hid_rx[itf].w_ptr += bufsize;
-        int proc_pkt = driver_process_usb_packet_hid(64);
-        if (proc_pkt == 0) {
-            driver_process_usb_nopacket_hid();
+        if (itf == ITF_HID_CTAP) {
+            memcpy(hid_rx[itf].buffer + hid_rx[itf].w_ptr, buffer, bufsize);
+            hid_rx[itf].w_ptr += bufsize;
+            int proc_pkt = driver_process_usb_packet_hid(64);
+            if (proc_pkt == 0) {
+                driver_process_usb_nopacket_hid();
+            }
         }
     }
 }

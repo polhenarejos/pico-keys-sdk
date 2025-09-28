@@ -78,6 +78,10 @@ void usb_init() {
         desc_device.idVendor = phy_data.vid;
         desc_device.idProduct = phy_data.pid;
     }
+    else {
+        phy_data.vid = desc_device.idVendor;
+        phy_data.pid = desc_device.idProduct;
+    }
     mutex_init(&mutex);
 #endif
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);

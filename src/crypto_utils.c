@@ -25,6 +25,7 @@
 #include "mbedtls/aes.h"
 #include "crypto_utils.h"
 #include "pico_keys.h"
+#include "otp.h"
 
 void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
     uint8_t o1[32];
@@ -35,14 +36,28 @@ void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
     hash_multi(o1, sizeof(o1), output);
 }
 
-void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
+void double_hash_pin_otp(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
+    uint8_t o1[32];
+    hash_multi_otp(pin, len, o1);
+    for (int i = 0; i < sizeof(o1); i++) {
+        o1[i] ^= pin[i % len];
+    }
+    hash_multi_otp(o1, sizeof(o1), output);
+}
+
+void hash_multi_ext(const uint8_t *input, uint16_t len, const uint8_t *init, uint16_t len_init, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
     uint16_t iters = 256;
     mbedtls_sha256_starts(&ctx, 0);
+    if (init && len_init > 0) {
+        mbedtls_sha256_update(&ctx, init, len_init);
+    }
+    else {
 #ifndef ENABLE_EMULATION
-    mbedtls_sha256_update(&ctx, pico_serial.id, sizeof(pico_serial.id));
+        mbedtls_sha256_update(&ctx, pico_serial.id, sizeof(pico_serial.id));
 #endif
+    }
 
     while (iters > len) {
         mbedtls_sha256_update(&ctx, input, len);
@@ -53,6 +68,18 @@ void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
     }
     mbedtls_sha256_finish(&ctx, output);
     mbedtls_sha256_free(&ctx);
+}
+
+void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
+    hash_multi_ext(input, len, NULL, 0, output);
+}
+
+void hash_multi_otp(const uint8_t *input, uint16_t len, uint8_t output[32]) {
+    if (otp_key_1) {
+        hash_multi_ext(input, len, otp_key_1, 32, output);
+    } else {
+        hash_multi(input, len, output);
+    }
 }
 
 void hash256(const uint8_t *input, size_t len, uint8_t output[32]) {

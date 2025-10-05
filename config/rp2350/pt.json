@@ -29,8 +29,8 @@
       "families": ["data"],
       "permissions": {
         "secure": "rw",
-        "nonsecure": "rw",
-        "bootloader": "rw"
+        "nonsecure": "",
+        "bootloader": "r"
       },
       "link": ["owner", 0],
       "ignored_during_arm_boot": true,

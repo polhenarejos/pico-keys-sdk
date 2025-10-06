@@ -40,31 +40,31 @@ static bool is_empty_buffer(const uint8_t *buffer, uint16_t buffer_len) {
     return true;
 }
 
-static int otp_write_data_mode(uint16_t row, uint8_t *data, uint16_t len, bool is_ecc) {
+static int otp_write_data_mode(uint16_t row, const uint8_t *data, uint16_t len, bool is_ecc) {
     otp_cmd_t cmd = { .flags = row | (is_ecc ? OTP_CMD_ECC_BITS : 0) | OTP_CMD_WRITE_BITS };
-    uint32_t ret = rom_func_otp_access(data, len, cmd);
+    uint32_t ret = rom_func_otp_access((uint8_t *)data, len, cmd);
     if (ret) {
         printf("OTP Write failed with error: %ld\n", ret);
     }
     return ret;
 }
 
-int otp_write_data(uint16_t row, uint8_t *data, uint16_t len) {
+int otp_write_data(uint16_t row, const uint8_t *data, uint16_t len) {
     return otp_write_data_mode(row, data, len, true);
 }
 
-int otp_write_data_raw(uint16_t row, uint8_t *data, uint16_t len) {
+int otp_write_data_raw(uint16_t row, const uint8_t *data, uint16_t len) {
     return otp_write_data_mode(row, data, len, false);
 }
 
-uint8_t* otp_buffer(uint16_t row) {
+const uint8_t* otp_buffer(uint16_t row) {
     volatile uint32_t *p = ((uint32_t *)(OTP_DATA_BASE + (row*2)));
-    return (uint8_t *)p;
+    return (const uint8_t *)p;
 }
 
-uint8_t* otp_buffer_raw(uint16_t row) {
+const uint8_t* otp_buffer_raw(uint16_t row) {
     volatile uint32_t *p = ((uint32_t *)(OTP_DATA_RAW_BASE + (row*4)));
-    return (uint8_t *)p;
+    return (const uint8_t *)p;
 }
 
 bool is_empty_otp_buffer(uint16_t row, uint16_t len) {
@@ -133,7 +133,7 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
         PICOKEY_CHECK(otp_write_data(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, BOOTKEY, sizeof(BOOTKEY)));
     }
 
-    uint8_t *boot_flags1 = otp_buffer_raw(OTP_DATA_BOOT_FLAGS1_ROW);
+    const uint8_t *boot_flags1 = otp_buffer_raw(OTP_DATA_BOOT_FLAGS1_ROW);
     alignas(4) uint8_t flagsb1[] = { boot_flags1[0] | (1 << (bootkey + OTP_DATA_BOOT_FLAGS1_KEY_VALID_LSB)), boot_flags1[1], boot_flags1[2], 0x00 };
     if (secure_lock) {
         flagsb1[1] |= ((OTP_DATA_BOOT_FLAGS1_KEY_INVALID_BITS >> OTP_DATA_BOOT_FLAGS1_KEY_INVALID_LSB) & (~(1 << bootkey)));
@@ -143,7 +143,7 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
     PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R1_ROW, flagsb1, sizeof(flagsb1)));
     PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R2_ROW, flagsb1, sizeof(flagsb1)));
 
-    uint8_t *crit1 = otp_buffer_raw(OTP_DATA_CRIT1_ROW);
+    const uint8_t *crit1 = otp_buffer_raw(OTP_DATA_CRIT1_ROW);
     alignas(4) uint8_t flagsc1[] = { crit1[0] | (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB), crit1[1], crit1[2], 0x00 };
     if (secure_lock) {
         flagsc1[0] |= (1 << OTP_DATA_CRIT1_DEBUG_DISABLE_LSB);
@@ -160,11 +160,11 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
     PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R7_ROW, flagsc1, sizeof(flagsc1)));
 
     if (secure_lock) {
-        uint8_t *page1 = otp_buffer_raw(OTP_DATA_PAGE1_LOCK1_ROW);
+        const uint8_t *page1 = otp_buffer_raw(OTP_DATA_PAGE1_LOCK1_ROW);
         uint8_t page1v = page1[0] | (OTP_DATA_PAGE1_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE1_LOCK1_LOCK_BL_LSB);
         alignas(4) uint8_t flagsp1[] = { page1v, page1v, page1v, 0x00 };
         PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_PAGE1_LOCK1_ROW, flagsp1, sizeof(flagsp1)));
-        uint8_t *page2 = otp_buffer_raw(OTP_DATA_PAGE2_LOCK1_ROW);
+        const uint8_t *page2 = otp_buffer_raw(OTP_DATA_PAGE2_LOCK1_ROW);
         uint8_t page2v = page2[0] | (OTP_DATA_PAGE2_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE2_LOCK1_LOCK_BL_LSB);
         alignas(4) uint8_t flagsp2[] = { page2v, page2v, page2v, 0x00 };
         PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_PAGE2_LOCK1_ROW, flagsp2, sizeof(flagsp2)));
@@ -193,7 +193,7 @@ static void otp_invalidate_key(uint16_t row, uint16_t len) {
 }
 
 static otp_ret_t otp_chaff(uint16_t row, uint16_t len) {
-    uint8_t *raw = otp_buffer_raw(row);
+    const uint8_t *raw = otp_buffer_raw(row);
     uint8_t *chaff = (uint8_t *)calloc(len * 2, sizeof(uint8_t));
     if (chaff) {
         memcpy(chaff, raw, len * 2);
@@ -209,7 +209,8 @@ static otp_ret_t otp_chaff(uint16_t row, uint16_t len) {
 
 static otp_ret_t otp_migrate_key(uint16_t new_row, uint16_t old_row, uint16_t len) {
     if (is_empty_otp_buffer(new_row, len) && !is_empty_otp_buffer(old_row, len)) {
-        uint8_t *key = otp_buffer(old_row), *new_key = (uint8_t *)calloc(len, sizeof(uint8_t));
+        const uint8_t *key = otp_buffer(old_row);
+        uint8_t *new_key = (uint8_t *)calloc(len, sizeof(uint8_t));
         if (new_key) {
             memcpy(new_key, key, len);
             otp_ret_t ret = otp_write_data(new_row, new_key, len);

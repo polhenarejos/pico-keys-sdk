@@ -40,9 +40,7 @@
 
 extern void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]);
 extern void double_hash_pin_otp(const uint8_t *pin, uint16_t len, uint8_t output[32]);
-extern void hash_multi_ext(const uint8_t *input, uint16_t len, const uint8_t *init, uint16_t len_init, uint8_t output[32]);
 extern void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]);
-extern void hash_multi_otp(const uint8_t *input, uint16_t len, uint8_t output[32]);
 extern void hash256(const uint8_t *input, size_t len, uint8_t output[32]);
 extern void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output);
 extern int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mode, uint8_t *data, uint16_t len);

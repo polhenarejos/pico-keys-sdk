@@ -180,6 +180,21 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
     return PICOKEY_OK;
 }
 
+#ifdef PICO_RP2350
+void otp_chaff(uint16_t row, uint16_t len) {
+    uint8_t *raw = otp_buffer_raw(row);
+    uint8_t *chaff = (uint8_t *)calloc(len * 2, sizeof(uint8_t));
+    if (chaff) {
+        memcpy(chaff, raw, len * 2);
+        for (int i = 0; i < len * 2; i++) {
+            chaff[i] ^= 0xFF;
+        }
+        otp_write_data_raw(row + 32, chaff, len * 2);
+        free(chaff);
+    }
+}
+#endif
+
 void init_otp_files() {
 
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
@@ -192,6 +207,9 @@ void init_otp_files() {
         if (ret != 0) {
             printf("Error writing OTP key 1 [%d]\n", ret);
         }
+#ifdef PICO_RP2350
+        otp_chaff(OTP_KEY_1, 32);
+#endif
         write_otp[0] = OTP_KEY_1;
     }
     OTP_READ(OTP_KEY_1, otp_key_1);
@@ -211,6 +229,9 @@ void init_otp_files() {
         if (ret != 0) {
             printf("Error writing OTP key 2 [%d]\n", ret);
         }
+#ifdef PICO_RP2350
+        otp_chaff(OTP_KEY_2, 32);
+#endif
         write_otp[1] = OTP_KEY_2;
     }
     OTP_READ(OTP_KEY_2, otp_key_2);

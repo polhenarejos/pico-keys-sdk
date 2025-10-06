@@ -68,7 +68,7 @@ uint8_t* otp_buffer_raw(uint16_t row) {
 }
 
 bool is_empty_otp_buffer(uint16_t row, uint16_t len) {
-    return is_empty_buffer(otp_buffer(row), len);
+    return is_empty_buffer(otp_buffer_raw(row), len * 2);
 }
 
 static bool is_otp_locked_page(uint8_t page) {

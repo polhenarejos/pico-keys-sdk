@@ -113,7 +113,7 @@ typedef int otp_ret_t;
 #define OTP_EMTPY(ROW, LEN) is_empty_otp_buffer(ROW, LEN)
 #elif defined(ESP_PLATFORM)
 typedef esp_err_t otp_ret_t;
-#define OTP_WRITE(ROW, DATA, LEN) esp_efuse_write_key(ROW, ESP_EFUSE_KEY_PURPOSE_USER, DATA, LEN);
+#define OTP_WRITE(ROW, DATA, LEN) esp_efuse_write_key(ROW, ESP_EFUSE_KEY_PURPOSE_USER, DATA, LEN)
 #define OTP_READ(ROW, PTR) do { \
     esp_err_t ret = read_key_from_efuse(ROW, _##PTR, sizeof(_##PTR)); \
     if (ret != ESP_OK) { printf("Error reading OTP key 1 [%d]\n", ret); } \
@@ -181,7 +181,18 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
 }
 
 #ifdef PICO_RP2350
-void otp_chaff(uint16_t row, uint16_t len) {
+static void otp_invalidate_key(uint16_t row, uint16_t len) {
+    if (!is_empty_otp_buffer(row, len)) {
+        uint8_t *inval = (uint8_t *)calloc(len * 2, sizeof(uint8_t));
+        if (inval) {
+            memset(inval, 0xFF, len * 2);
+            otp_write_data_raw(row, inval, len * 2);
+            free(inval);
+        }
+    }
+}
+
+static otp_ret_t otp_chaff(uint16_t row, uint16_t len) {
     uint8_t *raw = otp_buffer_raw(row);
     uint8_t *chaff = (uint8_t *)calloc(len * 2, sizeof(uint8_t));
     if (chaff) {
@@ -189,13 +200,42 @@ void otp_chaff(uint16_t row, uint16_t len) {
         for (int i = 0; i < len * 2; i++) {
             chaff[i] ^= 0xFF;
         }
-        otp_write_data_raw(row + 32, chaff, len * 2);
+        otp_ret_t ret = otp_write_data_raw(row + 32, chaff, len * 2);
         free(chaff);
+        return ret;
     }
+    return BOOTROM_ERROR_INVALID_STATE;
+}
+
+static otp_ret_t otp_migrate_key(uint16_t new_row, uint16_t old_row, uint16_t len) {
+    if (is_empty_otp_buffer(new_row, len) && !is_empty_otp_buffer(old_row, len)) {
+        uint8_t *key = otp_buffer(old_row), *new_key = (uint8_t *)calloc(len, sizeof(uint8_t));
+        if (new_key) {
+            memcpy(new_key, key, len);
+            otp_ret_t ret = otp_write_data(new_row, new_key, len);
+            if (ret == BOOTROM_OK) {
+                otp_chaff(new_row, len);
+                otp_invalidate_key(old_row, 32);
+            }
+            free(new_key);
+            return ret;
+        }
+    }
+    return BOOTROM_ERROR_INVALID_STATE;
+}
+
+void otp_migrate_chaff() {
+    otp_migrate_key(OTP_MKEK_ROW, OTP_OLD_MKEK_ROW, 32);
+    otp_migrate_key(OTP_DEVK_ROW, OTP_OLD_DEVK_ROW, 32);
+    otp_lock_page(OTP_MKEK_ROW >> 6);
 }
 #endif
 
 void init_otp_files() {
+
+#ifdef PICO_RP2350
+    otp_migrate_chaff();
+#endif
 
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
     otp_ret_t ret = 0;
@@ -260,4 +300,5 @@ void init_otp_files() {
     otp_key_1 = _otp1;
     otp_key_2 = _otp2;
 #endif
+
 }

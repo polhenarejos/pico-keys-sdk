@@ -21,8 +21,10 @@
 
 #ifdef PICO_RP2350
 
-#define OTP_MKEK_ROW 0xEF0
-#define OTP_DEVK_ROW 0xED0
+#define OTP_OLD_MKEK_ROW 0xEF0
+#define OTP_OLD_DEVK_ROW 0xED0
+#define OTP_MKEK_ROW     0xE90
+#define OTP_DEVK_ROW     0xE80
 
 #define OTP_KEY_1    OTP_MKEK_ROW
 #define OTP_KEY_2    OTP_DEVK_ROW

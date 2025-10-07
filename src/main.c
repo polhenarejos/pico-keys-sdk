@@ -82,14 +82,14 @@ int register_app(int (*select_aid)(app_t *, uint8_t), const uint8_t *aid) {
 }
 
 int select_app(const uint8_t *aid, size_t aid_len) {
-    if (current_app && current_app->aid && (current_app->aid + 1 == aid || !memcmp(current_app->aid + 1, aid, aid_len))) {
+    if (current_app && current_app->aid && (current_app->aid + 1 == aid || !memcmp(current_app->aid + 1, aid, MIN(current_app->aid[0], aid_len)))) {
         current_app->select_aid(current_app, 0);
         return PICOKEY_OK;
     }
     for (int a = 0; a < num_apps; a++) {
         if (!memcmp(apps[a].aid + 1, aid, MIN(aid_len, apps[a].aid[0]))) {
             if (current_app) {
-                if (current_app->aid && !memcmp(current_app->aid + 1, aid, aid_len)) {
+                if (current_app->aid && !memcmp(current_app->aid + 1, aid, MIN(current_app->aid[0], aid_len))) {
                     current_app->select_aid(current_app, 1);
                     return PICOKEY_OK;
                 }

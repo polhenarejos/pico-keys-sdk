@@ -38,11 +38,17 @@
 
 #define IV_SIZE 16
 
+extern int ct_memcmp(const void *a, const void *b, size_t n);
+// Newer and safe functions
+extern void derive_kbase(uint8_t kbase[32]);
+extern void derive_kver(const uint8_t *pin, size_t pin_len, uint8_t kver[32]);
+extern void pin_derive_kenc(const uint8_t pin_token[32], uint8_t kenc[32]);
+extern void pin_derive_session(const uint8_t *pin, size_t pin_len, uint8_t pin_token[32]);
+extern void pin_derive_verifier(const uint8_t *pin, size_t pin_len, uint8_t verifier[32]);
+extern int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t *out_buf);
+extern int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t *out_buf);
 extern void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]);
-extern void double_hash_pin_otp(const uint8_t *pin, uint16_t len, uint8_t output[32]);
-extern void hash_multi_ext(const uint8_t *input, uint16_t len, const uint8_t *init, uint16_t len_init, uint8_t output[32]);
 extern void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]);
-extern void hash_multi_otp(const uint8_t *input, uint16_t len, uint8_t output[32]);
 extern void hash256(const uint8_t *input, size_t len, uint8_t output[32]);
 extern void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output);
 extern int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mode, uint8_t *data, uint16_t len);

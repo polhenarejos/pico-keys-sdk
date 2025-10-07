@@ -23,10 +23,115 @@
 #include "mbedtls/md.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/aes.h"
+#include "mbedtls/hkdf.h"
+#include "mbedtls/gcm.h"
 #include "crypto_utils.h"
 #include "pico_keys.h"
 #include "otp.h"
+#include "random.h"
+#include <stdio.h>
 
+int ct_memcmp(const void *a, const void *b, size_t n) {
+    const volatile uint8_t *x = (const volatile uint8_t *)a;
+    const volatile uint8_t *y = (const volatile uint8_t *)b;
+    uint8_t r = 0;
+    for (size_t i = 0; i < n; ++i) {
+        r |= x[i] ^ y[i];
+    }
+    return r;
+}
+
+static const mbedtls_md_info_t *SHA256(void) {
+    return mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+}
+
+void derive_kbase(uint8_t kbase[32]) {
+    const uint8_t nootp_salt[] = "NO-OTP";
+    if (otp_key_1) {
+        mbedtls_hkdf(SHA256(), pico_serial_hash, sizeof(pico_serial_hash), otp_key_1, 32, (const uint8_t *)"DEVICE/ROOT", 12, kbase, 32);
+    }
+    else {
+        mbedtls_hkdf(SHA256(), nootp_salt, sizeof(nootp_salt)-1, pico_serial_hash, sizeof(pico_serial_hash), (const uint8_t *)"DEVICE/ROOT", 12, kbase, 32);
+    }
+}
+
+void derive_kver(const uint8_t *pin, size_t pin_len, uint8_t kver[32]) {
+    uint8_t kbase[32];
+    derive_kbase(kbase);
+    mbedtls_md_hmac(SHA256(), kbase, 32, pin, pin_len, kver);
+    mbedtls_platform_zeroize(kbase, sizeof(kbase));
+}
+
+void pin_derive_verifier(const uint8_t *pin, size_t pin_len, uint8_t verifier[32]) {
+    uint8_t kver[32];
+    derive_kver(pin, pin_len, kver);
+    mbedtls_hkdf(SHA256(), pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"PIN/VERIFY", 10, verifier, 32);
+    mbedtls_platform_zeroize(kver, sizeof(kver));
+}
+
+void pin_derive_session(const uint8_t *pin, size_t pin_len, uint8_t pin_token[32]) {
+    uint8_t kver[32];
+    derive_kver(pin, pin_len, kver);
+    mbedtls_hkdf(SHA256(), pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"PIN/TOKEN", 9, pin_token, 32);
+    mbedtls_platform_zeroize(kver, sizeof(kver));
+}
+
+void pin_derive_kenc(const uint8_t pin_token[32], uint8_t kenc[32]) {
+    mbedtls_hkdf(SHA256(), pico_serial_hash, sizeof(pico_serial_hash), pin_token, 32, (const uint8_t *)"PIN/ENC", 7, kenc, 32);
+}
+
+// ------------------------------------------------------------------
+// Encrypt 32-byte device key using AES-256-GCM
+// Output: [nonce|ciphertext|tag]  =  12 + in_len + 16 = 60 bytes
+// ------------------------------------------------------------------
+int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t *out_buf) {
+    uint8_t *nonce = out_buf;
+    uint8_t *ct    = out_buf + 12;
+    uint8_t *tag   = out_buf + 12 + in_len;
+
+    random_gen(NULL, nonce, 12);
+
+    mbedtls_gcm_context gcm;
+    mbedtls_gcm_init(&gcm);
+    uint8_t kenc[32];
+    pin_derive_kenc(key, kenc);
+    int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
+    mbedtls_platform_zeroize(kenc, sizeof(kenc));
+    if (rc != 0) {
+        return rc;
+    }
+
+    rc = mbedtls_gcm_crypt_and_tag(&gcm, MBEDTLS_GCM_ENCRYPT, in_len, nonce, 12, pico_serial_hash, sizeof(pico_serial_hash), in_buf, ct, 16, tag);
+    mbedtls_gcm_free(&gcm);
+    return rc;
+}
+
+// ------------------------------------------------------------------
+// Decrypt & verify 32-byte device key using AES-256-GCM
+// Input: [nonce|ciphertext|tag]  =  in_len bytes
+// Output: decrypted = in_len - 12 - 16 bytes
+// ------------------------------------------------------------------
+int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t *out_buf) {
+    const uint8_t *nonce = in_buf;
+    const uint8_t *ct    = in_buf + 12;
+    const uint8_t *tag   = in_buf + in_len - 16;
+
+    mbedtls_gcm_context gcm;
+    mbedtls_gcm_init(&gcm);
+    uint8_t kenc[32];
+    pin_derive_kenc(key, kenc);
+    int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
+    mbedtls_platform_zeroize(kenc, sizeof(kenc));
+    if (rc != 0) {
+        return rc;
+    }
+
+    rc = mbedtls_gcm_auth_decrypt(&gcm, in_len - 16 - 12, nonce, 12, pico_serial_hash, sizeof(pico_serial_hash), tag, 16, ct, out_buf);
+    mbedtls_gcm_free(&gcm);
+    return rc;
+}
+
+// Old functions, kept for compatibility. NOT SECURE, use the new ones above.
 void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
     uint8_t o1[32];
     hash_multi(pin, len, o1);
@@ -36,28 +141,15 @@ void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
     hash_multi(o1, sizeof(o1), output);
 }
 
-void double_hash_pin_otp(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
-    uint8_t o1[32];
-    hash_multi_otp(pin, len, o1);
-    for (int i = 0; i < sizeof(o1); i++) {
-        o1[i] ^= pin[i % len];
-    }
-    hash_multi_otp(o1, sizeof(o1), output);
-}
 
-void hash_multi_ext(const uint8_t *input, uint16_t len, const uint8_t *init, uint16_t len_init, uint8_t output[32]) {
+void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
     uint16_t iters = 256;
     mbedtls_sha256_starts(&ctx, 0);
-    if (init && len_init > 0) {
-        mbedtls_sha256_update(&ctx, init, len_init);
-    }
-    else {
 #ifndef ENABLE_EMULATION
-        mbedtls_sha256_update(&ctx, pico_serial.id, sizeof(pico_serial.id));
+    mbedtls_sha256_update(&ctx, pico_serial.id, sizeof(pico_serial.id));
 #endif
-    }
 
     while (iters > len) {
         mbedtls_sha256_update(&ctx, input, len);
@@ -68,18 +160,6 @@ void hash_multi_ext(const uint8_t *input, uint16_t len, const uint8_t *init, uin
     }
     mbedtls_sha256_finish(&ctx, output);
     mbedtls_sha256_free(&ctx);
-}
-
-void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
-    hash_multi_ext(input, len, NULL, 0, output);
-}
-
-void hash_multi_otp(const uint8_t *input, uint16_t len, uint8_t output[32]) {
-    if (otp_key_1) {
-        hash_multi_ext(input, len, otp_key_1, 32, output);
-    } else {
-        hash_multi(input, len, output);
-    }
 }
 
 void hash256(const uint8_t *input, size_t len, uint8_t output[32]) {

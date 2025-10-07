@@ -235,5 +235,6 @@ typedef struct { uint8_t id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES]; } pico_unique_boar
 #endif
 extern pico_unique_board_id_t pico_serial;
 extern char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+extern uint8_t pico_serial_hash[32];
 
 #endif

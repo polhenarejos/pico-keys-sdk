@@ -43,6 +43,8 @@
 #include "random.h"
 #include "apdu.h"
 #include "usb.h"
+#include "mbedtls/sha256.h"
+
 extern void do_flash();
 extern void low_flash_init();
 extern void init_otp_files();
@@ -289,6 +291,7 @@ void core0_loop() {
 }
 
 char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+uint8_t pico_serial_hash[32];
 pico_unique_board_id_t pico_serial;
 #ifdef ESP_PLATFORM
 #define pico_get_unique_board_id(a) do { uint32_t value; esp_efuse_read_block(EFUSE_BLK1, &value, 0, 32); memcpy((uint8_t *)(a), &value, sizeof(uint32_t)); esp_efuse_read_block(EFUSE_BLK1, &value, 32, 32); memcpy((uint8_t *)(a)+4, &value, sizeof(uint32_t)); } while(0)
@@ -307,6 +310,7 @@ int main(void) {
     for (int i = 0; i < sizeof(pico_serial); i++) {
         snprintf(&pico_serial_str[2 * i], 3, "%02X", pico_serial.id[i]);
     }
+    mbedtls_sha256(pico_serial.id, sizeof(pico_serial.id), pico_serial_hash, false);
 
 #ifndef ENABLE_EMULATION
 #ifdef PICO_PLATFORM

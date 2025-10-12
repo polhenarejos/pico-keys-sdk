@@ -47,4 +47,23 @@
         static void f(void)
 #endif
 
+#include <string.h>
+
+#ifdef _MSC_VER
+#ifndef HAVE_STRLCPY
+static inline size_t strlcpy(char *dst, const char *src, size_t size)
+{
+    size_t srclen = strlen(src);
+
+    if (size != 0) {
+        size_t copylen = (srclen >= size) ? size - 1 : srclen;
+        memcpy(dst, src, copylen);
+        dst[copylen] = '\0';
+    }
+
+    return srclen;
+}
+#endif
+#endif
+
 #endif // _COMPAT_H

@@ -18,8 +18,13 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
+#ifdef _MSC_VER
+#include "pthread_win32.h"
+#include "semaphore_win32.h"
+#else
 #include <pthread.h>
 #include <semaphore.h>
+#endif
 typedef struct {
     pthread_mutex_t mtx;
     pthread_cond_t  cnd;

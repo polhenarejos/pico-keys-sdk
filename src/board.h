@@ -20,6 +20,8 @@
 
 #ifdef _MSC_VER
 #include <windows.h>
+struct timezone;
+extern int gettimeofday(struct timeval *tp, struct timezone *tzp);
 #else
 #include <sys/time.h>
 #endif

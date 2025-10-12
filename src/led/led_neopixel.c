@@ -36,7 +36,7 @@ tNeopixel pixel[] = {
 };
 
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
-    #define NEOPIXEL_PIN GPIO_NUM_48
+    #define NEOPIXEL_PIN GPIO_NUM_21
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
     #define NEOPIXEL_PIN GPIO_NUM_15
 #elif defined(CONFIG_IDF_TARGET_ESP32C6)

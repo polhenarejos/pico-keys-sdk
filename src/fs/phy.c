@@ -55,7 +55,7 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     }
     if (phy->usb_product_present) {
         *p++ = PHY_USB_PRODUCT;
-        *p++ = strlen(phy->usb_product) + 1;
+        *p++ = (uint8_t)strlen(phy->usb_product) + 1;
         strcpy((char *)p, phy->usb_product);
         p += strlen(phy->usb_product);
         *p++ = '\0';
@@ -76,7 +76,7 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
         *p++ = phy->led_driver;
     }
 
-    *len = p - data;
+    *len = (uint8_t)(p - data);
     return PICOKEY_OK;
 }
 

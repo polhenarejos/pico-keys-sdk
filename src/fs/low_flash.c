@@ -54,8 +54,8 @@
   #else
    #include <unistd.h>
    #include <sys/mman.h>
-   #include "queue.h"
   #endif
+  #include "queue.h"
  #endif
  #define FLASH_SECTOR_SIZE       4096
  #define XIP_BASE 0
@@ -322,7 +322,7 @@ uint8_t *flash_read(uintptr_t addr) {
 uintptr_t flash_read_uintptr(uintptr_t addr) {
     uint8_t *p = flash_read(addr);
     uintptr_t v = 0x0;
-    for (int i = 0; i < sizeof(uintptr_t); i++) {
+    for (size_t i = 0; i < sizeof(uintptr_t); i++) {
         v |= (uintptr_t) p[i] << (8 * i);
     }
     return v;
@@ -330,7 +330,7 @@ uintptr_t flash_read_uintptr(uintptr_t addr) {
 uint16_t flash_read_uint16(uintptr_t addr) {
     uint8_t *p = flash_read(addr);
     uint16_t v = 0x0;
-    for (int i = 0; i < sizeof(uint16_t); i++) {
+    for (size_t i = 0; i < sizeof(uint16_t); i++) {
         v |= p[i] << (8 * i);
     }
     return v;

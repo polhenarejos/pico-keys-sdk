@@ -47,7 +47,7 @@
 #define EV_BUTTON_TIMEOUT        16
 #define EV_BUTTON_PRESSED        32
 
-static const uint8_t ITF_INVALID = 0xFF;
+enum { ITF_INVALID = 0xFF };
 
 #ifdef USB_ITF_HID
     extern uint8_t ITF_HID_CTAP, ITF_HID_KB;
@@ -77,7 +77,7 @@ extern void usb_task();
 extern queue_t usb_to_card_q;
 extern queue_t card_to_usb_q;
 
-extern void card_start(uint8_t, void (*func)(void));
+extern void card_start(uint8_t, void *(*func)(void *));
 extern void card_exit();
 extern int card_status(uint8_t itf);
 extern void usb_init();

@@ -31,7 +31,6 @@ static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 #include "apdu.h"
 #include "usb.h"
 
-static bool mounted = false;
 extern void init_fido();
 bool is_nk = false;
 uint8_t (*get_version_major)() = NULL;
@@ -47,14 +46,6 @@ typedef struct msg_packet {
 }) msg_packet_t;
 
 msg_packet_t msg_packet = { 0 };
-
-void tud_mount_cb() {
-    mounted = true;
-}
-
-bool driver_mounted_hid() {
-    return mounted;
-}
 
 static uint16_t *send_buffer_size = NULL;
 static write_status_t *last_write_result = NULL;
@@ -158,7 +149,7 @@ static bool sent_key = false;
 static bool keyboard_encode = false;
 
 void add_keyboard_buffer(const uint8_t *data, size_t data_len, bool encode) {
-    keyboard_buffer_len = MIN(sizeof(keyboard_buffer), data_len);
+    keyboard_buffer_len = (uint8_t)MIN(sizeof(keyboard_buffer), data_len);
     memcpy(keyboard_buffer, data, keyboard_buffer_len);
     keyboard_encode = encode;
 }
@@ -166,7 +157,7 @@ void add_keyboard_buffer(const uint8_t *data, size_t data_len, bool encode) {
 void append_keyboard_buffer(const uint8_t *data, size_t data_len) {
     if (keyboard_buffer_len + data_len < sizeof(keyboard_buffer)) {
         memcpy(keyboard_buffer + keyboard_buffer_len, data, MIN(sizeof(keyboard_buffer) - keyboard_buffer_len, data_len));
-        keyboard_buffer_len += MIN(sizeof(keyboard_buffer) - keyboard_buffer_len, data_len);
+        keyboard_buffer_len += (uint8_t)MIN(sizeof(keyboard_buffer) - keyboard_buffer_len, data_len);
     }
 }
 
@@ -328,7 +319,7 @@ int driver_process_usb_nopacket_hid() {
 }
 
 extern const uint8_t fido_aid[], u2f_aid[], oath_aid[];
-extern void apdu_thread(void), cbor_thread(void);
+extern void *cbor_thread(void *);
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;

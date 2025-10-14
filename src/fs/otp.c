@@ -171,6 +171,9 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
     }
 #elif defined(ESP_PLATFORM)
     // TODO: Implement secure boot for ESP32-S3
+#else
+    (void)bootkey;
+    (void)secure_lock;
 #endif // PICO_RP2350
     goto err;
     err:

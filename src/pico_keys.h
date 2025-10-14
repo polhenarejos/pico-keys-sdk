@@ -75,12 +75,12 @@ static inline uint16_t get_uint16_t_be(const uint8_t *b) {
 static inline uint16_t get_uint16_t_le(const uint8_t *b) {
     return make_uint16_t_le(b[0], b[1]);
 }
-static inline uint32_t put_uint16_t_be(uint16_t n, uint8_t *b) {
+static inline uint8_t put_uint16_t_be(uint16_t n, uint8_t *b) {
     *b++ = (n >> 8) & 0xff;
     *b = n & 0xff;
     return 2;
 }
-static inline uint32_t put_uint16_t_le(uint16_t n, uint8_t *b) {
+static inline uint8_t put_uint16_t_le(uint16_t n, uint8_t *b) {
     *b++ = n & 0xff;
     *b = (n >> 8) & 0xff;
     return 2;
@@ -154,7 +154,6 @@ extern int flash_clear_file(file_t *file);
 extern int (*button_pressed_cb)(uint8_t);
 
 extern bool is_req_button_pending();
-extern uint32_t button_timeout;
 
 #define SW_BYTES_REMAINING_00()             set_res_sw(0x61, 0x00)
 #define SW_WARNING_STATE_UNCHANGED()        set_res_sw(0x62, 0x00)

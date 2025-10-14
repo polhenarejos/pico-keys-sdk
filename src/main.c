@@ -118,7 +118,6 @@ bool is_req_button_pending() {
 
 bool cancel_button = false;
 
-#ifdef ENABLE_EMULATION
 #ifdef _MSC_VER
 #include <windows.h>
 struct timezone
@@ -148,7 +147,7 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
     return 0;
 }
 #endif
-#else
+#if !defined(ENABLE_EMULATION)
 #ifdef ESP_PLATFORM
 bool picok_board_button_read() {
     int boot_state = gpio_get_level(BOOT_PIN);
@@ -307,7 +306,7 @@ int main(void) {
 #endif
     pico_get_unique_board_id(&pico_serial);
     memset(pico_serial_str, 0, sizeof(pico_serial_str));
-    for (int i = 0; i < sizeof(pico_serial); i++) {
+    for (size_t i = 0; i < sizeof(pico_serial); i++) {
         snprintf(&pico_serial_str[2 * i], 3, "%02X", pico_serial.id[i]);
     }
     mbedtls_sha256(pico_serial.id, sizeof(pico_serial.id), pico_serial_hash, false);

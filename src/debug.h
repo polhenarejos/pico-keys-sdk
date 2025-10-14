@@ -20,16 +20,16 @@
 
 #if defined(DEBUG_APDU) && DEBUG_APDU == 1
 #define DEBUG_PAYLOAD(_p, _s) { \
-        printf("Payload %s (%d bytes) [%s:%d]:\n", #_p, (int) (_s), __FILE__, __LINE__); \
-        for (int _i = 0; _i < _s; _i += 16) { \
+        printf("Payload %s (%zu bytes) [%s:%d]:\n", #_p, (size_t)(_s), __FILE__, __LINE__); \
+        for (size_t _i = 0; _i < (size_t)(_s); _i += 16) { \
             printf("%" PRIxPTR "h : ", (uintptr_t) (_i + _p)); \
-            for (int _j = 0; _j < 16; _j++) { \
-                if (_j < _s - _i) printf("%02X ", (_p)[_i + _j]); \
+            for (size_t _j = 0; _j < 16; _j++) { \
+                if (_j < (size_t)(_s) - _i) printf("%02X ", (_p)[_i + _j]); \
                 else printf("   "); \
                 if (_j == 7) printf(" "); \
             } printf(":  "); \
-            for (int _j = 0; _j < 16; _j++) { \
-                if (_j < _s - _i && (_p)[_i + _j] > 32 && (_p)[_i + _j] != 127 && (_p)[_i + _j] < 176) printf("%c", (_p)[_i + _j]); \
+            for (size_t _j = 0; _j < 16; _j++) { \
+                if (_j < (size_t)(_s) - _i && (_p)[_i + _j] > 32 && (_p)[_i + _j] != 127 && (_p)[_i + _j] < 176) printf("%c", (_p)[_i + _j]); \
                 else printf(" "); \
                 if (_j == 7) printf(" "); \
             } \
@@ -37,9 +37,9 @@
         } printf("\n"); \
 }
 #define DEBUG_DATA(_p, _s) {                                                    \
-        printf("Data %s (%d bytes) [%s:%d]:\n", #_p, (int) (_s), __FILE__, __LINE__);      \
+        printf("Data %s (%zu bytes) [%s:%d]:\n", #_p, (size_t)(_s), __FILE__, __LINE__);      \
         char *_tmp = (char *) calloc(2 * (_s) + 1, sizeof(char)); \
-        for (int _i = 0; _i < (_s); _i++) {    \
+        for (size_t _i = 0; _i < (size_t)(_s); _i++) {    \
             sprintf(&_tmp[2 * _i], "%02X", (_p)[_i]);       \
         }                                                \
         printf("%s\n", _tmp);                             \

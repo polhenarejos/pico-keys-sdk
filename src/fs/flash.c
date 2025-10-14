@@ -195,15 +195,15 @@ int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len) {
 }
 
 uint32_t flash_free_space() {
-    return last_base - start_data_pool;
+    return (uint32_t)(last_base - start_data_pool);
 }
 
 uint32_t flash_used_space() {
-    return end_data_pool - last_base;
+    return (uint32_t)(end_data_pool - last_base);
 }
 
 uint32_t flash_total_space() {
-    return end_data_pool - start_data_pool;
+    return (uint32_t)(end_data_pool - start_data_pool);
 }
 
 uint32_t flash_num_files() {

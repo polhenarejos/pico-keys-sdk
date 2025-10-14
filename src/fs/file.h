@@ -71,6 +71,9 @@
 
 #define MAX_DYNAMIC_FILES 256
 
+#ifdef _MSC_VER
+__pragma( pack(push, 1) )
+#endif
 typedef struct file {
     const uint8_t *name;
     uint8_t *data;              //should include 2 bytes len at begining
@@ -82,7 +85,13 @@ typedef struct file {
 #ifdef ENABLE_EMULATION
     uint32_t _padding;
 #endif
-} __attribute__ ((packed)) file_t;
+}
+#ifdef _MSC_VER
+__pragma( pack(pop) )
+#else
+__attribute__ ((packed))
+#endif
+file_t;
 
 extern bool file_has_data(file_t *);
 

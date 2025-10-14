@@ -123,12 +123,12 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
             if (itf == ITF_HID_CTAP) {
-                driver_exec_finished_cont_hid(itf, apdu.rlen + 2, rdata_gr - apdu.rdata);
+                driver_exec_finished_cont_hid(itf, apdu.rlen + 2, (uint16_t)(rdata_gr - apdu.rdata));
             }
 #endif
 #ifdef USB_ITF_CCID
             if (itf == ITF_SC_CCID || itf == ITF_SC_WCID) {
-                driver_exec_finished_cont_ccid(itf, apdu.rlen + 2, rdata_gr - apdu.rdata);
+                driver_exec_finished_cont_ccid(itf, apdu.rlen + 2, (uint16_t)(rdata_gr - apdu.rdata));
             }
 #endif
 #else
@@ -152,12 +152,12 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 #ifndef ENABLE_EMULATION
 #ifdef USB_ITF_HID
             if (itf == ITF_HID_CTAP) {
-                driver_exec_finished_cont_hid(itf, apdu.ne + 2, rdata_gr - apdu.ne - apdu.rdata);
+                driver_exec_finished_cont_hid(itf, (uint16_t)(apdu.ne + 2), (uint16_t)(rdata_gr - apdu.ne - apdu.rdata));
             }
 #endif
 #ifdef USB_ITF_CCID
             if (itf == ITF_SC_CCID || itf == ITF_SC_WCID) {
-                driver_exec_finished_cont_ccid(itf, apdu.ne + 2, rdata_gr - apdu.ne - apdu.rdata);
+                driver_exec_finished_cont_ccid(itf, (uint16_t)(apdu.ne + 2), (uint16_t)(rdata_gr - apdu.ne - apdu.rdata));
             }
 #endif
 #else
@@ -183,7 +183,8 @@ uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
     return make_uint16_t_be(sw1, sw2);
 }
 
-void apdu_thread(void) {
+void *apdu_thread(void *arg) {
+    (void)arg;
     card_init_core1();
     while (1) {
         uint32_t m = 0;
@@ -219,6 +220,7 @@ done:   ;
 #ifdef ESP_PLATFORM
     vTaskDelete(NULL);
 #endif
+    return NULL;
 }
 
 void apdu_finish() {

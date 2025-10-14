@@ -90,7 +90,11 @@ extern "C" {
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
+#ifdef _MSC_VER
+#define CFG_TUSB_MEM_ALIGN        __declspec(align(4))
+#else
 #define CFG_TUSB_MEM_ALIGN        __attribute__((aligned(4)))
+#endif
 #endif
 
 //--------------------------------------------------------------------

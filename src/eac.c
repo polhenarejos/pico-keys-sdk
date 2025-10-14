@@ -237,7 +237,7 @@ int sm_verify() {
     uint16_t input_len = 0;
     int r = 0;
     bool add_header = (CLA(apdu) & 0xC) == 0xC;
-    int data_len = (int) (apdu.nc / sm_blocksize) * sm_blocksize;
+    size_t data_len = (size_t)(apdu.nc / sm_blocksize) * sm_blocksize;
     if (data_len % sm_blocksize) {
         data_len += sm_blocksize;
     }

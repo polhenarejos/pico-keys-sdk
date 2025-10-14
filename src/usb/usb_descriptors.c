@@ -167,13 +167,13 @@ void usb_desc_setup() {
 #ifdef USB_ITF_HID
     if (ITF_HID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_INOUT_DESC_LEN;
-        const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
+        const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
         memcpy(p, desc, sizeof(desc));
         p += sizeof(desc);
     }
     if (ITF_KEYBOARD != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_DESC_LEN;
-        const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), TUSB_DIR_IN_MASK | EPNUM_HID_KB, 16, 5) };
+        const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID_KB, 16, 5) };
         memcpy(p, desc_kb, sizeof(desc_kb));
         p += sizeof(desc_kb);
     }
@@ -373,8 +373,8 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
         uint8_t buff_avail = sizeof(_desc_str) / sizeof(_desc_str[0]) - 1;
         if (index >= 4) {
             const char *product = phy_data.usb_product_present ? phy_data.usb_product : string_desc_arr[2];
-            uint8_t len = MIN(strlen(product), buff_avail);
-            for (int ix = 0; ix < len; chr_count++, ix++) {
+            uint8_t len = (uint8_t)MIN(strlen(product), buff_avail);
+            for (size_t ix = 0; ix < len; chr_count++, ix++) {
                 _desc_str[1 + chr_count] = product[ix];
             }
             buff_avail -= len;
@@ -383,7 +383,7 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
                 buff_avail--;
             }
         }
-        for (int ix = 0; ix < MIN(strlen(str), buff_avail); chr_count++, ix++) {
+        for (size_t ix = 0; ix < MIN(strlen(str), buff_avail); chr_count++, ix++) {
             _desc_str[1 + chr_count] = str[ix];
         }
     }

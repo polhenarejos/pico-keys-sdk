@@ -37,13 +37,15 @@
 // Device specific functions
 static uint32_t *timeout_counter = NULL;
 static uint8_t card_locked_itf = 0; // no locked
-static void (*card_locked_func)(void) = NULL;
+static void *(*card_locked_func)(void *) = NULL;
 #ifndef ENABLE_EMULATION
 static mutex_t mutex;
 extern void usb_desc_setup();
 #endif
 #if !defined(PICO_PLATFORM) && !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
-#include <pthread.h>
+#ifdef _MSC_VER
+#include "pthread_win32.h"
+#endif
 pthread_t hcore0, hcore1;
 #endif
 
@@ -175,7 +177,7 @@ void card_init_core1() {
 
 uint16_t finished_data_size = 0;
 
-void card_start(uint8_t itf, void (*func)(void)) {
+void card_start(uint8_t itf, void *(*func)(void *)) {
     timeout_start();
     if (card_locked_itf != itf || card_locked_func != func) {
         if (card_locked_itf != ITF_TOTAL || card_locked_func != NULL) {

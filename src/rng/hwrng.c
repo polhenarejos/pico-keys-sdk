@@ -24,7 +24,7 @@
 #include "hwrng.h"
 #include "bsp/board.h"
 #include "pico/rand.h"
-#elif (ESP_PLATFORM)
+#elif defined(ESP_PLATFORM)
 #include "bootloader_random.h"
 #include "esp_random.h"
 #include "esp_compat.h"

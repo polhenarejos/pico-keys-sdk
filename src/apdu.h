@@ -73,6 +73,6 @@ extern int process_apdu();
 extern uint16_t apdu_process(uint8_t, const uint8_t *buffer, uint16_t buffer_size);
 extern void apdu_finish();
 extern uint16_t apdu_next();
-extern void apdu_thread();
+extern void *apdu_thread(void *);
 
 #endif

@@ -353,15 +353,17 @@ if(USB_ITF_CCID)
     )
 endif()
 
+if(NOT MSVC)
 add_definitions("-fmacro-prefix-map=${CMAKE_CURRENT_LIST_DIR}/=")
-
+endif()
+if(MSVC)
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/fs/mman.c
+    )
+endif()
 if(ENABLE_EMULATION)
     if(APPLE)
         add_definitions("-Wno-deprecated-declarations")
-    elseif(MSVC)
-        set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
-            ${CMAKE_CURRENT_LIST_DIR}/src/fs/mman.c
-        )
     endif()
     add_definitions(-DENABLE_EMULATION)
     set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
@@ -385,7 +387,7 @@ endif()
 if(MSVC)
     set(
         CMAKE_C_FLAGS
-        "${CMAKE_C_FLAGS} -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105"
+        "${CMAKE_C_FLAGS} -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105 -wd4141 -wd4200"
     )
 
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS
@@ -397,7 +399,7 @@ if(MSVC)
         _WIN32_WINNT_WIN10_RS4=0
         _WIN32_WINNT_WIN10_RS5=0
         _STRALIGN_USE_SECURE_CRT=0
-        NTDDI_WIN10_CU=0)
+        NTDDI_WIN11_DT=0)
     set_source_files_properties(
         ${EXTERNAL_SOURCES}
         PROPERTIES

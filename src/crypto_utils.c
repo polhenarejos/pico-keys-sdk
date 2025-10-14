@@ -135,7 +135,7 @@ int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
 void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
     uint8_t o1[32];
     hash_multi(pin, len, o1);
-    for (int i = 0; i < sizeof(o1); i++) {
+    for (size_t i = 0; i < sizeof(o1); i++) {
         o1[i] ^= pin[i % len];
     }
     hash_multi(o1, sizeof(o1), output);

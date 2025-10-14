@@ -15,21 +15,33 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _BOARD_H_
-#define _BOARD_H_
-
 #ifdef _MSC_VER
-#include <windows.h>
-struct timezone;
-extern int gettimeofday(struct timeval *tp, struct timezone *tzp);
-#else
-#include <sys/time.h>
-#endif
+#ifndef _SEMAPHORE_H_
+#define _SEMAPHORE_H_
 
-static inline uint32_t board_millis() {
-    struct timeval start;
-    gettimeofday(&start, NULL);
-    return start.tv_sec * 1000 + start.tv_usec / 1000;
+#include <windows.h>
+
+typedef struct {
+    HANDLE handle;
+} sem_t;
+
+static inline int sem_init(sem_t *sem, int pshared, unsigned int value) {
+    (void)pshared;
+    sem->handle = CreateSemaphore(NULL, value, 0x7FFFFFFF, NULL);
+    return sem->handle ? 0 : -1;
 }
 
-#endif // _BOARD_H_
+static inline int sem_wait(sem_t *sem) {
+    return WaitForSingleObject(sem->handle, INFINITE) == WAIT_OBJECT_0 ? 0 : -1;
+}
+
+static inline int sem_post(sem_t *sem) {
+    return ReleaseSemaphore(sem->handle, 1, NULL) ? 0 : -1;
+}
+
+static inline int sem_destroy(sem_t *sem) {
+    return CloseHandle(sem->handle) ? 0 : -1;
+}
+
+#endif // _SEMAPHORE_H_
+#endif // _MSC_VER

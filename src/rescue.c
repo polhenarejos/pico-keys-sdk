@@ -70,7 +70,7 @@ int cmd_write() {
 
     if (P1(apdu) == 0x1) { // PHY
 #ifndef ENABLE_EMULATION
-        int ret = phy_unserialize_data(apdu.data, apdu.nc, &phy_data);
+        int ret = phy_unserialize_data(apdu.data, (uint16_t)apdu.nc, &phy_data);
         if (ret == PICOKEY_OK) {
             if (phy_save() != PICOKEY_OK) {
                 return SW_EXEC_ERROR();

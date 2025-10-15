@@ -152,10 +152,6 @@ void do_flash() {
             }
         }
         flash_available = false;
-#ifdef ESP_PLATFORM
-        esp_partition_munmap(fd_map);
-        esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
-#endif
         mutex_exit(&mtx_flash);
     }
     sem_release(&sem_flash);
@@ -246,7 +242,7 @@ page_flash_t *find_free_page(uintptr_t addr) {
             flash_pages[r].address == addr_alg) {                                                   //first available
             p = &flash_pages[r];
             if (!flash_pages[r].ready && !flash_pages[r].erase) {
-#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+#ifdef PICO_PLATFORM
                 memcpy(p->page, (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
 #else
                 memcpy(p->page, (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);

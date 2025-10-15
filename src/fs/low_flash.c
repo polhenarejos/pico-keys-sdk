@@ -258,12 +258,20 @@ page_flash_t *find_free_page(uintptr_t addr) {
 }
 
 int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
-    page_flash_t *p = NULL;
-
     if (!data || len == 0) {
         return PICOKEY_ERR_NULL_PARAM;
     }
-
+#if defined(ESP_PLATFORM)
+	uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
+	uint8_t *cache = (uint8_t *) malloc(FLASH_SECTOR_SIZE);
+	memcpy(cache,(uint8_t *) addr_alg + (uintptr_t) map, FLASH_SECTOR_SIZE);
+	flash_range_erase(addr_alg, FLASH_SECTOR_SIZE);
+	memcpy(cache + (addr & (FLASH_SECTOR_SIZE - 1)), data, len);
+	flash_range_program(addr_alg, cache, FLASH_SECTOR_SIZE);
+	free(cache);
+	return PICOKEY_OK;
+#else
+	page_flash_t *p = NULL;
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
@@ -279,6 +287,7 @@ int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
     //printf("Flash: modified page %X with data %x at [%x]\n",(uintptr_t)addr,(uintptr_t)data,addr&(FLASH_SECTOR_SIZE-1));
     mutex_exit(&mtx_flash);
     return PICOKEY_OK;
+#endif
 }
 
 int flash_program_halfword(uintptr_t addr, uint16_t data) {
@@ -294,6 +303,9 @@ int flash_program_uintptr(uintptr_t addr, uintptr_t data) {
 }
 
 uint8_t *flash_read(uintptr_t addr) {
+#if defined(ESP_PLATFORM)
+	return (uint8_t *) addr + (uintptr_t) map;
+#else
     uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages > 0) {
@@ -313,6 +325,7 @@ uint8_t *flash_read(uintptr_t addr) {
     }
 #endif
     return v;
+#endif
 }
 
 uintptr_t flash_read_uintptr(uintptr_t addr) {
@@ -336,6 +349,10 @@ uint8_t flash_read_uint8(uintptr_t addr) {
 }
 
 int flash_erase_page(uintptr_t addr, size_t page_size) {
+#if defined(ESP_PLATFORM)
+	uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
+	flash_range_erase(addr_alg, page_size);
+#else
     page_flash_t *p = NULL;
 
     mutex_enter_blocking(&mtx_flash);
@@ -355,6 +372,7 @@ int flash_erase_page(uintptr_t addr, size_t page_size) {
     mutex_exit(&mtx_flash);
 
     return PICOKEY_OK;
+#endif
 }
 
 bool flash_check_blank(const uint8_t *p_start, size_t size) {

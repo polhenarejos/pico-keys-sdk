@@ -245,7 +245,7 @@ page_flash_t *find_free_page(uintptr_t addr) {
 #ifdef PICO_PLATFORM
                 memcpy(p->page, (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
 #else
-                memcpy(p->page, (uint8_t *) (map + addr_alg), FLASH_SECTOR_SIZE);
+                memcpy(p->page, (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
 #endif
                 ready_pages++;
                 p->address = addr_alg;
@@ -308,9 +308,9 @@ uint8_t *flash_read(uintptr_t addr) {
     uint8_t *v = (uint8_t *) addr;
     mutex_exit(&mtx_flash);
 #if !defined(PICO_PLATFORM)
-    //if (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) {
+    if (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) {
         v += (uintptr_t) map;
-    //}
+    }
 #endif
     return v;
 }

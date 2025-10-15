@@ -69,11 +69,7 @@ extern uint32_t FLASH_SIZE_BYTES;
 #define FLASH_SIZE_BYTES   (8 * 1024 * 1024)
 #endif
 
-#ifdef ESP_PLATFORM
-#define TOTAL_FLASH_PAGES 512
-#else
 #define TOTAL_FLASH_PAGES 6
-#endif
 
 extern void flash_set_bounds(uintptr_t start, uintptr_t end);
 

@@ -370,8 +370,9 @@ int flash_erase_page(uintptr_t addr, size_t page_size) {
     p->ready = false;
     p->page_size = page_size;
     mutex_exit(&mtx_flash);
-#endif
+
     return PICOKEY_OK;
+#endif
 }
 
 bool flash_check_blank(const uint8_t *p_start, size_t size) {

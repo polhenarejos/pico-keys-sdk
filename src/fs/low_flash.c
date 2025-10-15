@@ -170,7 +170,7 @@ void low_flash_init() {
     esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
     data_start_addr = 0;
     data_end_addr = FLASH_SECTOR_SIZE * TOTAL_FLASH_PAGES;
-    FLASH_SIZE_BYTES = part0->size;
+    FLASH_SIZE_BYTES = FLASH_SECTOR_SIZE * TOTAL_FLASH_PAGES;
 #elif defined(PICO_PLATFORM)
     uint8_t txbuf[6] = {0x9f};
     uint8_t rxbuf[6] = {0};

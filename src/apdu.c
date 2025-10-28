@@ -217,9 +217,6 @@ done:   ;
         current_app->unload();
         current_app = NULL;
     }
-#ifdef ESP_PLATFORM
-    vTaskDelete(NULL);
-#endif
     return NULL;
 }
 

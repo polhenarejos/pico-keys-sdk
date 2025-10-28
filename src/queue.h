@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #endif
+#include <stdbool.h>
 typedef struct {
     pthread_mutex_t mtx;
     pthread_cond_t  cnd;
@@ -115,7 +116,7 @@ static inline void queue_clear(queue_t *a) {
     pthread_mutex_unlock(&a->mtx);
 }
 extern pthread_t hcore0, hcore1;
-#define multicore_launch_core1(a) pthread_create(&hcore1, NULL, (void *(*) (void *))a, NULL)
+#define multicore_launch_func_core1(a) pthread_create(&hcore1, NULL, (void *(*) (void *))a, NULL)
 #define multicore_reset_core1()
 
 typedef pthread_mutex_t mutex_t;

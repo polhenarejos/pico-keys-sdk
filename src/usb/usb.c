@@ -185,7 +185,7 @@ void card_start(uint8_t itf, void *(*func)(void *)) {
         }
         if (func) {
             multicore_reset_core1();
-            multicore_launch_core1(func);
+            multicore_launch_func_core1(func);
         }
         led_set_mode(MODE_MOUNTED);
         card_locked_itf = itf;

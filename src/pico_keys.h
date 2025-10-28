@@ -236,4 +236,8 @@ extern pico_unique_board_id_t pico_serial;
 extern char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
 extern uint8_t pico_serial_hash[32];
 
+#if defined(PICO_PLATFORM)
+#define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
+#endif
+
 #endif

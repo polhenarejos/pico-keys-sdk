@@ -70,6 +70,7 @@ extern uint32_t FLASH_SIZE_BYTES;
 #endif
 
 #define TOTAL_FLASH_PAGES 6
+#define FLASH_LOCKOUT_RETRIES 5
 
 extern void flash_set_bounds(uintptr_t start, uintptr_t end);
 
@@ -109,16 +110,14 @@ void do_flash() {
                 if (flash_pages[r].ready == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
                     //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
-                    while (multicore_lockout_start_timeout_us(1000) == false) {
-                        ;
+                    for (int retries = 0; retries < FLASH_LOCKOUT_RETRIES && multicore_lockout_start_timeout_us(1000) == false; retries++) {
                     }
                     //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
                     uint32_t ints = save_and_disable_interrupts();
                     flash_range_erase(flash_pages[r].address - XIP_BASE, FLASH_SECTOR_SIZE);
                     flash_range_program(flash_pages[r].address - XIP_BASE, flash_pages[r].page, FLASH_SECTOR_SIZE);
                     restore_interrupts(ints);
-                    while (multicore_lockout_end_timeout_us(1000) == false) {
-                        ;
+                    for (int retries = 0; retries < FLASH_LOCKOUT_RETRIES && multicore_lockout_end_timeout_us(1000) == false; retries++) {
                     }
                     //printf("WRITEN %X !\n",flash_pages[r].address);
 #else
@@ -129,13 +128,11 @@ void do_flash() {
                 }
                 else if (flash_pages[r].erase == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    while (multicore_lockout_start_timeout_us(1000) == false) {
-                        ;
+                    for (int retries = 0; retries < FLASH_LOCKOUT_RETRIES && multicore_lockout_start_timeout_us(1000) == false; retries++) {
                     }
                     //printf("WRITTING\n");
                     flash_range_erase(flash_pages[r].address - XIP_BASE, flash_pages[r].page_size ? ((int) (flash_pages[r].page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
-                    while (multicore_lockout_end_timeout_us(1000) == false) {
-                        ;
+                    for (int retries = 0; retries < FLASH_LOCKOUT_RETRIES && multicore_lockout_end_timeout_us(1000) == false; retries++) {
                     }
 #else
                     memset(map + flash_pages[r].address, 0, FLASH_SECTOR_SIZE);
@@ -199,6 +196,9 @@ void low_flash_init() {
         uint16_t last_sector_number = (((uint32_t*)workarea)[1] & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
         data_start_addr = first_sector_number * FLASH_SECTOR_SIZE;
         data_end_addr = (last_sector_number + 1) * FLASH_SECTOR_SIZE;
+        if (data_end_addr > FLASH_SIZE_BYTES) {
+            data_end_addr = FLASH_SIZE_BYTES;
+        }
     }
     data_end_addr -= 2 * FLASH_SECTOR_SIZE;
 #else

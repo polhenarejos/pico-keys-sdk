@@ -24,8 +24,8 @@
     {
       "name": "Pico Keys Data",
       "id": 1,
-      "start": "2048K",
-      "size": "2048K",
+      "start": "1024K",
+      "size": "3072K",
       "families": ["data"],
       "permissions": {
         "secure": "rw",

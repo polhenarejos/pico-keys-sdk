@@ -44,7 +44,7 @@ typedef struct cmd {
 } cmd_t;
 
 extern uint8_t num_apps;
-extern app_t apps[8];
+extern app_t apps[16];
 extern app_t *current_app;
 
 PACK(struct apdu {

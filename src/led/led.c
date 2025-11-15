@@ -112,16 +112,34 @@ void led_init() {
     led_driver = &led_driver_dummy;
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
     // Guess default driver
-#ifdef PICO_DEFAULT_LED_PIN
-    led_driver = &led_driver_pico;
+#if defined(PIMORONI_TINY2040) || defined(PIMORONI_TINY2350)
+    led_driver = &led_driver_pimoroni;
+    phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_PIMORONI;
 #elif defined(CYW43_WL_GPIO_LED_PIN)
     led_driver = &led_driver_cyw43;
+    phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_CYW43;
+    phy_data.led_gpio = phy_data.led_gpio_present ? phy_data.led_gpio : CYW43_WL_GPIO_LED_PIN;
 #elif defined(PICO_DEFAULT_WS2812_PIN)
     led_driver = &led_driver_ws2812;
+    phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_WS2812;
+    phy_data.led_gpio = phy_data.led_gpio_present ? phy_data.led_gpio : PICO_DEFAULT_WS2812_PIN;
 #elif defined(ESP_PLATFORM)
+    #if defined(CONFIG_IDF_TARGET_ESP32S3)
+        #define NEOPIXEL_PIN GPIO_NUM_48
+    #elif defined(CONFIG_IDF_TARGET_ESP32S2)
+        #define NEOPIXEL_PIN GPIO_NUM_15
+    #elif defined(CONFIG_IDF_TARGET_ESP32C6)
+        #define NEOPIXEL_PIN GPIO_NUM_8
+    #else
+        #define NEOPIXEL_PIN GPIO_NUM_27
+    #endif
     led_driver = &led_driver_neopixel;
-#elif defined(PIMORONI_TINY2040) || defined(PIMORONI_TINY2350)
-    led_driver = &led_driver_pimoroni;
+    phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_NEOPIXEL;
+    phy_data.led_gpio = phy_data.led_gpio_present ? phy_data.led_gpio : NEOPIXEL_PIN;
+#elif defined(PICO_DEFAULT_LED_PIN)
+    led_driver = &led_driver_pico;
+    phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_PICO;
+    phy_data.led_gpio = phy_data.led_gpio_present ? phy_data.led_gpio : PICO_DEFAULT_LED_PIN;
 #endif
     if (phy_data.led_driver_present) {
         switch (phy_data.led_driver) {
@@ -149,6 +167,8 @@ void led_init() {
                 break;
         }
     }
+    phy_data.led_driver_present = true;
+    phy_data.led_gpio_present = true;
     led_driver->init();
     led_set_mode(MODE_NOT_MOUNTED);
 #endif

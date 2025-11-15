@@ -39,6 +39,8 @@ const uint8_t rescue_aid[] = {
 #endif
 
 extern uint8_t PICO_PRODUCT;
+extern uint8_t PICO_VERSION_MAJOR;
+extern uint8_t PICO_VERSION_MINOR;
 
 int rescue_select(app_t *a, uint8_t force) {
     a->process_apdu = rescue_process_apdu;
@@ -46,8 +48,8 @@ int rescue_select(app_t *a, uint8_t force) {
     res_APDU_size = 0;
     res_APDU[res_APDU_size++] = PICO_MCU;
     res_APDU[res_APDU_size++] = PICO_PRODUCT;
-    res_APDU[res_APDU_size++] = PICO_KEYS_SDK_VERSION_MAJOR;
-    res_APDU[res_APDU_size++] = PICO_KEYS_SDK_VERSION_MINOR;
+    res_APDU[res_APDU_size++] = PICO_VERSION_MAJOR;
+    res_APDU[res_APDU_size++] = PICO_VERSION_MINOR;
     apdu.ne = res_APDU_size;
     if (force) {
         scan_flash();
@@ -81,6 +83,24 @@ int cmd_write() {
     return SW_OK();
 }
 
+int cmd_read() {
+    if (apdu.nc != 0) {
+        return SW_WRONG_LENGTH();
+    }
+
+    if (P1(apdu) == 0x1) { // PHY
+#ifndef ENABLE_EMULATION
+        uint16_t len = 0;
+        int ret = phy_serialize_data(&phy_data, apdu.rdata, &len);
+        if (ret != PICOKEY_OK) {
+            return SW_EXEC_ERROR();
+        }
+        res_APDU_size = len;
+#endif
+    }
+    return SW_OK();
+}
+
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
 int cmd_secure() {
     if (apdu.nc != 0) {
@@ -100,12 +120,14 @@ int cmd_secure() {
 
 #define INS_WRITE            0x1C
 #define INS_SECURE           0x1D
+#define INS_READ             0x1E
 
 static const cmd_t cmds[] = {
     { INS_WRITE, cmd_write },
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
     { INS_SECURE, cmd_secure },
 #endif
+    { INS_READ, cmd_read },
     { 0x00, 0x0 }
 };
 

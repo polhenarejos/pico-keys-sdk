@@ -83,6 +83,7 @@ void usb_init() {
     else {
         phy_data.vid = desc_device.idVendor;
         phy_data.pid = desc_device.idProduct;
+        phy_data.vidpid_present = true;
     }
     mutex_init(&mutex);
 #endif

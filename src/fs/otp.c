@@ -128,7 +128,7 @@ typedef esp_err_t otp_ret_t;
 bool otp_is_secure_boot_enabled() {
 #ifdef PICO_RP2350
     alignas(2) uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
-    const uint8_t *bootkey = otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey);
+    const uint8_t *bootkey = otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10*SECURE_BOOT_BOOTKEY_INDEX);
     if (memcmp(bootkey, BOOTKEY, sizeof(BOOTKEY)) != 0) {
         return false;
     }
@@ -140,10 +140,11 @@ bool otp_is_secure_boot_enabled() {
     if ((crit1[0] & (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB)) == 0) {
         return false;
     }
+    return true;
 #elif defined(ESP_PLATFORM)
     // TODO: Implement secure boot check for ESP32-S3
 #endif
-    return true;
+    return false;
 }
 
 bool otp_is_secure_boot_locked() {
@@ -158,10 +159,11 @@ bool otp_is_secure_boot_locked() {
         || ((crit1[0] & (3 << OTP_DATA_CRIT1_GLITCH_DETECTOR_SENS_LSB)) != (3 << OTP_DATA_CRIT1_GLITCH_DETECTOR_SENS_LSB))) {
         return false;
     }
+    return otp_is_secure_boot_enabled();
 #elif defined(ESP_PLATFORM)
     // TODO: Implement secure boot lock check for ESP32-S3
 #endif
-    return true;
+    return false;
 }
 
 int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {

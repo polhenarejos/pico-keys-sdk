@@ -88,7 +88,8 @@ int cmd_read() {
         return SW_WRONG_LENGTH();
     }
 
-    if (P1(apdu) == 0x1) { // PHY
+    uint8_t p1 = P1(apdu);
+    if (p1 == 0x1) { // PHY
 #ifndef ENABLE_EMULATION
         uint16_t len = 0;
         int ret = phy_serialize_data(&phy_data, apdu.rdata, &len);
@@ -97,6 +98,15 @@ int cmd_read() {
         }
         res_APDU_size = len;
 #endif
+    }
+    else if (p1 == 0x2) { // FLASH INFO
+        res_APDU_size = 0;
+        uint32_t free = flash_free_space(), total = flash_total_space(), used = flash_used_space(), nfiles = flash_num_files(), size = flash_size();
+        res_APDU_size += put_uint32_t_be(free, res_APDU + res_APDU_size);
+        res_APDU_size += put_uint32_t_be(used, res_APDU + res_APDU_size);
+        res_APDU_size += put_uint32_t_be(total, res_APDU + res_APDU_size);
+        res_APDU_size += put_uint32_t_be(nfiles, res_APDU + res_APDU_size);
+        res_APDU_size += put_uint32_t_be(size, res_APDU + res_APDU_size);
     }
     return SW_OK();
 }

@@ -108,6 +108,15 @@ int cmd_read() {
         res_APDU_size += put_uint32_t_be(nfiles, res_APDU + res_APDU_size);
         res_APDU_size += put_uint32_t_be(size, res_APDU + res_APDU_size);
     }
+    else if (p1 == 0x3) { // OTP SECURE BOOT STATUS
+        res_APDU_size = 0;
+        uint8_t bootkey = 0xFF;
+        bool enabled = otp_is_secure_boot_enabled(&bootkey);
+        bool locked = otp_is_secure_boot_locked();
+        res_APDU[res_APDU_size++] = enabled ? 0x1 : 0x0;
+        res_APDU[res_APDU_size++] = locked ? 0x1 : 0x0;
+        res_APDU[res_APDU_size++] = bootkey;
+    }
     return SW_OK();
 }
 

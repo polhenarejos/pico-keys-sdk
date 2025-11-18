@@ -125,20 +125,29 @@ typedef esp_err_t otp_ret_t;
 #define SECURE_BOOT_BOOTKEY_INDEX 0
 #endif
 
-bool otp_is_secure_boot_enabled() {
+bool otp_is_secure_boot_enabled(uint8_t *bootkey) {
 #ifdef PICO_RP2350
-    alignas(2) uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
-    const uint8_t *bootkey = otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10*SECURE_BOOT_BOOTKEY_INDEX);
-    if (memcmp(bootkey, BOOTKEY, sizeof(BOOTKEY)) != 0) {
-        return false;
-    }
-    const uint8_t *boot_flags1 = otp_buffer(OTP_DATA_BOOT_FLAGS1_ROW);
-    if ((boot_flags1[0] & (1 << (SECURE_BOOT_BOOTKEY_INDEX + OTP_DATA_BOOT_FLAGS1_KEY_VALID_LSB))) == 0) {
-        return false;
-    }
     const uint8_t *crit1 = otp_buffer(OTP_DATA_CRIT1_ROW);
     if ((crit1[0] & (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB)) == 0) {
         return false;
+    }
+    alignas(2) uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
+    uint8_t bootkey_idx = 0;
+    for (; bootkey_idx < 6; bootkey_idx++) {
+        const uint8_t *bootkey_row = otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10 * bootkey_idx);
+        if (memcmp(bootkey_row, BOOTKEY, sizeof(BOOTKEY)) == 0) {
+            break;
+        }
+    }
+    if (bootkey_idx == 6) {
+        return false;
+    }
+    const uint8_t *boot_flags1 = otp_buffer(OTP_DATA_BOOT_FLAGS1_ROW);
+    if ((boot_flags1[0] & (1 << (bootkey_idx + OTP_DATA_BOOT_FLAGS1_KEY_VALID_LSB))) == 0) {
+        return false;
+    }
+    if (bootkey) {
+        *bootkey = bootkey_idx;
     }
     return true;
 #elif defined(ESP_PLATFORM)
@@ -148,9 +157,13 @@ bool otp_is_secure_boot_enabled() {
 }
 
 bool otp_is_secure_boot_locked() {
+    uint8_t bootkey_idx = 0xFF;
+    if (otp_is_secure_boot_enabled(&bootkey_idx) == false) {
+        return false;
+    }
 #ifdef PICO_RP2350
     const uint8_t *boot_flags1 = otp_buffer_raw(OTP_DATA_BOOT_FLAGS1_ROW);
-    if ((boot_flags1[1] & ((OTP_DATA_BOOT_FLAGS1_KEY_INVALID_BITS >> OTP_DATA_BOOT_FLAGS1_KEY_INVALID_LSB) & (~(1 << SECURE_BOOT_BOOTKEY_INDEX)))) == 0) {
+    if ((boot_flags1[1] & ((OTP_DATA_BOOT_FLAGS1_KEY_INVALID_BITS >> OTP_DATA_BOOT_FLAGS1_KEY_INVALID_LSB) & (~(1 << bootkey_idx)))) != ((OTP_DATA_BOOT_FLAGS1_KEY_INVALID_BITS >> OTP_DATA_BOOT_FLAGS1_KEY_INVALID_LSB) & (~(1 << bootkey_idx)))) {
         return false;
     }
     const uint8_t *crit1 = otp_buffer_raw(OTP_DATA_CRIT1_ROW);
@@ -159,7 +172,7 @@ bool otp_is_secure_boot_locked() {
         || ((crit1[0] & (3 << OTP_DATA_CRIT1_GLITCH_DETECTOR_SENS_LSB)) != (3 << OTP_DATA_CRIT1_GLITCH_DETECTOR_SENS_LSB))) {
         return false;
     }
-    return otp_is_secure_boot_enabled();
+    return bootkey_idx != 0xFF;
 #elif defined(ESP_PLATFORM)
     // TODO: Implement secure boot lock check for ESP32-S3
 #endif

@@ -48,14 +48,7 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     }
     *p++ = PHY_OPTS;
     *p++ = 2;
-    uint16_t opts = phy->opts;
-    if (otp_is_secure_boot_enabled()) {
-        opts |= PHY_OPT_SECBOOT;
-    }
-    if (otp_is_secure_boot_locked()) {
-        opts |= PHY_OPT_SECLOCK;
-    }
-    p += put_uint16_t_be(opts, p);
+    p += put_uint16_t_be(phy->opts, p);
     if (phy->up_btn_present) {
         *p++ = PHY_UP_BTN;
         *p++ = 1;
@@ -123,12 +116,6 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
             case PHY_OPTS:
                 if (tlen == 2) {
                     phy->opts = get_uint16_t_be(p);
-                    if (otp_is_secure_boot_enabled()) {
-                        phy->opts |= PHY_OPT_SECBOOT;
-                    }
-                    if (otp_is_secure_boot_locked()) {
-                        phy->opts |= PHY_OPT_SECLOCK;
-                    }
                     p += 2;
                 }
                 break;

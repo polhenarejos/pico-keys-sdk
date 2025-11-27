@@ -19,6 +19,10 @@
 #include "apdu.h"
 #include "pico_keys_version.h"
 #include "otp.h"
+#ifdef PICO_PLATFORM
+#include "pico/bootrom.h"
+#include "hardware/watchdog.h"
+#endif
 
 int rescue_process_apdu();
 int rescue_unload();
@@ -137,9 +141,32 @@ int cmd_secure() {
 }
 #endif
 
+#ifdef PICO_PLATFORM
+int cmd_reboot_bootsel() {
+    if (apdu.nc != 0) {
+        return SW_WRONG_LENGTH();
+    }
+
+    if (P1(apdu) == 0x1) {
+        // Reboot to BOOTSEL
+        reset_usb_boot(0, 0);
+    }
+    else if (P1(apdu) == 0x0) {
+        // Reboot to normal mode
+        watchdog_reboot(0, 0, 100);
+    }
+    else {
+        return SW_INCORRECT_P1P2();
+    }
+
+    return SW_OK();
+}
+#endif
+
 #define INS_WRITE            0x1C
 #define INS_SECURE           0x1D
 #define INS_READ             0x1E
+#define INS_REBOOT_BOOTSEL   0x1F
 
 static const cmd_t cmds[] = {
     { INS_WRITE, cmd_write },
@@ -147,6 +174,9 @@ static const cmd_t cmds[] = {
     { INS_SECURE, cmd_secure },
 #endif
     { INS_READ, cmd_read },
+#ifdef PICO_PLATFORM
+    { INS_REBOOT_BOOTSEL, cmd_reboot_bootsel },
+#endif
     { 0x00, 0x0 }
 };
 

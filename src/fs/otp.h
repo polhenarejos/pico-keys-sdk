@@ -50,7 +50,7 @@ extern void init_otp_files();
 extern const uint8_t *otp_key_1;
 extern const uint8_t *otp_key_2;
 
-extern bool otp_is_secure_boot_enabled();
+extern bool otp_is_secure_boot_enabled(uint8_t *bootkey);
 extern bool otp_is_secure_boot_locked();
 
 #endif // _OTP_H_

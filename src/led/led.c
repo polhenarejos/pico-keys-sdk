@@ -21,6 +21,7 @@
 #ifdef PICO_PLATFORM
 #include "bsp/board.h"
 #elif defined(ESP_PLATFORM)
+#include "driver/gpio.h"
 #include "esp_compat.h"
 #elif defined(ENABLE_EMULATION)
 #include "emulation.h"

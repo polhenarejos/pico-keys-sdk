@@ -3,3 +3,4 @@ idf_component_register(
     INCLUDE_DIRS . fs rng usb led ../tinycbor/src
     REQUIRES bootloader_support esp_partition esp_tinyusb efuse mbedtls
 )
+idf_component_set_property(${COMPONENT_NAME} WHOLE_ARCHIVE ON)

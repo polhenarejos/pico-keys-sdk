@@ -107,7 +107,7 @@ uint8_t const desc_hid_report_kb[] = {
 #endif
 
 enum {
-    EPNUM_DUMMY = 1,
+    EPNUM_DUMMY = 0,
 #ifdef USB_ITF_CCID
     EPNUM_CCID,
 #if TUSB_SMARTCARD_CCID_EPS == 3

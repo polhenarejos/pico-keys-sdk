@@ -35,7 +35,7 @@
 #endif
 
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-#define USB_BCD   0x0200
+#define USB_BCD   0x0210
 #else
 #define USB_BCD   0x0110
 #endif
@@ -136,7 +136,7 @@ enum {
 #if TUSB_SMARTCARD_CCID_EPS == 3
 #define TUD_SMARTCARD_DESCRIPTOR(_itf, _strix, _epout, _epin, _epint, _epsize) \
     TUD_SMARTCARD_DESCRIPTOR_2EP(_itf, _strix, _epout, _epin, _epsize), \
-    7, TUSB_DESC_ENDPOINT, _epint,  TUSB_XFER_INTERRUPT, U16_TO_U8S_LE(_epsize), 0
+    7, TUSB_DESC_ENDPOINT, _epint,  TUSB_XFER_INTERRUPT, U16_TO_U8S_LE(_epsize), 10
 #else
 #define TUD_SMARTCARD_DESCRIPTOR(_itf, _strix, _epout, _epin, _epint, _epsize) \
     TUD_SMARTCARD_DESCRIPTOR_2EP(_itf, _strix, _epout, _epin, _epsize)

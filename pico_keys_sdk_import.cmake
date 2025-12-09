@@ -108,111 +108,6 @@ endif()
 
 message(STATUS "USB VID/PID:\t\t\t ${USB_VID}:${USB_PID}")
 
-if(NOT ESP_PLATFORM)
-    set(NEED_UPDATE OFF)
-
-    option(ENABLE_EDDSA "Enable/disable EdDSA support" OFF)
-    if(ENABLE_EDDSA)
-        message(STATUS "EdDSA support:\t\t enabled")
-    else()
-        message(STATUS "EdDSA support:\t\t disabled")
-    endif(ENABLE_EDDSA)
-
-    set(MBEDTLS_PATH "${CMAKE_SOURCE_DIR}/pico-keys-sdk/mbedtls")
-    execute_process(
-        COMMAND git config --global --add safe.directory ${MBEDTLS_PATH}
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_QUIET ERROR_QUIET
-    )
-
-    if(ENABLE_EDDSA)
-        set(MBEDTLS_ORIGIN "https://github.com/polhenarejos/mbedtls.git")
-        set(MBEDTLS_REF "mbedtls-3.6-eddsa")
-
-        execute_process(
-            COMMAND git -C ${MBEDTLS_PATH} symbolic-ref --quiet --short HEAD
-            OUTPUT_VARIABLE CURRENT_BRANCH
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-            RESULT_VARIABLE BRANCH_ERR
-        )
-
-        message(STATUS "Current branch for mbedTLS: ${CURRENT_BRANCH}")
-        message(STATUS "Target branch for mbedTLS:  ${MBEDTLS_REF}")
-
-        if(NOT BRANCH_ERR EQUAL 0 OR NOT "${CURRENT_BRANCH}" STREQUAL "${MBEDTLS_REF}")
-            set(NEED_UPDATE ON)
-        else()
-            set(NEED_UPDATE OFF)
-        endif()
-
-        add_definitions(-DMBEDTLS_ECP_DP_ED25519_ENABLED=1 -DMBEDTLS_ECP_DP_ED448_ENABLED=1 -DMBEDTLS_EDDSA_C=1 -DMBEDTLS_SHA3_C=1)
-
-    else()
-        set(MBEDTLS_ORIGIN "https://github.com/Mbed-TLS/mbedtls.git")
-        set(MBEDTLS_REF "v3.6.5")
-
-        execute_process(
-            COMMAND git -C ${MBEDTLS_PATH} describe --tags --exact-match
-            OUTPUT_VARIABLE CURRENT_TAG
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-            RESULT_VARIABLE TAG_ERR
-        )
-
-        message(STATUS "Current tag for mbedTLS: ${CURRENT_TAG}")
-        message(STATUS "Target tag for mbedTLS:  ${MBEDTLS_REF}")
-
-        if(NOT TAG_ERR EQUAL 0 OR NOT "${CURRENT_TAG}" STREQUAL "${MBEDTLS_REF}")
-            set(NEED_UPDATE ON)
-        else()
-            set(NEED_UPDATE OFF)
-        endif()
-
-    endif()
-
-    if(NEED_UPDATE)
-        message(STATUS "Updating mbedTLS source code...")
-
-        execute_process(
-            COMMAND git -C ${MBEDTLS_PATH} submodule update --init --recursive --remote pico-keys-sdk
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            OUTPUT_QUIET ERROR_QUIET
-        )
-
-        execute_process(
-            COMMAND git -C ${MBEDTLS_PATH} remote set-url origin ${MBEDTLS_ORIGIN}
-            OUTPUT_QUIET ERROR_QUIET
-        )
-
-        execute_process(
-            COMMAND git -C ${MBEDTLS_PATH} fetch origin +refs/heads/*:refs/remotes/origin/* --tags --force
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            OUTPUT_QUIET ERROR_QUIET
-        )
-
-        execute_process(
-            COMMAND rm -rf ${MBEDTLS_PATH}/framework
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            OUTPUT_QUIET ERROR_QUIET
-        )
-
-        if(ENABLE_EDDSA)
-            execute_process(
-                COMMAND git -C ${MBEDTLS_PATH} checkout -B ${MBEDTLS_REF} --track origin/${MBEDTLS_REF}
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                OUTPUT_QUIET ERROR_QUIET
-            )
-        else()
-            execute_process(
-                COMMAND git -C ${MBEDTLS_PATH} checkout ${MBEDTLS_REF}
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                OUTPUT_QUIET ERROR_QUIET
-            )
-        endif()
-    else()
-        message(STATUS "mbedTLS source code is up to date.")
-    endif()
-endif(NOT ESP_PLATFORM)
-
 set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c
@@ -252,13 +147,6 @@ set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
 )
-
-if (ENABLE_EDDSA)
-    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/eddsa.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha3.c
-    )
-endif()
 
 set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c

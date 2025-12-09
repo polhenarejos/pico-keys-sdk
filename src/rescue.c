@@ -54,6 +54,8 @@ int rescue_select(app_t *a, uint8_t force) {
     res_APDU[res_APDU_size++] = PICO_PRODUCT;
     res_APDU[res_APDU_size++] = PICO_VERSION_MAJOR;
     res_APDU[res_APDU_size++] = PICO_VERSION_MINOR;
+    memcpy(res_APDU + res_APDU_size, pico_serial.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);
+    res_APDU_size += PICO_UNIQUE_BOARD_ID_SIZE_BYTES;
     apdu.ne = res_APDU_size;
     if (force) {
         scan_flash();
@@ -124,23 +126,6 @@ int cmd_read() {
     return SW_OK();
 }
 
-#if defined(PICO_RP2350) || defined(ESP_PLATFORM)
-int cmd_secure() {
-    if (apdu.nc != 0) {
-        return SW_WRONG_LENGTH();
-    }
-
-    uint8_t bootkey = P1(apdu);
-    bool secure_lock = P2(apdu) == 0x1;
-
-    int ret = otp_enable_secure_boot(bootkey, secure_lock);
-    if (ret != 0) {
-        return SW_EXEC_ERROR();
-    }
-    return SW_OK();
-}
-#endif
-
 #ifdef PICO_PLATFORM
 int cmd_reboot_bootsel() {
     if (apdu.nc != 0) {
@@ -164,15 +149,11 @@ int cmd_reboot_bootsel() {
 #endif
 
 #define INS_WRITE            0x1C
-#define INS_SECURE           0x1D
 #define INS_READ             0x1E
 #define INS_REBOOT_BOOTSEL   0x1F
 
 static const cmd_t cmds[] = {
     { INS_WRITE, cmd_write },
-#if defined(PICO_RP2350) || defined(ESP_PLATFORM)
-    { INS_SECURE, cmd_secure },
-#endif
     { INS_READ, cmd_read },
 #ifdef PICO_PLATFORM
     { INS_REBOOT_BOOTSEL, cmd_reboot_bootsel },

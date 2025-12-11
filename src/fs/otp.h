@@ -44,6 +44,7 @@ extern int otp_write_data_raw(uint16_t row, const uint8_t *data, uint16_t len);
 
 #endif
 
+extern int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock);
 extern void init_otp_files();
 
 extern const uint8_t *otp_key_1;

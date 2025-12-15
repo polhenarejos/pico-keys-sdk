@@ -23,6 +23,9 @@
 #include "pico/bootrom.h"
 #include "hardware/watchdog.h"
 #endif
+#include "mbedtls/ecdsa.h"
+#include "mbedtls/sha256.h"
+#include "random.h"
 
 int rescue_process_apdu();
 int rescue_unload();
@@ -54,6 +57,8 @@ int rescue_select(app_t *a, uint8_t force) {
     res_APDU[res_APDU_size++] = PICO_PRODUCT;
     res_APDU[res_APDU_size++] = PICO_VERSION_MAJOR;
     res_APDU[res_APDU_size++] = PICO_VERSION_MINOR;
+    memcpy(res_APDU + res_APDU_size, pico_serial.id, sizeof(pico_serial.id));
+    res_APDU_size += sizeof(pico_serial.id);
     apdu.ne = res_APDU_size;
     if (force) {
         scan_flash();
@@ -67,6 +72,43 @@ INITIALIZER ( rescue_ctor ) {
 
 int rescue_unload() {
     return PICOKEY_OK;
+}
+
+int cmd_keydev_sign() {
+    if (apdu.nc == 0) {
+        return SW_WRONG_LENGTH();
+    }
+    uint8_t hash[32];
+    mbedtls_sha256(apdu.data, 16, hash, false);
+    if (!otp_key_2) {
+        return SW_INS_NOT_SUPPORTED();
+    }
+    mbedtls_ecdsa_context ecdsa;
+    mbedtls_ecdsa_init(&ecdsa);
+    int ret = mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256K1, &ecdsa, otp_key_2, 32);
+    if (ret != 0) {
+        mbedtls_ecdsa_free(&ecdsa);
+        return SW_EXEC_ERROR();
+    }
+    uint16_t key_size = 2 * (int)((mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256K1)->bit_size + 7) / 8);
+    mbedtls_mpi r, s;
+    mbedtls_mpi_init(&r);
+    mbedtls_mpi_init(&s);
+
+    ret = mbedtls_ecdsa_sign(&ecdsa.MBEDTLS_PRIVATE(grp), &r, &s, &ecdsa.MBEDTLS_PRIVATE(d), hash, sizeof(hash), random_gen, NULL);
+    if (ret != 0) {
+        mbedtls_ecdsa_free(&ecdsa);
+        mbedtls_mpi_free(&r);
+        mbedtls_mpi_free(&s);
+        return SW_EXEC_ERROR();
+    }
+
+    mbedtls_mpi_write_binary(&r, res_APDU, key_size / 2); res_APDU_size = key_size / 2;
+    mbedtls_mpi_write_binary(&s, res_APDU + res_APDU_size, key_size / 2); res_APDU_size += key_size / 2;
+    mbedtls_ecdsa_free(&ecdsa);
+    mbedtls_mpi_free(&r);
+    mbedtls_mpi_free(&s);
+    return SW_OK();
 }
 
 int cmd_write() {
@@ -163,12 +205,14 @@ int cmd_reboot_bootsel() {
 }
 #endif
 
+#define INS_KEYDEV_SIGN      0x10
 #define INS_WRITE            0x1C
 #define INS_SECURE           0x1D
 #define INS_READ             0x1E
 #define INS_REBOOT_BOOTSEL   0x1F
 
 static const cmd_t cmds[] = {
+    { INS_KEYDEV_SIGN, cmd_keydev_sign },
     { INS_WRITE, cmd_write },
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
     { INS_SECURE, cmd_secure },

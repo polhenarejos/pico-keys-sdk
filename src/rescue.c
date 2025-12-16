@@ -23,6 +23,9 @@
 #include "pico/bootrom.h"
 #include "hardware/watchdog.h"
 #endif
+#include "mbedtls/ecdsa.h"
+#include "mbedtls/sha256.h"
+#include "random.h"
 
 int rescue_process_apdu();
 int rescue_unload();
@@ -54,6 +57,8 @@ int rescue_select(app_t *a, uint8_t force) {
     res_APDU[res_APDU_size++] = PICO_PRODUCT;
     res_APDU[res_APDU_size++] = PICO_VERSION_MAJOR;
     res_APDU[res_APDU_size++] = PICO_VERSION_MINOR;
+    memcpy(res_APDU + res_APDU_size, pico_serial.id, sizeof(pico_serial.id));
+    res_APDU_size += sizeof(pico_serial.id);
     apdu.ne = res_APDU_size;
     if (force) {
         scan_flash();
@@ -67,6 +72,89 @@ INITIALIZER ( rescue_ctor ) {
 
 int rescue_unload() {
     return PICOKEY_OK;
+}
+
+int cmd_keydev_sign() {
+    uint8_t p1 = P1(apdu);
+    if (p1 == 0x01) {
+        if (apdu.nc != 32) {
+            return SW_WRONG_LENGTH();
+        }
+        if (!otp_key_2) {
+            return SW_INS_NOT_SUPPORTED();
+        }
+        mbedtls_ecdsa_context ecdsa;
+        mbedtls_ecdsa_init(&ecdsa);
+        int ret = mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256K1, &ecdsa, otp_key_2, 32);
+        if (ret != 0) {
+            mbedtls_ecdsa_free(&ecdsa);
+            return SW_EXEC_ERROR();
+        }
+        uint16_t key_size = 2 * (int)((mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256K1)->bit_size + 7) / 8);
+        mbedtls_mpi r, s;
+        mbedtls_mpi_init(&r);
+        mbedtls_mpi_init(&s);
+
+        ret = mbedtls_ecdsa_sign(&ecdsa.MBEDTLS_PRIVATE(grp), &r, &s, &ecdsa.MBEDTLS_PRIVATE(d), apdu.data, apdu.nc, random_gen, NULL);
+        if (ret != 0) {
+            mbedtls_ecdsa_free(&ecdsa);
+            mbedtls_mpi_free(&r);
+            mbedtls_mpi_free(&s);
+            return SW_EXEC_ERROR();
+        }
+
+        mbedtls_mpi_write_binary(&r, res_APDU, key_size / 2); res_APDU_size = key_size / 2;
+        mbedtls_mpi_write_binary(&s, res_APDU + res_APDU_size, key_size / 2); res_APDU_size += key_size / 2;
+        mbedtls_ecdsa_free(&ecdsa);
+        mbedtls_mpi_free(&r);
+        mbedtls_mpi_free(&s);
+    }
+    else if (p1 == 0x02) {
+        // Return public key
+        if (!otp_key_2) {
+            return SW_INS_NOT_SUPPORTED();
+        }
+        if (apdu.nc != 0) {
+            return SW_WRONG_LENGTH();
+        }
+        mbedtls_ecp_keypair ecp;
+        mbedtls_ecp_keypair_init(&ecp);
+        int ret = mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256K1, &ecp, otp_key_2, 32);
+        if (ret != 0) {
+            mbedtls_ecp_keypair_free(&ecp);
+            return SW_EXEC_ERROR();
+        }
+        ret = mbedtls_ecp_mul(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), &ecp.MBEDTLS_PRIVATE(d), &ecp.MBEDTLS_PRIVATE(grp).G, random_gen, NULL);
+        if (ret != 0) {
+            mbedtls_ecp_keypair_free(&ecp);
+            return SW_EXEC_ERROR();
+        }
+        size_t olen = 0;
+        ret = mbedtls_ecp_point_write_binary(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), MBEDTLS_ECP_PF_UNCOMPRESSED, &olen, res_APDU, 4096);
+        if (ret != 0) {
+            mbedtls_ecp_keypair_free(&ecp);
+            return SW_EXEC_ERROR();
+        }
+        res_APDU_size = (uint16_t)olen;
+        mbedtls_ecp_keypair_free(&ecp);
+    }
+    else if (p1 == 0x03) {
+        // Upload device attestation certificate
+        if (apdu.nc == 0) {
+            return SW_WRONG_LENGTH();
+        }
+        file_t *ef_devcert = file_new(0x2F02); // EF_DEVCERT
+        if (!ef_devcert) {
+            return SW_FILE_NOT_FOUND();
+        }
+        file_put_data(ef_devcert, apdu.data, (uint16_t)apdu.nc);
+        res_APDU_size = 0;
+        low_flash_available();
+    }
+    else {
+        return SW_INCORRECT_P1P2();
+    }
+    return SW_OK();
 }
 
 int cmd_write() {
@@ -163,12 +251,14 @@ int cmd_reboot_bootsel() {
 }
 #endif
 
+#define INS_KEYDEV_SIGN      0x10
 #define INS_WRITE            0x1C
 #define INS_SECURE           0x1D
 #define INS_READ             0x1E
 #define INS_REBOOT_BOOTSEL   0x1F
 
 static const cmd_t cmds[] = {
+    { INS_KEYDEV_SIGN, cmd_keydev_sign },
     { INS_WRITE, cmd_write },
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
     { INS_SECURE, cmd_secure },

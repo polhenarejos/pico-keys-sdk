@@ -15,9 +15,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#define STRINGIFY_(x) #x
-#define STRINGIFY(x) STRINGIFY_(x)
-
 
 //#define CUST_BUTTON_PIN 2
 
@@ -200,8 +197,6 @@ bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
 }
 
 #ifdef CUST_BUTTON_PIN
-#pragma message("FBU DEBUG: Using custom button pin function")
-#pragma message("FBU DEBUG: CUST_BUTTON_PIN=" STRINGIFY(CUST_BUTTON_PIN))
 
 bool picok_board_button_read(void) {
     // Variables statiques pour mémoriser l'état précédent et le timing
@@ -230,7 +225,6 @@ bool picok_board_button_read(void) {
 }
 
 #else
-#pragma message("FBU DEBUG: Using BOOTSEL button function")
 bool picok_board_button_read(void) {
   return picok_get_bootsel_button();
 }
@@ -365,7 +359,6 @@ int app_main() {
 #endif
 int main(void) {
 #endif
-#pragma message("FBU DEBUG: main start")
     pico_get_unique_board_id(&pico_serial);
     memset(pico_serial_str, 0, sizeof(pico_serial_str));
     for (size_t i = 0; i < sizeof(pico_serial); i++) {
@@ -427,15 +420,12 @@ int main(void) {
 #endif
 
 #ifdef CUST_BUTTON_PIN
-#pragma message("FBU DEBUG: Custom button pin defined")
     /* platform-specific GPIO setup */
 #if defined(ESP_PLATFORM)
-#pragma message("FBU DEBUG: ESP Platform - init custom button pin")
     gpio_pad_select_gpio(CUST_BUTTON_PIN);
     gpio_set_direction(CUST_BUTTON_PIN, GPIO_MODE_INPUT);
     gpio_pulldown_dis(CUST_BUTTON_PIN);
 #elif defined(PICO_PLATFORM)
-#pragma message("FBU DEBUG: PICO Platform - init custom button pin")
     gpio_init(CUST_BUTTON_PIN);
     gpio_set_dir(CUST_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(CUST_BUTTON_PIN);

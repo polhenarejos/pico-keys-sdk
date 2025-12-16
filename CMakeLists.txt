@@ -17,66 +17,92 @@
 
  cmake_minimum_required(VERSION 3.16)
 
-if(ESP_PLATFORM)
-set(EXTRA_COMPONENT_DIRS src)
-include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-set(USB_ITF_CCID 1)
-#set(USB_ITF_HID 1)
-include(pico_keys_sdk_import.cmake)
-project(pico_keys_sdk)
+ if(ESP_PLATFORM)
+    set(EXTRA_COMPONENT_DIRS src)
+    include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 else()
+    if(NOT ENABLE_EMULATION)
+        set(PICO_USE_FASTEST_SUPPORTED_CLOCK 1)
+        include(pico_sdk_import.cmake)
+    endif()
 
- if(ENABLE_EMULATION)
- else()
- include(pico_sdk_import.cmake)
- endif()
+    project(picokey C CXX ASM)
 
- project(pico_keys C CXX ASM)
+    set(CMAKE_C_STANDARD 11)
+    set(CMAKE_CXX_STANDARD 17)
 
- set(CMAKE_C_STANDARD 11)
- set(CMAKE_CXX_STANDARD 17)
+    if(NOT DEFINED __FOR_CI)
+        set(__FOR_CI 0)
+    endif()
+    if(__FOR_CI)
+        add_definitions(-D__FOR_CI)
+    endif()
 
- if(ENABLE_EMULATION)
-  else()
- pico_sdk_init()
- endif()
-
- if (NOT DEFINED __FOR_CI)
-     set(__FOR_CI 0)
- endif()
- if (__FOR_CI)
-     add_definitions(-D__FOR_CI)
- endif()
+    add_executable(picokey)
+endif()
 
 set(USB_ITF_CCID 1)
-set(USB_ITF_HID 1)
+set(USB_ITF_WCID 1)
+include(cmake/version.cmake)
 include(pico_keys_sdk_import.cmake)
-
-add_executable(pico_keys_sdk_exe)
-
-target_compile_options(pico_keys_sdk_exe PUBLIC
-    -Wall
-    -Werror
+if(NOT ESP_PLATFORM)
+    set(SOURCES ${PICO_KEYS_SOURCES})
+endif()
+set(SOURCES ${SOURCES}
+    ${CMAKE_CURRENT_LIST_DIR}/src/fs/files.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/version.c
 )
 
-if(ENABLE_EMULATION)
-target_compile_options(pico_keys_sdk_exe PUBLIC
-        -fdata-sections
-        -ffunction-sections
-        )
-if(APPLE)
-target_link_options(pico_keys_sdk_exe PUBLIC
-        -Wl,-dead_strip
-        )
-else()
-target_link_options(pico_keys_sdk_exe PUBLIC
-        -Wl,--gc-sections
-        )
-endif (APPLE)
-else()
-pico_add_extra_outputs(pico_keys_sdk_exe)
+SET_VERSION(ver_major ver_minor "${CMAKE_CURRENT_LIST_DIR}/src/pico_keys_version.h" 2)
 
-target_link_libraries(pico_keys_sdk_exe PRIVATE pico_keys_sdk pico_stdlib pico_multicore hardware_flash hardware_sync hardware_adc pico_unique_id hardware_rtc tinyusb_device tinyusb_board)
+if(ESP_PLATFORM)
+    project(picokey)
 endif()
 
+if(NOT ESP_PLATFORM)
+    target_sources(picokey PUBLIC ${SOURCES})
+    target_include_directories(picokey PUBLIC ${INCLUDES})
+
+    target_compile_options(picokey PUBLIC
+        -Wall
+    )
+
+    if(CUST_BUTTON_PIN)
+        target_compile_definitions(picokey PUBLIC CUST_BUTTON_PIN=${CUST_BUTTON_PIN})
+    endif()
+    message(STATUS "CUST_BUTTON_PIN is set to: ${CUST_BUTTON_PIN}")
+
+    if(NOT MSVC)
+        target_compile_options(picokey PUBLIC
+            -Werror
+        )
+    endif()
+
+    if(ENABLE_EMULATION)
+        if(NOT MSVC)
+            target_compile_options(picokey PUBLIC
+                -fdata-sections
+                -ffunction-sections
+            )
+        endif()
+        if(APPLE)
+            target_link_options(picokey PUBLIC
+                -Wl,-dead_strip
+            )
+        elseif(MSVC)
+            target_compile_options(picokey PUBLIC
+                -WX
+            )
+
+            target_link_libraries(picokey PUBLIC wsock32 ws2_32 Bcrypt)
+        else()
+            target_link_options(picokey PUBLIC
+                -Wl,--gc-sections
+            )
+        endif(APPLE)
+        target_link_libraries(picokey PRIVATE pthread m)
+    else()
+        pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
+    endif()
 endif()
+

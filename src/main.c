@@ -21,6 +21,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "pico_keys.h"
+#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+#endif
 
 #if !defined(ENABLE_EMULATION)
 #include "tusb.h"
@@ -149,7 +152,8 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
 #endif
 #if !defined(ENABLE_EMULATION)
 #ifdef ESP_PLATFORM
-#ifdef CUST_BUTTON_PIN
+#if CUST_BUTTON_PIN >= 0
+#pragma message("Using custom button pin with ESP_PLATFORM")
 bool picok_board_button_read() {
     // Static variables to remember previous state and timing
     static bool last_stable_state = false;      // last validated stable state
@@ -419,10 +423,15 @@ int main(void) {
 
 #ifndef ENABLE_EMULATION
 #ifdef ESP_PLATFORM
+#ifdef CUST_BUTTON_PIN
+    gpio_pad_select_gpio(CUST_BUTTON_PIN);
+    gpio_set_direction(CUST_BUTTON_PIN, GPIO_MODE_INPUT);
+    gpio_pullup_en(CUST_BUTTON_PIN);
+#else        
     gpio_pad_select_gpio(BOOT_PIN);
     gpio_set_direction(BOOT_PIN, GPIO_MODE_INPUT);
     gpio_pulldown_dis(BOOT_PIN);
-
+#endif
     tusb_cfg.string_descriptor[3] = pico_serial_str;
     if (phy_data.usb_product_present) {
         tusb_cfg.string_descriptor[2] = phy_data.usb_product;
@@ -442,13 +451,10 @@ int main(void) {
 #endif
 #endif
 
-#ifdef CUST_BUTTON_PIN
+
     /* platform-specific GPIO setup */
-#if defined(ESP_PLATFORM)
-    gpio_pad_select_gpio(CUST_BUTTON_PIN);
-    gpio_set_direction(CUST_BUTTON_PIN, GPIO_MODE_INPUT);
-    gpio_pulldown_dis(CUST_BUTTON_PIN);
-#elif defined(PICO_PLATFORM)
+#if defined(PICO_PLATFORM)
+#ifdef CUST_BUTTON_PIN
     gpio_init(CUST_BUTTON_PIN);
     gpio_set_dir(CUST_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(CUST_BUTTON_PIN);

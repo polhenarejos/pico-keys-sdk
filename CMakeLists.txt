@@ -60,6 +60,10 @@ SET_VERSION(ver_major ver_minor "${CMAKE_CURRENT_LIST_DIR}/src/pico_keys_version
 
 if(ESP_PLATFORM)
     project(picokey)
+    if(CUST_BUTTON_PIN)
+        target_compile_definitions(picokey PUBLIC CUST_BUTTON_PIN=${CUST_BUTTON_PIN})
+        message(STATUS "CUST_BUTTON_PIN is set to: ${CUST_BUTTON_PIN}")
+    endif()    
 endif()
 
 if(NOT ESP_PLATFORM)

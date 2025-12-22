@@ -151,8 +151,30 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
 #ifdef ESP_PLATFORM
 #ifdef CUST_BUTTON_PIN
 bool picok_board_button_read() {
-    int boot_state = gpio_get_level(CUST_BUTTON_PIN);
-    return boot_state == 0;
+    // Static variables to remember previous state and timing
+    static bool last_stable_state = false;      // last validated stable state
+    static bool last_raw_state = false;         // last GPIO read state
+    static uint32_t stable_since = 0;           // timestamp of last change
+
+    // Raw GPIO read (pull-up active, button pressed = 0)
+    bool cur = !gpio_get_level(CUST_BUTTON_PIN);
+    uint32_t now = board_millis();
+
+    // Detect a raw change
+    if (cur != last_raw_state) {
+        stable_since = now;   // reset debounce timer
+        last_raw_state = cur;
+    }
+
+    // If state is stable for at least 50 ms, validate it
+    if (now - stable_since >= 50) {
+        last_stable_state = cur;
+    }
+
+    // Return stable state (ready for core0_loop)
+    return last_stable_state;
+
+
 }
 #else
 bool picok_board_button_read() {
@@ -199,28 +221,28 @@ bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
 #ifdef CUST_BUTTON_PIN
 
 bool picok_board_button_read(void) {
-    // Variables statiques pour mémoriser l'état précédent et le timing
-    static bool last_stable_state = false;      // dernier état stable validé
-    static bool last_raw_state = false;         // dernier état lu du GPIO
-    static uint32_t stable_since = 0;           // timestamp du dernier changement
+    // Static variables to remember previous state and timing
+    static bool last_stable_state = false;      // last validated stable state
+    static bool last_raw_state = false;         // last GPIO read state
+    static uint32_t stable_since = 0;           // timestamp of last change
 
-    // Lecture brute du GPIO (pull-up active, bouton appuyé = 0)
+    // Raw GPIO read (pull-up active, button pressed = 0)
     bool cur = !gpio_get(CUST_BUTTON_PIN);
 
     uint32_t now = board_millis();
 
-    // Détecte un changement brut
+    // Detect a raw change
     if (cur != last_raw_state) {
-        stable_since = now;   // réinitialise le timer anti-rebond
+        stable_since = now;   // reset debounce timer
         last_raw_state = cur;
     }
 
-    // Si l'état est stable depuis au moins 50 ms, on le valide
+    // If state is stable for at least 50 ms, validate it
     if (now - stable_since >= 50) {
         last_stable_state = cur;
     }
 
-    // Retourne l'état stable (prêt pour core0_loop)
+    // Return stable state (ready for core0_loop)
     return last_stable_state;
 }
 
@@ -311,14 +333,14 @@ void core0_loop() {
         if (button_pressed_cb && board_millis() > 1000 && !is_busy()) {
             bool cur = picok_board_button_read();
 
-            // front descendant = bouton pressé
+            // falling edge = button pressed
             if (cur && !button_pressed_state) {
                 button_pressed_state = true;
                 button_press_start = board_millis();
                 long_press_reported = false;
             }
 
-            // front montant = bouton relâché
+            // rising edge = button released
             if (!cur && button_pressed_state) {
                 button_pressed_state = false;
                 uint32_t duration = board_millis() - button_press_start;
@@ -332,7 +354,7 @@ void core0_loop() {
                 }
             }
 
-            // long press en cours
+            // long press in progress
             if (button_pressed_state && !long_press_reported &&
                 (board_millis() - button_press_start >= 800)) {
                 long_press_reported = true;

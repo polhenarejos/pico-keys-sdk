@@ -357,6 +357,7 @@ int app_main() {
 #ifndef PICO_PLATFORM
 #define pico_get_unique_board_id(a) memset(a, 0, sizeof(*(a)))
 #endif
+
 int main(void) {
 #endif
     pico_get_unique_board_id(&pico_serial);

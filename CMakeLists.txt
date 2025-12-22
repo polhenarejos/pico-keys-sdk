@@ -72,8 +72,9 @@ if(NOT ESP_PLATFORM)
 
     if(CUST_BUTTON_PIN)
         target_compile_definitions(picokey PUBLIC CUST_BUTTON_PIN=${CUST_BUTTON_PIN})
+        message(STATUS "CUST_BUTTON_PIN is set to: ${CUST_BUTTON_PIN}")
     endif()
-    message(STATUS "CUST_BUTTON_PIN is set to: ${CUST_BUTTON_PIN}")
+    
 
     if(NOT MSVC)
         target_compile_options(picokey PUBLIC

@@ -18,9 +18,9 @@
 #include "pico_keys.h"
 
 #ifdef PICO_DEFAULT_LED_PIN
-uint8_t gpio = PICO_DEFAULT_LED_PIN;
+static uint8_t gpio = PICO_DEFAULT_LED_PIN;
 #else
-uint8_t gpio = 0;
+static uint8_t gpio = 0;
 #endif
 
 #ifdef PICO_PLATFORM

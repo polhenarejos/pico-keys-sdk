@@ -18,18 +18,10 @@
 #include "pico_keys.h"
 
 #ifdef PICO_PLATFORM
-#ifdef PIMORONI_TINY2040
-#define LED_R_PIN TINY2040_LED_R_PIN
-#define LED_G_PIN TINY2040_LED_G_PIN
-#define LED_B_PIN TINY2040_LED_B_PIN
-#elif defined(PIMORONI_TINY2350)
-#define LED_R_PIN TINY2350_LED_R_PIN
-#define LED_G_PIN TINY2350_LED_G_PIN
-#define LED_B_PIN TINY2350_LED_B_PIN
+#ifdef PICO_DEFAULT_LED_PIN
+static uint8_t gpio = PICO_DEFAULT_LED_PIN;
 #else
-#define LED_R_PIN 0
-#define LED_G_PIN 0
-#define LED_B_PIN 0
+static uint8_t gpio = 0;
 #endif
 
 uint8_t pixel[][3] = {
@@ -44,21 +36,24 @@ uint8_t pixel[][3] = {
 };
 
 void led_driver_init_pimoroni() {
-    gpio_init(LED_R_PIN);
-    gpio_set_dir(LED_R_PIN, GPIO_OUT);
-    gpio_init(LED_G_PIN);
-    gpio_set_dir(LED_G_PIN, GPIO_OUT);
-    gpio_init(LED_B_PIN);
-    gpio_set_dir(LED_B_PIN, GPIO_OUT);
+    if (phy_data.led_gpio_present) {
+        gpio = phy_data.led_gpio;
+    }
+    gpio_init(gpio-1);
+    gpio_set_dir(gpio-1, GPIO_OUT);
+    gpio_init(gpio);
+    gpio_set_dir(gpio, GPIO_OUT);
+    gpio_init(gpio+1);
+    gpio_set_dir(gpio+1, GPIO_OUT);
 }
 
 void led_driver_color_pimoroni(uint8_t color, uint32_t led_brightness, float progress) {
     if (progress < 0.5) {
         color = LED_COLOR_OFF;
     }
-    gpio_put(LED_R_PIN, pixel[color][0]);
-    gpio_put(LED_G_PIN, pixel[color][1]);
-    gpio_put(LED_B_PIN, pixel[color][2]);
+    gpio_put(gpio-1, pixel[color][0]);
+    gpio_put(gpio, pixel[color][1]);
+    gpio_put(gpio+1, pixel[color][2]);
 }
 
 led_driver_t led_driver_pimoroni = {

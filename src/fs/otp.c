@@ -327,6 +327,7 @@ void init_otp_files() {
         if (ret != 0) {
             printf("Error writing OTP key 2 [%d]\n", ret);
         }
+        mbedtls_platform_zeroize(pkey, sizeof(pkey));
 #ifdef PICO_RP2350
         otp_chaff(OTP_KEY_2, 32);
 #endif

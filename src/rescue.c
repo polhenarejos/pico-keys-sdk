@@ -159,10 +159,12 @@ int cmd_keydev_sign() {
 
 // Blocking CORE1
 void led_3_blinks() {
+#ifndef ENABLE_EMULATION
     uint32_t mode = led_get_mode();
     led_set_mode(MODE_PROCESSING);
     sleep_ms(500);
     led_set_mode(mode);
+#endif
 }
 
 int cmd_write() {

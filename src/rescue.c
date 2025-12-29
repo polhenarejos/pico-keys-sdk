@@ -157,6 +157,14 @@ int cmd_keydev_sign() {
     return SW_OK();
 }
 
+// Blocking CORE1
+void led_3_blinks() {
+    uint32_t mode = led_get_mode();
+    led_set_mode(MODE_PROCESSING);
+    sleep_ms(500);
+    led_set_mode(mode);
+}
+
 int cmd_write() {
     if (apdu.nc < 2) {
         return SW_WRONG_LENGTH();
@@ -172,6 +180,7 @@ int cmd_write() {
         }
 #endif
     }
+    led_3_blinks();
     return SW_OK();
 }
 
@@ -225,6 +234,7 @@ int cmd_secure() {
     if (ret != 0) {
         return SW_EXEC_ERROR();
     }
+    led_3_blinks();
     return SW_OK();
 }
 #endif

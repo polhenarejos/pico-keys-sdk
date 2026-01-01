@@ -287,6 +287,7 @@ else()
       ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
       ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pimoroni.c
       ${CMAKE_CURRENT_LIST_DIR}/src/led/led_ws2812.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_rp2350_one.c
     )
   endif()
 endif()

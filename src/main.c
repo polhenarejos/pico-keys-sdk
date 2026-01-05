@@ -203,9 +203,9 @@ bool wait_button() {
     uint32_t button_timeout = 0;
     if (phy_data.up_btn_present) {
         button_timeout = phy_data.up_btn * 1000;
-        if (button_timeout == 0) {
-            return false;
-        }
+    }
+    if (button_timeout == 0) {
+        return false;
     }
     uint32_t start_button = board_millis();
     bool timeout = false;

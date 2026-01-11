@@ -4,3 +4,6 @@
 [submodule "tinycbor"]
 	path = tinycbor
 	url = https://github.com/intel/tinycbor.git
+[submodule "mlkem"]
+	path = mlkem
+	url = https://github.com/pq-code-package/mlkem-native/

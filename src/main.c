@@ -247,7 +247,7 @@ void init_rtc() {
 #endif
 }
 
-extern void neug_task();
+extern void hwrng_task();
 extern void usb_task();
 void execute_tasks()
 {
@@ -261,7 +261,7 @@ void execute_tasks()
 void core0_loop() {
     while (1) {
         execute_tasks();
-        neug_task();
+        hwrng_task();
         do_flash();
 #ifndef ENABLE_EMULATION
         if (button_pressed_cb && board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up

@@ -286,3 +286,9 @@ int mbedtls_sha256_finish(mbedtls_sha256_context *ctx, unsigned char *output) {
     }
     return 0;
 }
+
+void mbedtls_sha256_clone(mbedtls_sha256_context *dst,
+                          const mbedtls_sha256_context *src)
+{
+    *dst = *src;
+}

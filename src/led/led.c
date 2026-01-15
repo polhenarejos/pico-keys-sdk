@@ -116,6 +116,7 @@ void led_init() {
 #if defined(PIMORONI_TINY2040) || defined(PIMORONI_TINY2350)
     led_driver = &led_driver_pimoroni;
     phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_PIMORONI;
+    phy_data.led_gpio = phy_data.led_gpio_present ? phy_data.led_gpio : PICO_DEFAULT_LED_PIN;
 #elif defined(CYW43_WL_GPIO_LED_PIN)
     led_driver = &led_driver_cyw43;
     phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_CYW43;

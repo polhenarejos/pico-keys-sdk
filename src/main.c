@@ -15,9 +15,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+
+//#define CUST_BUTTON_PIN 2
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "pico_keys.h"
+#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+#endif
 
 #if !defined(ENABLE_EMULATION)
 #include "tusb.h"
@@ -146,12 +152,42 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
 #endif
 #if !defined(ENABLE_EMULATION)
 #ifdef ESP_PLATFORM
+#if CUST_BUTTON_PIN >= 0
+#pragma message("Using custom button pin with ESP_PLATFORM")
+bool picok_board_button_read() {
+    // Static variables to remember previous state and timing
+    static bool last_stable_state = false;      // last validated stable state
+    static bool last_raw_state = false;         // last GPIO read state
+    static uint32_t stable_since = 0;           // timestamp of last change
+
+    // Raw GPIO read (pull-up active, button pressed = 0)
+    bool cur = !gpio_get_level(CUST_BUTTON_PIN);
+    uint32_t now = board_millis();
+
+    // Detect a raw change
+    if (cur != last_raw_state) {
+        stable_since = now;   // reset debounce timer
+        last_raw_state = cur;
+    }
+
+    // If state is stable for at least 50 ms, validate it
+    if (now - stable_since >= 50) {
+        last_stable_state = cur;
+    }
+
+    // Return stable state (ready for core0_loop)
+    return last_stable_state;
+
+
+}
+#else
 bool picok_board_button_read() {
     int boot_state = gpio_get_level(BOOT_PIN);
     return boot_state == 0;
 }
+#endif
 #elif defined(PICO_PLATFORM)
-bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
+bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {  
     const uint CS_PIN_INDEX = 1;
 
     // Must disable interrupts, as interrupt handlers may be in flash, and we
@@ -185,14 +221,46 @@ bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
 
     return button_state;
 }
+
+#ifdef CUST_BUTTON_PIN
+
+bool picok_board_button_read(void) {
+    // Static variables to remember previous state and timing
+    static bool last_stable_state = false;      // last validated stable state
+    static bool last_raw_state = false;         // last GPIO read state
+    static uint32_t stable_since = 0;           // timestamp of last change
+
+    // Raw GPIO read (pull-up active, button pressed = 0)
+    bool cur = !gpio_get(CUST_BUTTON_PIN);
+
+    uint32_t now = board_millis();
+
+    // Detect a raw change
+    if (cur != last_raw_state) {
+        stable_since = now;   // reset debounce timer
+        last_raw_state = cur;
+    }
+
+    // If state is stable for at least 50 ms, validate it
+    if (now - stable_since >= 50) {
+        last_stable_state = cur;
+    }
+
+    // Return stable state (ready for core0_loop)
+    return last_stable_state;
+}
+
+#else
 bool picok_board_button_read(void) {
   return picok_get_bootsel_button();
 }
+#endif
 #else
 bool picok_board_button_read(void) {
     return true; // always unpressed
 }
 #endif
+
 bool button_pressed_state = false;
 uint32_t button_pressed_time = 0;
 uint8_t button_press = 0;
@@ -258,36 +326,52 @@ void execute_tasks()
     led_blinking_task();
 }
 
+//bool button_pressed_state = false;
+uint32_t button_press_start = 0;
+bool long_press_reported = false;
+
 void core0_loop() {
     while (1) {
         execute_tasks();
         neug_task();
         do_flash();
+
 #ifndef ENABLE_EMULATION
-        if (button_pressed_cb && board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up
-            bool current_button_state = picok_board_button_read();
-            if (current_button_state != button_pressed_state) {
-                if (current_button_state == false) { // unpressed
-                    if (button_pressed_time == 0 || button_pressed_time + 1000 > board_millis()) {
-                        button_press++;
-                    }
-                    button_pressed_time = board_millis();
-                }
-                button_pressed_state = current_button_state;
+        if (button_pressed_cb && board_millis() > 1000 && !is_busy()) {
+            bool cur = picok_board_button_read();
+
+            // falling edge = button pressed
+            if (cur && !button_pressed_state) {
+                button_pressed_state = true;
+                button_press_start = board_millis();
+                long_press_reported = false;
             }
-            if (button_pressed_time > 0 && button_press > 0 && button_pressed_time + 1000 < board_millis() && button_pressed_state == false) {
-                if (button_pressed_cb != NULL) {
-                    (*button_pressed_cb)(button_press);
+
+            // rising edge = button released
+            if (!cur && button_pressed_state) {
+                button_pressed_state = false;
+                uint32_t duration = board_millis() - button_press_start;
+
+                if (!long_press_reported) {
+                    if (duration < 800) {
+                        button_pressed_cb(1); // short press
+                    } else {
+                        button_pressed_cb(2); // long press
+                    }
                 }
-                button_pressed_time = button_press = 0;
+            }
+
+            // long press in progress
+            if (button_pressed_state && !long_press_reported &&
+                (board_millis() - button_press_start >= 800)) {
+                long_press_reported = true;
+                button_pressed_cb(2); // long press
             }
         }
 #endif
-#ifdef ESP_PLATFORM
-    vTaskDelay(pdMS_TO_TICKS(10));
-#endif
     }
 }
+
 
 char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
 uint8_t pico_serial_hash[32];
@@ -302,6 +386,7 @@ int app_main() {
 #ifndef PICO_PLATFORM
 #define pico_get_unique_board_id(a) memset(a, 0, sizeof(*(a)))
 #endif
+
 int main(void) {
 #endif
     pico_get_unique_board_id(&pico_serial);
@@ -341,10 +426,15 @@ int main(void) {
 
 #ifndef ENABLE_EMULATION
 #ifdef ESP_PLATFORM
+#ifdef CUST_BUTTON_PIN
+    gpio_pad_select_gpio(CUST_BUTTON_PIN);
+    gpio_set_direction(CUST_BUTTON_PIN, GPIO_MODE_INPUT);
+    gpio_pullup_en(CUST_BUTTON_PIN);
+#else        
     gpio_pad_select_gpio(BOOT_PIN);
     gpio_set_direction(BOOT_PIN, GPIO_MODE_INPUT);
     gpio_pulldown_dis(BOOT_PIN);
-
+#endif
     tusb_cfg.string_descriptor[3] = pico_serial_str;
     if (phy_data.usb_product_present) {
         tusb_cfg.string_descriptor[2] = phy_data.usb_product;
@@ -364,11 +454,24 @@ int main(void) {
 #endif
 #endif
 
+
+    /* platform-specific GPIO setup */
+#if defined(PICO_PLATFORM)
+#ifdef CUST_BUTTON_PIN
+    gpio_init(CUST_BUTTON_PIN);
+    gpio_set_dir(CUST_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(CUST_BUTTON_PIN);
+#endif
+#endif
+
+
 #ifdef ESP_PLATFORM
     xTaskCreatePinnedToCore(core0_loop, "core0", 4096*ITF_TOTAL*2, NULL, CONFIG_TINYUSB_TASK_PRIORITY - 1, &hcore0, ESP32_CORE0);
 #else
     core0_loop();
 #endif
+
+
 
     return 0;
 }

@@ -64,12 +64,12 @@ if(ESP_PLATFORM)
 endif()
 
 if(NOT DEFINED USB_VID)
-    set(USB_VID 0xFEFF)
+    set(USB_VID 0x2E8A)
 endif()
 add_definitions(-DUSB_VID=${USB_VID})
 
 if(NOT DEFINED USB_PID)
-    set(USB_PID 0xFCFD)
+    set(USB_PID 0x10FD)
 endif()
 add_definitions(-DUSB_PID=${USB_PID})
 

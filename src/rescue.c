@@ -19,14 +19,6 @@
 #include "apdu.h"
 #include "pico_keys_version.h"
 #include "otp.h"
-#ifdef PICO_PLATFORM
-#include "pico/bootrom.h"
-#include "hardware/watchdog.h"
-#include "pico/aon_timer.h"
-#else
-#include <sys/time.h>
-#include <time.h>
-#endif
 #include "mbedtls/ecdsa.h"
 #include "mbedtls/sha256.h"
 #include "random.h"
@@ -38,7 +30,6 @@ extern char __flash_binary_end;
 
 int rescue_process_apdu();
 int rescue_unload();
-bool set_rtc = false;
 
 const uint8_t rescue_aid[] = {
     8,
@@ -220,14 +211,7 @@ int cmd_write() {
             uint32_t t = (apdu.data[0] << 24) | (apdu.data[1] << 16) | (apdu.data[2] << 8) | apdu.data[3];
             tv_sec = (time_t)t;
         }
-#ifdef PICO_PLATFORM
-        struct timespec tv = {.tv_sec = tv_sec, .tv_nsec = 0};
-        aon_timer_set_time(&tv);
-#else
-        struct timeval tv = {.tv_sec = tv_sec, .tv_usec = 0};
-        settimeofday(&tv, NULL);
-#endif
-        set_rtc = true;
+        set_rtc_time(tv_sec);
     }
     led_3_blinks();
     return SW_OK();
@@ -277,16 +261,15 @@ int cmd_read() {
         if (p2 != 0x1 && p2 != 0x2) {
             return SW_INCORRECT_P1P2();
         }
-        if (!set_rtc) {
+        if (!has_set_rtc()) {
             return SW_CONDITIONS_NOT_SATISFIED();
         }
         res_APDU_size = 0;
+        time_t tv_sec = get_rtc_time();
 #ifdef PICO_PLATFORM
-        struct timespec tv;
-        aon_timer_get_time(&tv);
+        struct timespec tv = {.tv_sec = tv_sec, .tv_nsec = 0};
 #else
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
+        struct timeval tv = {.tv_sec = tv_sec, .tv_usec = 0};
 #endif
         if (p2 == 0x1) {
             struct tm *tm = localtime(&tv.tv_sec);

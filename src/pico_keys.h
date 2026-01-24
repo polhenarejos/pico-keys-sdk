@@ -61,6 +61,15 @@
 #include "pico/util/queue.h"
 #endif
 
+#ifdef PICO_PLATFORM
+#include "pico/bootrom.h"
+#include "hardware/watchdog.h"
+#include "pico/aon_timer.h"
+#else
+#include <sys/time.h>
+#include <time.h>
+#endif
+
 extern bool wait_button();
 
 extern void low_flash_init_core1();
@@ -241,5 +250,9 @@ extern uint8_t pico_serial_hash[32];
 #if defined(PICO_PLATFORM)
 #define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
 #endif
+
+extern bool has_set_rtc();
+extern time_t get_rtc_time();
+extern void set_rtc_time(time_t tv_sec);
 
 #endif

@@ -237,6 +237,35 @@ bool wait_button() {
 }
 #endif
 
+bool set_rtc = false;
+
+bool has_set_rtc() {
+    return set_rtc;
+}
+
+void set_rtc_time(time_t t) {
+#ifdef PICO_PLATFORM
+    struct timespec tv = {.tv_sec = t, .tv_nsec = 0};
+    aon_timer_set_time(&tv);
+#else
+    struct timeval tv = {.tv_sec = t, .tv_usec = 0};
+    settimeofday(&tv, NULL);
+#endif
+    set_rtc = true;
+}
+
+time_t get_rtc_time() {
+#ifdef PICO_PLATFORM
+    struct timespec tv;
+    aon_timer_get_time(&tv);
+    return tv.tv_sec;
+#else
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec;
+#endif
+}
+
 struct apdu apdu;
 
 void init_rtc() {

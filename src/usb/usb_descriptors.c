@@ -28,10 +28,10 @@
 #include "usb.h"
 
 #ifndef USB_VID
-#define USB_VID   0xFEFF
+#define USB_VID   0x2E8A
 #endif
 #ifndef USB_PID
-#define USB_PID   0xFCFD
+#define USB_PID   0x10FD
 #endif
 
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
@@ -316,6 +316,7 @@ uint8_t const *tud_descriptor_bos_cb(void) {
 //--------------------------------------------------------------------+
 
 // array of pointer to string descriptors
+char *string_desc_itf[4] = {0};
 char const *string_desc_arr [] = {
     (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
     "Pol Henarejos",                     // 1: Manufacturer
@@ -368,6 +369,9 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
             if (phy_data.usb_product_present) {
                 str = phy_data.usb_product;
             }
+        }
+        else if (index >= 5 && string_desc_itf[index - 5] != NULL) {
+            str = string_desc_itf[index - 5];
         }
 
         uint8_t buff_avail = sizeof(_desc_str) / sizeof(_desc_str[0]) - 1;

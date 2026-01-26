@@ -18,7 +18,6 @@
 #ifndef _SHA256_ALT_H_
 #define _SHA256_ALT_H_
 
-#include "pico_keys.h"
 #include "pico/sha256.h"
 
 typedef struct mbedtls_sha256_context {

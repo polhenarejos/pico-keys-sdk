@@ -15,8 +15,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#define HWRNG_PRE_LOOP 32
 
-#include <stdint.h>
+#include <stdlib.h>
+#if defined(PICO_PLATFORM)
+#include "pico/stdlib.h"
+#endif
 #include <string.h>
 
 #include "hwrng.h"
@@ -25,31 +29,11 @@
 static uint32_t random_word[RANDOM_BYTES_LENGTH / sizeof(uint32_t)];
 
 void random_init(void) {
-    int i;
+    hwrng_init(random_word, RANDOM_BYTES_LENGTH / sizeof(uint32_t));
 
-    neug_init(random_word, RANDOM_BYTES_LENGTH / sizeof(uint32_t));
-
-    for (i = 0; i < NEUG_PRE_LOOP; i++) {
-        neug_get();
+    for (int i = 0; i < HWRNG_PRE_LOOP; i++) {
+        hwrng_get();
     }
-}
-
-/*
- * Return pointer to random 32-byte
- */
-void random_bytes_free(const uint8_t *p);
-#define MAX_RANDOM_BUFFER 1024
-const uint8_t *random_bytes_get(size_t len) {
-    if (len > MAX_RANDOM_BUFFER) {
-        return NULL;
-    }
-    static uint32_t return_word[MAX_RANDOM_BUFFER / sizeof(uint32_t)];
-    for (size_t ix = 0; ix < len; ix += RANDOM_BYTES_LENGTH) {
-        neug_wait_full();
-        memcpy(return_word + ix / sizeof(uint32_t), random_word, RANDOM_BYTES_LENGTH);
-        random_bytes_free((const uint8_t *) random_word);
-    }
-    return (const uint8_t *) return_word;
 }
 
 /*
@@ -58,9 +42,25 @@ const uint8_t *random_bytes_get(size_t len) {
 void random_bytes_free(const uint8_t *p) {
     (void) p;
     memset(random_word, 0, RANDOM_BYTES_LENGTH);
-    neug_flush();
+    hwrng_flush();
 }
 
+/*
+ * Return pointer to random 32-byte
+ */
+#define MAX_RANDOM_BUFFER 1024
+const uint8_t *random_bytes_get(size_t len) {
+    if (len > MAX_RANDOM_BUFFER) {
+        return NULL;
+    }
+    static uint32_t return_word[MAX_RANDOM_BUFFER / sizeof(uint32_t)];
+    for (size_t ix = 0; ix < len; ix += RANDOM_BYTES_LENGTH) {
+        hwrng_wait_full();
+        memcpy(return_word + ix / sizeof(uint32_t), random_word, RANDOM_BYTES_LENGTH);
+        random_bytes_free((const uint8_t *) random_word);
+    }
+    return (const uint8_t *) return_word;
+}
 
 /*
  * Random byte iterator
@@ -71,7 +71,7 @@ int random_gen(void *arg, unsigned char *out, size_t out_len) {
     uint8_t n;
 
     while (out_len) {
-        neug_wait_full();
+        hwrng_wait_full();
 
         n = RANDOM_BYTES_LENGTH - index;
         if (n > out_len) {
@@ -85,7 +85,7 @@ int random_gen(void *arg, unsigned char *out, size_t out_len) {
 
         if (index >= RANDOM_BYTES_LENGTH) {
             index = 0;
-            neug_flush();
+            hwrng_flush();
         }
     }
 
@@ -95,3 +95,9 @@ int random_gen(void *arg, unsigned char *out, size_t out_len) {
 
     return 0;
 }
+
+#ifdef ENABLE_PQC
+void randombytes(uint8_t *buf, size_t n) {
+    random_gen(NULL, buf, n);
+}
+#endif

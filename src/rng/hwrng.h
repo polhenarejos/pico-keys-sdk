@@ -17,17 +17,11 @@
 
 #ifndef _NEUG_H_
 #define _NEUG_H_
+#include <stdint.h>
 
-#define NEUG_PRE_LOOP 32
-
-#include <stdlib.h>
-#if defined(PICO_PLATFORM)
-#include "pico/stdlib.h"
-#endif
-
-void neug_init(uint32_t *buf, uint8_t size);
-uint32_t neug_get();
-void neug_flush(void);
-void neug_wait_full();
+void hwrng_init(uint32_t *buf, uint8_t size);
+uint32_t hwrng_get();
+void hwrng_flush(void);
+void hwrng_wait_full();
 
 #endif

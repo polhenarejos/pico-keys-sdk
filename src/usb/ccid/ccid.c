@@ -201,6 +201,20 @@ int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
     (void) rx_read;
     if (ccid_rx[itf].w_ptr - ccid_rx[itf].r_ptr >= 10) {
         driver_init_ccid(itf);
+        if (ccid_header[itf]->dwLength > USB_BUFFER_SIZE - 10) {
+            //Invalid length
+            ccid_rx[itf].r_ptr = ccid_rx[itf].w_ptr = 0;
+
+            ccid_resp_fast[itf]->bMessageType = CCID_DATA_BLOCK_RET;
+            ccid_resp_fast[itf]->dwLength = 2;
+            ccid_resp_fast[itf]->bSlot = 0;
+            ccid_resp_fast[itf]->bSeq = ccid_header[itf]->bSeq;
+            ccid_resp_fast[itf]->abRFU0 = ccid_status;
+            ccid_resp_fast[itf]->abRFU1 = 0;
+            memcpy(&ccid_resp_fast[itf]->apdu, "\x6F\x00", 2);
+            ccid_write_fast(itf, (const uint8_t *)ccid_resp_fast[itf], 12);
+            return 0;
+        }
         //printf("ccid_process %ld %d %x %x %d\n",ccid_header[itf]->dwLength,rx_read-10,ccid_header[itf]->bMessageType,ccid_header[itf]->bSeq,ccid_rx[itf].w_ptr - ccid_rx[itf].r_ptr - 10);
         if (ccid_header[itf]->dwLength <= (uint32_t)(ccid_rx[itf].w_ptr - ccid_rx[itf].r_ptr - 10)){
             ccid_rx[itf].r_ptr += (uint16_t)(ccid_header[itf]->dwLength + 10);

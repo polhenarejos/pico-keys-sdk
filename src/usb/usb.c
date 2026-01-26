@@ -73,8 +73,8 @@ queue_t card_to_usb_q = {0};
 
 #ifndef ENABLE_EMULATION
 extern tusb_desc_device_t desc_device;
-#endif
 extern char *string_desc_itf[4], *string_desc_arr[];
+#endif
 void usb_init()
 {
 #ifndef ENABLE_EMULATION
@@ -110,24 +110,32 @@ void usb_init()
     if (enabled_usb_itf & PHY_USB_ITF_HID) {
         ITF_HID_CTAP = ITF_HID_TOTAL++;
         ITF_HID = ITF_TOTAL++;
+#ifndef ENABLE_EMULATION
         string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[5];
+#endif
     }
     if (enabled_usb_itf & PHY_USB_ITF_KB) {
         ITF_HID_KB = ITF_HID_TOTAL++;
         ITF_KEYBOARD = ITF_TOTAL++;
+#ifndef ENABLE_EMULATION
         string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[6];
+#endif
     }
 #endif
 #ifdef USB_ITF_CCID
     if (enabled_usb_itf & PHY_USB_ITF_CCID) {
         ITF_SC_CCID = ITF_SC_TOTAL++;
         ITF_CCID = ITF_TOTAL++;
+#ifndef ENABLE_EMULATION
         string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[7];
+#endif
     }
     if (enabled_usb_itf & PHY_USB_ITF_WCID) {
         ITF_SC_WCID = ITF_SC_TOTAL++;
         ITF_WCID = ITF_TOTAL++;
+#ifndef ENABLE_EMULATION
         string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[8];
+#endif
     }
 #endif
     card_locked_itf = ITF_TOTAL;

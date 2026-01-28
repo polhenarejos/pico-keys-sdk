@@ -22,6 +22,7 @@
 #include "mbedtls/ecdsa.h"
 #include "mbedtls/sha256.h"
 #include "random.h"
+#include "crypto_utils.h"
 
 #ifdef PICO_PLATFORM
 extern char __flash_binary_start;
@@ -45,6 +46,8 @@ const uint8_t rescue_aid[] = {
 #else
 #define PICO_MCU 0
 #endif
+
+#define EF_DEVCERT_KEY 0xE0C1
 
 extern uint8_t PICO_PRODUCT;
 extern uint8_t PICO_VERSION_MAJOR;
@@ -75,30 +78,69 @@ int rescue_unload() {
     return PICOKEY_OK;
 }
 
+static int load_internal_keydev(mbedtls_ecp_keypair *ecp, mbedtls_ecp_group_id ec_id) {
+    file_t *ef_devcert_key = file_new(EF_DEVCERT_KEY);
+    if (!ef_devcert_key) {
+        return SW_FILE_NOT_FOUND();
+    }
+    uint8_t kbase[32] = {0};
+    derive_kbase(kbase);
+    if (file_has_data(ef_devcert_key)) {
+        uint8_t pkey[32] = {0};
+        memcpy(pkey, file_get_data(ef_devcert_key), 32);
+        aes_decrypt(kbase, pico_serial_hash, 32 * 8, PICO_KEYS_AES_MODE_CBC, pkey, 32);
+        int ret = mbedtls_ecp_read_key(ec_id, ecp, pkey, 32);
+        mbedtls_platform_zeroize(pkey, sizeof(pkey));
+        if (ret != 0) {
+            return SW_EXEC_ERROR();
+        }
+    }
+    else {
+        // Generate new key
+        uint8_t pkey[MBEDTLS_ECP_MAX_BYTES] = {0};
+        size_t olen = 0;
+        mbedtls_ecp_gen_key(ec_id, ecp, random_gen, NULL);
+        mbedtls_ecp_write_key_ext(ecp, &olen, pkey, sizeof(pkey));
+
+        aes_encrypt(kbase, pico_serial_hash, 32 * 8, PICO_KEYS_AES_MODE_CBC, pkey, 32);
+        file_put_data(ef_devcert_key, pkey, (uint16_t)olen);
+        mbedtls_platform_zeroize(pkey, sizeof(pkey));
+        low_flash_available();
+    }
+    return PICOKEY_OK;
+}
+
 int cmd_keydev_sign() {
     uint8_t p1 = P1(apdu);
     if (p1 == 0x01) {
         if (apdu.nc != 32) {
             return SW_WRONG_LENGTH();
         }
+        mbedtls_ecp_keypair ecp;
+        mbedtls_ecp_keypair_init(&ecp);
+        mbedtls_ecp_group_id ec_id = MBEDTLS_ECP_DP_SECP256K1;
         if (!otp_key_2) {
-            return SW_INS_NOT_SUPPORTED();
+            int ret = load_internal_keydev(&ecp, ec_id);
+            if (ret != PICOKEY_OK) {
+                mbedtls_ecp_keypair_free(&ecp);
+                return ret;
+            }
         }
-        mbedtls_ecdsa_context ecdsa;
-        mbedtls_ecdsa_init(&ecdsa);
-        int ret = mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256K1, &ecdsa, otp_key_2, 32);
-        if (ret != 0) {
-            mbedtls_ecdsa_free(&ecdsa);
-            return SW_EXEC_ERROR();
+        else {
+            int ret = mbedtls_ecp_read_key(ec_id, &ecp, otp_key_2, 32);
+            if (ret != 0) {
+                mbedtls_ecp_keypair_free(&ecp);
+                return SW_EXEC_ERROR();
+            }
         }
-        uint16_t key_size = 2 * (int)((mbedtls_ecp_curve_info_from_grp_id(MBEDTLS_ECP_DP_SECP256K1)->bit_size + 7) / 8);
+        uint16_t key_size = 2 * (int)((mbedtls_ecp_curve_info_from_grp_id(ec_id)->bit_size + 7) / 8);
         mbedtls_mpi r, s;
         mbedtls_mpi_init(&r);
         mbedtls_mpi_init(&s);
 
-        ret = mbedtls_ecdsa_sign(&ecdsa.MBEDTLS_PRIVATE(grp), &r, &s, &ecdsa.MBEDTLS_PRIVATE(d), apdu.data, apdu.nc, random_gen, NULL);
+        int ret = mbedtls_ecdsa_sign(&ecp.MBEDTLS_PRIVATE(grp), &r, &s, &ecp.MBEDTLS_PRIVATE(d), apdu.data, apdu.nc, random_gen, NULL);
         if (ret != 0) {
-            mbedtls_ecdsa_free(&ecdsa);
+            mbedtls_ecp_keypair_free(&ecp);
             mbedtls_mpi_free(&r);
             mbedtls_mpi_free(&s);
             return SW_EXEC_ERROR();
@@ -106,26 +148,33 @@ int cmd_keydev_sign() {
 
         mbedtls_mpi_write_binary(&r, res_APDU, key_size / 2); res_APDU_size = key_size / 2;
         mbedtls_mpi_write_binary(&s, res_APDU + res_APDU_size, key_size / 2); res_APDU_size += key_size / 2;
-        mbedtls_ecdsa_free(&ecdsa);
+        mbedtls_ecp_keypair_free(&ecp);
         mbedtls_mpi_free(&r);
         mbedtls_mpi_free(&s);
     }
     else if (p1 == 0x02) {
         // Return public key
-        if (!otp_key_2) {
-            return SW_INS_NOT_SUPPORTED();
-        }
         if (apdu.nc != 0) {
             return SW_WRONG_LENGTH();
         }
         mbedtls_ecp_keypair ecp;
         mbedtls_ecp_keypair_init(&ecp);
-        int ret = mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256K1, &ecp, otp_key_2, 32);
-        if (ret != 0) {
-            mbedtls_ecp_keypair_free(&ecp);
-            return SW_EXEC_ERROR();
+        mbedtls_ecp_group_id ec_id = MBEDTLS_ECP_DP_SECP256K1;
+        if (!otp_key_2) {
+            int ret = load_internal_keydev(&ecp, ec_id);
+            if (ret != PICOKEY_OK) {
+                mbedtls_ecp_keypair_free(&ecp);
+                return ret;
+            }
         }
-        ret = mbedtls_ecp_mul(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), &ecp.MBEDTLS_PRIVATE(d), &ecp.MBEDTLS_PRIVATE(grp).G, random_gen, NULL);
+        else {
+            int ret = mbedtls_ecp_read_key(ec_id, &ecp, otp_key_2, 32);
+            if (ret != 0) {
+                mbedtls_ecp_keypair_free(&ecp);
+                return SW_EXEC_ERROR();
+            }
+        }
+        int ret = mbedtls_ecp_mul(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), &ecp.MBEDTLS_PRIVATE(d), &ecp.MBEDTLS_PRIVATE(grp).G, random_gen, NULL);
         if (ret != 0) {
             mbedtls_ecp_keypair_free(&ecp);
             return SW_EXEC_ERROR();

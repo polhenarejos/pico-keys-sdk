@@ -1,5 +1,5 @@
  #
- # This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
+ # This file is part of the Pico Keys SDK distribution (https://github.com/librekeys/pico-keys-sdk).
  # Copyright (c) 2022 Pol Henarejos.
  #
  # This program is free software: you can redistribute it and/or modify

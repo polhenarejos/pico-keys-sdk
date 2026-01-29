@@ -26,7 +26,7 @@ else()
         include(pico_sdk_import.cmake)
     endif()
 
-    project(picokey C CXX ASM)
+    project(pico_rescue C CXX ASM)
 
     set(CMAKE_C_STANDARD 11)
     set(CMAKE_CXX_STANDARD 17)
@@ -38,7 +38,7 @@ else()
         add_definitions(-D__FOR_CI)
     endif()
 
-    add_executable(picokey)
+    add_executable(pico_rescue)
 endif()
 
 set(USB_ITF_CCID 1)
@@ -53,48 +53,48 @@ set(SOURCES ${SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/src/version.c
 )
 
-SET_VERSION(ver_major ver_minor "${CMAKE_CURRENT_LIST_DIR}/src/pico_keys_version.h" 2)
+SET_VERSION(ver_major ver_minor "${CMAKE_CURRENT_LIST_DIR}/src/pico_keys_version.h" 3)
 
 if(ESP_PLATFORM)
-    project(picokey)
+    project(pico_rescue)
 endif()
 
 if(NOT ESP_PLATFORM)
-    target_sources(picokey PUBLIC ${SOURCES})
-    target_include_directories(picokey PUBLIC ${INCLUDES})
+    target_sources(pico_rescue PUBLIC ${SOURCES})
+    target_include_directories(pico_rescue PUBLIC ${INCLUDES})
 
-    target_compile_options(picokey PUBLIC
+    target_compile_options(pico_rescue PUBLIC
         -Wall
     )
     if(NOT MSVC)
-        target_compile_options(picokey PUBLIC
+        target_compile_options(pico_rescue PUBLIC
             -Werror
         )
     endif()
 
     if(ENABLE_EMULATION)
         if(NOT MSVC)
-            target_compile_options(picokey PUBLIC
+            target_compile_options(pico_rescue PUBLIC
                 -fdata-sections
                 -ffunction-sections
             )
         endif()
         if(APPLE)
-            target_link_options(picokey PUBLIC
+            target_link_options(pico_rescue PUBLIC
                 -Wl,-dead_strip
             )
         elseif(MSVC)
-            target_compile_options(picokey PUBLIC
+            target_compile_options(pico_rescue PUBLIC
                 -WX
             )
 
-            target_link_libraries(picokey PUBLIC wsock32 ws2_32 Bcrypt)
+            target_link_libraries(pico_rescue PUBLIC wsock32 ws2_32 Bcrypt)
         else()
-            target_link_options(picokey PUBLIC
+            target_link_options(pico_rescue PUBLIC
                 -Wl,--gc-sections
             )
         endif(APPLE)
-        target_link_libraries(picokey PRIVATE pthread m)
+        target_link_libraries(pico_rescue PRIVATE pthread m)
     else()
         pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
     endif()

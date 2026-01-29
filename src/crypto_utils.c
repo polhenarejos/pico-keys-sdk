@@ -278,3 +278,16 @@ mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t prime_
     }
     return MBEDTLS_ECP_DP_NONE;
 }
+
+#define POLY 0xedb88320
+
+uint32_t crc32c(const uint8_t *buf, size_t len) {
+    uint32_t crc = 0xffffffff;
+    while (len--) {
+        crc ^= *buf++;
+        for (int k = 0; k < 8; k++) {
+            crc = (crc >> 1) ^ (POLY & (0 - (crc & 1)));
+        }
+    }
+    return ~crc;
+}

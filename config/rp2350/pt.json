@@ -10,7 +10,7 @@
   },
   "partitions": [
     {
-      "name": "Pico Keys Firmware",
+      "name": "PicoKeys Firmware",
       "id": 0,
       "start": 0,
       "size": "1024K",
@@ -22,15 +22,30 @@
       }
     },
     {
-      "name": "Pico Keys Data",
+      "name": "PicoKeys Data",
       "id": 1,
-      "start": "1024K",
-      "size": "3072K",
+      "start": "1032K",
+      "size": "3064K",
       "families": ["data"],
       "permissions": {
         "secure": "rw",
         "nonsecure": "",
         "bootloader": "r"
+      },
+      "link": ["owner", 0],
+      "ignored_during_arm_boot": true,
+      "ignored_during_riscv_boot": true
+    },
+    {
+      "name": "PicoKeys Binding",
+      "id": 2,
+      "start": "1024K",
+      "size": "8K",
+      "families": ["data"],
+      "permissions": {
+        "secure": "r",
+        "nonsecure": "",
+        "bootloader": "w"
       },
       "link": ["owner", 0],
       "ignored_during_arm_boot": true,

@@ -22,6 +22,7 @@
 
 #include "pico_keys.h"
 #include <string.h>
+#include "crypto_utils.h"
 #ifdef PICO_PLATFORM
  #include "pico/stdlib.h"
  #include "hardware/flash.h"
@@ -158,8 +159,14 @@ void do_flash() {
     sem_release(&sem_flash);
 }
 
+#ifdef PICO_RP2040
+void phymarker_write();
+#endif
 //this function has to be called from the core 0
 void low_flash_init() {
+#ifdef PICO_RP2040
+    phymarker_write();
+#endif
     memset(flash_pages, 0, sizeof(page_flash_t) * TOTAL_FLASH_PAGES);
     mutex_init(&mtx_flash);
     sem_init(&sem_flash, 0, 1);
@@ -371,3 +378,40 @@ bool flash_check_blank(const uint8_t *p_start, size_t size) {
     }
     return true;
 }
+
+#ifdef PICO_RP2040
+typedef struct {
+    uint64_t magic;
+    uint16_t version;
+    uint16_t flags;
+    uint8_t  uid[PICO_UNIQUE_BOARD_ID_SIZE_BYTES];
+    uint32_t crc32;
+} __attribute__ ((packed)) phymarker_t;
+
+uintptr_t __phymarker_start = (uintptr_t)0x10100000;
+
+const uint64_t PHYSICAL_MARKER_MAGIC = 0x5049434F4B455953ULL; // "PICOKEYS"
+
+void phymarker_write() {
+    const uint64_t magic = *(uint64_t *)__phymarker_start;
+    if (magic == PHYSICAL_MARKER_MAGIC) {
+        return;
+    }
+    phymarker_t pm = {
+        .magic = PHYSICAL_MARKER_MAGIC, // "PICOKEYS"
+        .version = 0x0001,
+        .flags = 0x0000,
+        .crc32 = 0x00000000
+    };
+    memcpy(pm.uid, pico_serial.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);
+    pm.crc32 = crc32c((const uint8_t *)&pm, sizeof(phymarker_t) - sizeof(uint32_t));
+
+    uint32_t ints = save_and_disable_interrupts();
+
+    flash_range_erase((uint32_t)__phymarker_start - XIP_BASE, FLASH_SECTOR_SIZE);
+    flash_range_program((uint32_t)__phymarker_start - XIP_BASE, (const uint8_t *)&pm, sizeof(phymarker_t));
+
+    restore_interrupts(ints);
+}
+
+#endif

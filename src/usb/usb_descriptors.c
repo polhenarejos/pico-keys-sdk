@@ -323,14 +323,10 @@ char const *string_desc_arr [] = {
     "Pico Key",                       // 2: Product
     "11223344",                      // 3: Serials, should use chip ID
     "Config"               // 4: Vendor Interface
-#ifdef USB_ITF_HID
     , "HID Interface"
     , "HID Keyboard Interface"
-#endif
-#ifdef USB_ITF_CCID
     , "CCID OTP FIDO Interface"
     , "WebCCID Interface"
-#endif
 };
 
 #ifdef ESP_PLATFORM

@@ -235,6 +235,11 @@ bool wait_button() {
     req_button_pending = false;
     return timeout || cancel_button;
 }
+
+__attribute__((weak)) int picokey_init() {
+    return 0;
+}
+
 #endif
 
 bool set_rtc = false;
@@ -391,6 +396,10 @@ int main(void) {
 #else
     tusb_init();
 #endif
+#endif
+
+#ifndef ENABLE_EMULATION
+    picokey_init();
 #endif
 
 #ifdef ESP_PLATFORM

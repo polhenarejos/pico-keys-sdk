@@ -180,7 +180,7 @@ int cmd_keydev_sign() {
             return SW_EXEC_ERROR();
         }
         size_t olen = 0;
-        ret = mbedtls_ecp_point_write_binary(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), MBEDTLS_ECP_PF_UNCOMPRESSED, &olen, res_APDU, 4096);
+        ret = mbedtls_ecp_point_write_binary(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), MBEDTLS_ECP_PF_UNCOMPRESSED, &olen, res_APDU, 2038);
         if (ret != 0) {
             mbedtls_ecp_keypair_free(&ecp);
             return SW_EXEC_ERROR();

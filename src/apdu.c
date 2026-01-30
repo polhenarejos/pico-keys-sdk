@@ -30,7 +30,7 @@ uint8_t *rdata_gr = NULL;
 uint16_t rdata_bk = 0x0;
 extern uint32_t timeout;
 bool is_chaining = false;
-uint8_t chain_buf[4096];
+uint8_t chain_buf[2038];
 uint8_t *chain_ptr = NULL;
 
 int process_apdu() {

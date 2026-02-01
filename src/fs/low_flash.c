@@ -406,10 +406,12 @@ void phymarker_write() {
     memcpy(pm.uid, pico_serial.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);
     pm.crc32 = crc32c((const uint8_t *)&pm, sizeof(phymarker_t) - sizeof(uint32_t));
 
+    uint8_t buf[FLASH_PAGE_SIZE] = {0};
+    memcpy(buf, &pm, sizeof(phymarker_t));
     uint32_t ints = save_and_disable_interrupts();
 
     flash_range_erase((uint32_t)__phymarker_start - XIP_BASE, FLASH_SECTOR_SIZE);
-    flash_range_program((uint32_t)__phymarker_start - XIP_BASE, (const uint8_t *)&pm, sizeof(phymarker_t));
+    flash_range_program((uint32_t)__phymarker_start - XIP_BASE, (const uint8_t *)buf, sizeof(buf));
 
     restore_interrupts(ints);
 }

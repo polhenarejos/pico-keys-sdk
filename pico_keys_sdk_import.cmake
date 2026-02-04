@@ -338,7 +338,10 @@ set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
 )
 
 if(ESP_PLATFORM)
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES} ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c)
+    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+        ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
+    )
 else()
   if (NOT ENABLE_EMULATION)
     set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}

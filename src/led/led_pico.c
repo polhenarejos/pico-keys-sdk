@@ -23,7 +23,15 @@ static uint8_t gpio = PICO_DEFAULT_LED_PIN;
 static uint8_t gpio = 0;
 #endif
 
-#ifdef PICO_PLATFORM
+#ifdef ESP_PLATFORM
+#include "driver/gpio.h"
+#define gpio_init gpio_reset_pin
+#define gpio_set_dir gpio_set_direction
+#define gpio_put gpio_set_level
+#define GPIO_OUT GPIO_MODE_OUTPUT
+#endif
+
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
 void led_driver_init_pico() {
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;

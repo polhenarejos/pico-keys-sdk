@@ -145,14 +145,14 @@ void led_init() {
 #endif
     if (phy_data.led_driver_present) {
         switch (phy_data.led_driver) {
+            case PHY_LED_DRIVER_PICO:
+                led_driver = &led_driver_pico;
+                break;
 #ifdef ESP_PLATFORM
             case PHY_LED_DRIVER_NEOPIXEL:
                 led_driver = &led_driver_neopixel;
                 break;
 #else
-            case PHY_LED_DRIVER_PICO:
-                led_driver = &led_driver_pico;
-                break;
 #ifdef CYW43_WL_GPIO_LED_PIN
             case PHY_LED_DRIVER_CYW43:
                 led_driver = &led_driver_cyw43;

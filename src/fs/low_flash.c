@@ -150,10 +150,6 @@ void do_flash() {
             }
         }
         flash_available = false;
-#ifdef ESP_PLATFORM
-        esp_partition_munmap(fd_map);
-        esp_partition_mmap(part0, 0, part0->size, ESP_PARTITION_MMAP_DATA, (const void **)&map, (esp_partition_mmap_handle_t *)&fd_map);
-#endif
         mutex_exit(&mtx_flash);
     }
     sem_release(&sem_flash);

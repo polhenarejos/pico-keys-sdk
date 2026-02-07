@@ -38,6 +38,7 @@ extern int otp_write_data_raw(uint16_t row, const uint8_t *data, uint16_t len);
 #elif defined(ESP_PLATFORM)
 
 #include "esp_efuse.h"
+#include "esp_efuse_table.h"
 
 #define OTP_KEY_1    EFUSE_BLK_KEY3
 #define OTP_KEY_2    EFUSE_BLK_KEY4

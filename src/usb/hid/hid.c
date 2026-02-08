@@ -21,6 +21,7 @@
 #if defined(PICO_PLATFORM)
 #include "bsp/board.h"
 #elif defined(ESP_PLATFORM)
+#include "freertos/FreeRTOS.h"
 static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 #endif
 #else

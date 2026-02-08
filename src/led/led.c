@@ -92,6 +92,7 @@ extern led_driver_t led_driver_cyw43;
 extern led_driver_t led_driver_ws2812;
 extern led_driver_t led_driver_neopixel;
 extern led_driver_t led_driver_pimoroni;
+extern led_driver_t led_driver_rp2350_one;
 
 void led_driver_init_dummy() {
     // Do nothing
@@ -117,6 +118,11 @@ void led_init() {
     led_driver = &led_driver_pimoroni;
     phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_PIMORONI;
     phy_data.led_gpio = phy_data.led_gpio_present ? phy_data.led_gpio : PICO_DEFAULT_LED_PIN;
+#elif defined(WAVESHARE_RP2350_ONE)
+    // RP2350-One uses WS2812 LED on GPIO 16
+    led_driver = &led_driver_rp2350_one;
+    phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_RP2350_ONE;
+    phy_data.led_gpio = phy_data.led_gpio_present ? phy_data.led_gpio : 16;
 #elif defined(CYW43_WL_GPIO_LED_PIN)
     led_driver = &led_driver_cyw43;
     phy_data.led_driver = phy_data.led_driver_present ? phy_data.led_driver : PHY_LED_DRIVER_CYW43;
@@ -163,6 +169,9 @@ void led_init() {
                 break;
             case PHY_LED_DRIVER_PIMORONI:
                 led_driver = &led_driver_pimoroni;
+                break;
+            case PHY_LED_DRIVER_RP2350_ONE:
+                led_driver = &led_driver_rp2350_one;
                 break;
 #endif
             default:

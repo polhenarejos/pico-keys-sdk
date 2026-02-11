@@ -261,11 +261,16 @@ typedef esp_err_t otp_ret_t;
 
 bool otp_is_secure_boot_enabled(uint8_t *bootkey) {
 #ifdef PICO_RP2350
+    static const uint8_t BOOTKEY[32] = {
+        0xE1, 0xD1, 0x6B, 0xA7, 0x64, 0xAB, 0xD7, 0x12,
+        0xD4, 0xEF, 0x6E, 0x3E, 0xDD, 0x74, 0x4E, 0xD5,
+        0x63, 0x8C, 0x26, 0x0B, 0x77, 0x1C, 0xF9, 0x81,
+        0x51, 0x11, 0x0B, 0xAF, 0xAC, 0x9B, 0xC8, 0x71
+    };
     const uint8_t *crit1 = otp_buffer(OTP_DATA_CRIT1_ROW);
     if ((crit1[0] & (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB)) == 0) {
         return false;
     }
-    alignas(2) uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
     uint8_t bootkey_idx = 0;
     for (; bootkey_idx < 6; bootkey_idx++) {
         const uint8_t *bootkey_row = otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10 * bootkey_idx);

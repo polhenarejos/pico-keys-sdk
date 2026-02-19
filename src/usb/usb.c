@@ -178,8 +178,10 @@ void usb_send_event(uint32_t flag) {
     if (flag == EV_CMD_AVAILABLE) {
         timeout_start();
     }
-    uint32_t m;
-    queue_remove_blocking(&card_to_usb_q , &m);
+    if (flag != EV_CMD_AVAILABLE) {
+        uint32_t m;
+        queue_remove_blocking(&card_to_usb_q , &m);
+    }
 #ifndef ENABLE_EMULATION
     mutex_exit(&mutex);
 #endif
@@ -254,6 +256,9 @@ void usb_task() {
 
 int card_status(uint8_t itf) {
     if (card_locked_itf == itf) {
+        if (timeout == 0) {
+            return PICOKEY_ERR_FILE_NOT_FOUND;
+        }
         uint32_t m = 0x0;
 #ifndef ENABLE_EMULATION
         mutex_enter_blocking(&mutex);

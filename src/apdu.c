@@ -190,7 +190,9 @@ void *apdu_thread(void *arg) {
         uint32_t m = 0;
         queue_remove_blocking(&usb_to_card_q, &m);
         uint32_t flag = m + 1;
-        queue_add_blocking(&card_to_usb_q, &flag);
+        if (m != EV_CMD_AVAILABLE) {
+            queue_add_blocking(&card_to_usb_q, &flag);
+        }
 
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE) {
             set_res_sw(0x6f, 0x00);

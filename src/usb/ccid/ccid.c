@@ -177,20 +177,20 @@ int driver_write_ccid(uint8_t itf, const uint8_t *tx_buffer, uint16_t buffer_siz
     if (*tx_buffer != 0x81) {
         DEBUG_PAYLOAD(tx_buffer, buffer_size);
     }
-    int r = tud_vendor_n_write(itf, tx_buffer, buffer_size);
-    if (r > 0) {
+    uint32_t written = tud_vendor_n_write(itf, tx_buffer, buffer_size);
+    if (written > 0) {
         tud_vendor_n_flush(itf);
 
-        ccid_tx[itf].r_ptr += (uint16_t)buffer_size;
+        ccid_tx[itf].r_ptr += (uint16_t)written;
         if (ccid_tx[itf].r_ptr >= ccid_tx[itf].w_ptr) {
             ccid_tx[itf].r_ptr = ccid_tx[itf].w_ptr = 0;
         }
 
     }
 #ifdef ENABLE_EMULATION
-    tud_vendor_tx_cb(itf, r);
+    tud_vendor_tx_cb(itf, written);
 #endif
-    return r;
+    return (int)written;
 }
 
 int ccid_write_fast(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {

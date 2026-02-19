@@ -254,3 +254,30 @@ uint16_t apdu_next() {
     }
     return 0;
 }
+
+int bulk_cmd(int (*cmd)()) {
+    uint8_t *p = apdu.data;
+    uint8_t *rapdu = apdu.rdata;
+    uint16_t rapdu_size = 0;
+    uint8_t *top = apdu.data + apdu.nc;
+    while (p < top) {
+        P1(apdu) = p[0];
+        P2(apdu) = p[1];
+        apdu.nc = p[2];
+        apdu.data = p + 3;
+        *apdu.rdata++ = p[0];
+        *apdu.rdata++ = p[1];
+        *apdu.rdata++ = 0;
+        *apdu.rdata++ = 0;
+        apdu.rlen = 0;
+        cmd();
+        put_uint16_t_be(apdu.rlen, apdu.rdata - 2);
+        put_uint16_t_be(apdu.sw, apdu.rdata + apdu.rlen);
+        rapdu_size += 4 + apdu.rlen + 2;
+        apdu.rdata += apdu.rlen + 2;
+        p += 3 + apdu.nc;
+    }
+    apdu.rlen = rapdu_size;
+    apdu.rdata = rapdu;
+    return SW_OK();
+}

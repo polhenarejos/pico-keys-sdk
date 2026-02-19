@@ -74,5 +74,6 @@ extern uint16_t apdu_process(uint8_t, const uint8_t *buffer, uint16_t buffer_siz
 extern void apdu_finish();
 extern uint16_t apdu_next();
 extern void *apdu_thread(void *);
+extern int bulk_cmd(int (*cmd)());
 
 #endif

@@ -58,7 +58,11 @@
   #endif
   #include "queue.h"
  #endif
- #define FLASH_SECTOR_SIZE       4096
+ #ifdef ENABLE_EMULATION
+    #define FLASH_SECTOR_SIZE       0x4000
+ #else
+    #define FLASH_SECTOR_SIZE       0x1000
+ #endif
  #define XIP_BASE 0
  int fd_map = 0;
  uint8_t *map = NULL;

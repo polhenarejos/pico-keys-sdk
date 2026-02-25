@@ -22,7 +22,11 @@
 
 #if !defined(PICO_PLATFORM)
 #define XIP_BASE                0
-#define FLASH_SECTOR_SIZE       4096
+#ifdef ENABLE_EMULATION
+#define FLASH_SECTOR_SIZE       0x4000
+#else
+#define FLASH_SECTOR_SIZE       0x1000
+#endif
 #ifdef ESP_PLATFORM
 uint32_t FLASH_SIZE_BYTES = (1 * 1024 * 1024);
 #else

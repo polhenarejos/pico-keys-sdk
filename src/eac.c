@@ -21,6 +21,11 @@
 #include "mbedtls/cmac.h"
 #include "asn1.h"
 #include "apdu.h"
+#ifdef ENABLE_EMULATION
+#include "usb/emulation/emulation.h"
+#else
+#include "usb/usb.h"
+#endif
 
 static uint8_t sm_nonce[8];
 static uint8_t sm_kmac[16];
@@ -144,7 +149,7 @@ int sm_wrap() {
     if (sm_indicator == 0) {
         return PICOKEY_OK;
     }
-    uint8_t input[2048];
+    uint8_t input[USB_BUFFER_SIZE];
     size_t input_len = 0;
     memset(input, 0, sizeof(input));
     mbedtls_mpi ssc;
@@ -232,7 +237,7 @@ void sm_update_iv() {
 }
 
 int sm_verify() {
-    uint8_t input[2048];
+    uint8_t input[USB_BUFFER_SIZE];
     memset(input, 0, sizeof(input));
     uint16_t input_len = 0;
     int r = 0;

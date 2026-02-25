@@ -106,7 +106,9 @@ extern void driver_exec_finished_emul(uint8_t itf, uint16_t size_next);
 extern void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint16_t offset);
 #endif
 
+#ifndef USB_BUFFER_SIZE
 #define USB_BUFFER_SIZE         2048
+#endif
 
 PACK(
 typedef struct {

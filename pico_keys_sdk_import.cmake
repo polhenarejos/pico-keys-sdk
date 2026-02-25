@@ -79,6 +79,7 @@ endif()
 if(NOT DEFINED ENABLE_EMULATION)
     set(ENABLE_EMULATION 0)
 endif()
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/openssl.cmake)
 
 option(ENABLE_DELAYED_BOOT "Enable/disable delayed boot" OFF)
 if(ENABLE_DELAYED_BOOT)
@@ -392,13 +393,19 @@ endif()
     set(INCLUDES ${INCLUDES}
         ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
     )
-set(LIBRARIES
-    mbedtls
-)
+set(LIBRARIES)
+if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
+    list(APPEND LIBRARIES mbedtls)
+endif()
+if(USE_OPENSSL_EMULATION_WRAPPER)
+    list(APPEND LIBRARIES OpenSSL::Crypto)
+endif()
 
 if (NOT ESP_PLATFORM)
-    add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
-    target_include_directories(mbedtls PUBLIC ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include)
+    if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
+        add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
+        target_include_directories(mbedtls PUBLIC ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include)
+    endif()
     if(USB_ITF_HID)
         add_library(tinycbor STATIC ${CBOR_SOURCES})
         target_include_directories(tinycbor PUBLIC ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src)
@@ -479,6 +486,11 @@ if(ENABLE_EMULATION)
     set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
     )
+    if(USE_OPENSSL_EMULATION_WRAPPER)
+        set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+            ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/openssl.c
+        )
+    endif()
     set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aesni.c
     )
@@ -529,10 +541,12 @@ if(PICO_RP2350)
     set(INCLUDES ${INCLUDES}
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt
     )
-    target_include_directories(mbedtls PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt
-    )
-    target_link_libraries(mbedtls PRIVATE pico_sha256)
+    if(TARGET mbedtls)
+        target_include_directories(mbedtls PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt
+        )
+        target_link_libraries(mbedtls PRIVATE pico_sha256)
+    endif()
     set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt/sha256_alt.c
     )

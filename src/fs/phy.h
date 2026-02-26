@@ -61,6 +61,7 @@
 #ifdef ESP_PLATFORM
 #define PHY_LED_DRIVER_NEOPIXEL  0x5
 #endif
+#define PHY_LED_DRIVER_RP2350_ONE 0x6
 
 #define PHY_LED_DRIVER_NONE     0xFF
 

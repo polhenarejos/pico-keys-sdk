@@ -9,6 +9,7 @@ idf_component_register(
     SRCS ${MLKEM_SOURCES}
     INCLUDE_DIRS ${MLKEM_DIR}
 )
+idf_component_set_property(${COMPONENT_NAME} WHOLE_ARCHIVE ON)
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MLK_CONFIG_PARAMETER_SET=768

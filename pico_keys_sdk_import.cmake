@@ -444,9 +444,9 @@ endif()
 
 if(ENABLE_PQC)
     list(APPEND LIBRARIES
-        mlkem512
         mlkem768
         mlkem1024
+        mlkem512
     )
 endif()
 

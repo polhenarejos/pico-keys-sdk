@@ -53,7 +53,7 @@ list(APPEND SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/version.c
 )
 
-SET_VERSION(ver_major ver_minor "${CMAKE_CURRENT_LIST_DIR}/src/pico_keys_version.h" 3)
+SET_VERSION(ver_major ver_minor "${CMAKE_CURRENT_LIST_DIR}/src/pico_keys_version.h")
 
 if(ESP_PLATFORM)
     project(pico_rescue)

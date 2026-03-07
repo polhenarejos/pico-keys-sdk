@@ -416,7 +416,7 @@ if(USE_OPENSSL_EMULATION_WRAPPER)
     list(APPEND LIBRARIES OpenSSL::Crypto)
 endif()
 
-if (NOT ESP_PLATFORM)
+if(NOT ESP_PLATFORM)
     if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
         add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
         target_include_directories(mbedtls PUBLIC ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include)

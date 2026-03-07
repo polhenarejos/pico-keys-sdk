@@ -16,6 +16,7 @@
 #
 
 include(pico-keys-sdk/cmake/version.cmake OPTIONAL)
+include(pico-keys-sdk/cmake/options.cmake OPTIONAL)
 
 option(VIDPID "Set specific VID/PID from a known platform {NitroHSM, NitroFIDO2, NitroStart, NitroPro, Nitro3, Yubikey5, YubikeyNeo, YubiHSM, Gnuk, GnuPG}" "None")
 
@@ -33,7 +34,6 @@ elseif(VIDPID STREQUAL "NitroStart")
 elseif(VIDPID STREQUAL "NitroPro")
     set(USB_VID 0x20A0)
     set(USB_PID 0x4108)
-
 elseif(VIDPID STREQUAL "Nitro3")
     set(USB_VID 0x20A0)
     set(USB_PID 0x42B2)
@@ -66,12 +66,12 @@ endif()
 if(NOT DEFINED USB_VID)
     set(USB_VID 0x2E8A)
 endif()
-add_definitions(-DUSB_VID=${USB_VID})
+add_compile_definitions(USB_VID=${USB_VID})
 
 if(NOT DEFINED USB_PID)
     set(USB_PID 0x10FD)
 endif()
-add_definitions(-DUSB_PID=${USB_PID})
+add_compile_definitions(USB_PID=${USB_PID})
 
 if(NOT DEFINED DEBUG_APDU)
     set(DEBUG_APDU 0)
@@ -82,29 +82,32 @@ endif()
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/openssl.cmake)
 
 option(ENABLE_DELAYED_BOOT "Enable/disable delayed boot" OFF)
+configure_bool_option(
+    ENABLE_DELAYED_BOOT
+    ""
+    "Delayed boot:\t\t enabled"
+    "Delayed boot:\t\t disabled"
+)
 if(ENABLE_DELAYED_BOOT)
-    add_definitions(-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64)
-    message(STATUS "Delayed boot:\t\t enabled")
-else()
-    message(STATUS "Delayed boot:\t\t disabled")
-endif(ENABLE_DELAYED_BOOT)
+    add_compile_definitions(PICO_XOSC_STARTUP_DELAY_MULTIPLIER=64)
+endif()
 if(USB_ITF_HID)
-    add_definitions(-DUSB_ITF_HID=1)
+    add_compile_definitions(USB_ITF_HID=1)
     message(STATUS "USB HID Interface:\t\t enabled")
-endif(USB_ITF_HID)
+endif()
 if(USB_ITF_CCID)
-    add_definitions(-DUSB_ITF_CCID=1)
+    add_compile_definitions(USB_ITF_CCID=1)
     message(STATUS "USB CCID Interface:\t\t enabled")
     if(USB_ITF_WCID)
-        add_definitions(-DUSB_ITF_WCID=1)
+        add_compile_definitions(USB_ITF_WCID=1)
         message(STATUS "USB WebCCID Interface:\t enabled")
-    endif(USB_ITF_WCID)
-endif(USB_ITF_CCID)
-add_definitions(-DDEBUG_APDU=${DEBUG_APDU})
+    endif()
+endif()
+add_compile_definitions(DEBUG_APDU=${DEBUG_APDU})
 if(NOT ESP_PLATFORM)
-    add_definitions(-DMBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
+    add_compile_definitions(MBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
 else()
-    add_definitions(-DCFG_TUSB_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/src/usb/tusb_config.h")
+    add_compile_definitions(CFG_TUSB_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/src/usb/tusb_config.h")
 endif()
 
 message(STATUS "USB VID/PID:\t\t\t ${USB_VID}:${USB_PID}")
@@ -113,11 +116,12 @@ if(NOT ESP_PLATFORM)
     set(NEED_UPDATE OFF)
 
     option(ENABLE_EDDSA "Enable/disable EdDSA support" OFF)
-    if(ENABLE_EDDSA)
-        message(STATUS "EdDSA support:\t\t enabled")
-    else()
-        message(STATUS "EdDSA support:\t\t disabled")
-    endif(ENABLE_EDDSA)
+    configure_bool_option(
+        ENABLE_EDDSA
+        ""
+        "EdDSA support:\t\t enabled"
+        "EdDSA support:\t\t disabled"
+    )
 
     set(MBEDTLS_PATH "${CMAKE_SOURCE_DIR}/pico-keys-sdk/mbedtls")
     execute_process(
@@ -146,7 +150,12 @@ if(NOT ESP_PLATFORM)
             set(NEED_UPDATE OFF)
         endif()
 
-        add_definitions(-DMBEDTLS_ECP_DP_ED25519_ENABLED=1 -DMBEDTLS_ECP_DP_ED448_ENABLED=1 -DMBEDTLS_EDDSA_C=1 -DMBEDTLS_SHA3_C=1)
+        add_compile_definitions(
+            MBEDTLS_ECP_DP_ED25519_ENABLED=1
+            MBEDTLS_ECP_DP_ED448_ENABLED=1
+            MBEDTLS_EDDSA_C=1
+            MBEDTLS_SHA3_C=1
+        )
 
     else()
         set(MBEDTLS_ORIGIN "https://github.com/Mbed-TLS/mbedtls.git")
@@ -212,15 +221,18 @@ if(NOT ESP_PLATFORM)
     else()
         message(STATUS "mbedTLS source code is up to date.")
     endif()
-endif(NOT ESP_PLATFORM)
+endif()
 
 option(ENABLE_PQC "Enable/disable PQC support" OFF)
+configure_bool_option(
+    ENABLE_PQC
+    ""
+    "PQC support:\t\t\t enabled"
+    "PQC support:\t\t\t disabled"
+)
 if(ENABLE_PQC)
-    message(STATUS "PQC support:\t\t\t enabled")
-    add_definitions(-DENABLE_PQC)
-else()
-    message(STATUS "PQC support:\t\t\t disabled")
-endif(ENABLE_PQC)
+    add_compile_definitions(ENABLE_PQC)
+endif()
 
 set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
@@ -265,62 +277,65 @@ set(MBEDTLS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
 )
 
-if (ENABLE_EDDSA)
-    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
+if(ENABLE_EDDSA)
+    list(APPEND MBEDTLS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/eddsa.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha3.c
     )
 endif()
 
 if(ENABLE_PQC)
-if (NOT ESP_PLATFORM)
-    file(GLOB_RECURSE MLKEM_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src/*.c
-    )
-    list(FILTER MLKEM_SOURCES EXCLUDE REGEX "/native/")
+    if(NOT ESP_PLATFORM)
+        file(GLOB_RECURSE MLKEM_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src/*.c
+        )
+        list(FILTER MLKEM_SOURCES EXCLUDE REGEX "/native/")
 
-    add_library(mlkem512 STATIC ${MLKEM_SOURCES})
-    target_include_directories(mlkem512 PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
-        ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
-    )
-    target_compile_definitions(mlkem512 PRIVATE
-        MLK_CONFIG_PARAMETER_SET=512
-        MLK_CONFIG_MULTILEVEL_WITH_SHARED
-        MLK_CONFIG_NAMESPACE_PREFIX=mlkem
-    )
+        add_library(mlkem512 STATIC ${MLKEM_SOURCES})
+        target_include_directories(mlkem512 PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
+            ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
+        )
+        target_compile_definitions(mlkem512 PRIVATE
+            MLK_CONFIG_PARAMETER_SET=512
+            MLK_CONFIG_MULTILEVEL_WITH_SHARED
+            MLK_CONFIG_NAMESPACE_PREFIX=mlkem
+        )
 
-    add_library(mlkem768 STATIC ${MLKEM_SOURCES})
-    target_include_directories(mlkem768 PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
-        ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
-    )
-    target_compile_definitions(mlkem768 PRIVATE
-        MLK_CONFIG_PARAMETER_SET=768
-        MLK_CONFIG_MULTILEVEL_NO_SHARED
-        MLK_CONFIG_NAMESPACE_PREFIX=mlkem
-    )
+        add_library(mlkem768 STATIC ${MLKEM_SOURCES})
+        target_include_directories(mlkem768 PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
+            ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
+        )
+        target_compile_definitions(mlkem768 PRIVATE
+            MLK_CONFIG_PARAMETER_SET=768
+            MLK_CONFIG_MULTILEVEL_NO_SHARED
+            MLK_CONFIG_NAMESPACE_PREFIX=mlkem
+        )
 
-    add_library(mlkem1024 STATIC ${MLKEM_SOURCES})
-    target_include_directories(mlkem1024 PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
-        ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
-    )
-    target_compile_definitions(mlkem1024 PRIVATE
-        MLK_CONFIG_PARAMETER_SET=1024
-        MLK_CONFIG_MULTILEVEL_NO_SHARED
-        MLK_CONFIG_NAMESPACE_PREFIX=mlkem
-    )
-endif()
+        add_library(mlkem1024 STATIC ${MLKEM_SOURCES})
+        target_include_directories(mlkem1024 PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
+            ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
+        )
+        target_compile_definitions(mlkem1024 PRIVATE
+            MLK_CONFIG_PARAMETER_SET=1024
+            MLK_CONFIG_MULTILEVEL_NO_SHARED
+            MLK_CONFIG_NAMESPACE_PREFIX=mlkem
+        )
+    endif()
 
-    set(INCLUDES ${INCLUDES}
+    list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem
         ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
     )
-    add_definitions(-DMLK_CONFIG_NAMESPACE_PREFIX=mlkem -DMLK_CONFIG_MULTILEVEL_BUILD=1)
+    add_compile_definitions(
+        MLK_CONFIG_NAMESPACE_PREFIX=mlkem
+        MLK_CONFIG_MULTILEVEL_BUILD=1
+    )
 endif()
 
-set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+list(APPEND PICO_KEYS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
@@ -339,19 +354,19 @@ set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
 )
 
 if(ESP_PLATFORM)
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+    list(APPEND PICO_KEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c
         ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
     )
 else()
-  if (NOT ENABLE_EMULATION)
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
-      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_cyw43.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pimoroni.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/led/led_ws2812.c
-    )
-  endif()
+    if(NOT ENABLE_EMULATION)
+        list(APPEND PICO_KEYS_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/src/led/led_cyw43.c
+            ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
+            ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pimoroni.c
+            ${CMAKE_CURRENT_LIST_DIR}/src/led/led_ws2812.c
+        )
+    endif()
 endif()
 
 ## mbedTLS reports an stringop overflow for cmac.c
@@ -362,7 +377,7 @@ if(NOT ENABLE_EMULATION AND NOT APPLE)
         COMPILE_FLAGS "-Wno-error=stringop-overflow= -Wno-stringop-overflow"
     )
 endif()
-set(INCLUDES ${INCLUDES}
+list(APPEND INCLUDES
     ${CMAKE_CURRENT_LIST_DIR}/src
     ${CMAKE_CURRENT_LIST_DIR}/src/usb
     ${CMAKE_CURRENT_LIST_DIR}/src/fs
@@ -373,7 +388,7 @@ set(INCLUDES ${INCLUDES}
 )
 
 if(USB_ITF_HID)
-    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
+    list(APPEND MBEDTLS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_csr.c
@@ -381,18 +396,18 @@ if(USB_ITF_HID)
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
     )
-
 endif()
 
-    set(CBOR_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
-        ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser.c
-        ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c
-    )
+set(CBOR_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
+    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser.c
+    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c
+)
 
-    set(INCLUDES ${INCLUDES}
-        ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
-    )
+list(APPEND INCLUDES
+    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
+)
+
 set(LIBRARIES)
 if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
     list(APPEND LIBRARIES mbedtls)
@@ -409,11 +424,11 @@ if (NOT ESP_PLATFORM)
     if(USB_ITF_HID)
         add_library(tinycbor STATIC ${CBOR_SOURCES})
         target_include_directories(tinycbor PUBLIC ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src)
-        set(LIBRARIES ${LIBRARIES} tinycbor)
+        list(APPEND LIBRARIES tinycbor)
     endif()
 endif()
 
-if (PICO_PLATFORM)
+if(PICO_PLATFORM)
     list(APPEND LIBRARIES
         pico_stdlib
         pico_multicore
@@ -427,7 +442,7 @@ if (PICO_PLATFORM)
     )
 endif()
 
-if (ENABLE_PQC)
+if(ENABLE_PQC)
     list(APPEND LIBRARIES
         mlkem512
         mlkem768
@@ -436,12 +451,12 @@ if (ENABLE_PQC)
 endif()
 
 set(IS_CYW43 0)
-if (PICO_PLATFORM)
+if(PICO_PLATFORM)
     file(READ ${PICO_SDK_PATH}/src/boards/include/boards/${PICO_BOARD}.h content)
     string(REGEX MATCHALL "CYW43_WL_GPIO_LED_PIN" _ ${content})
-    if (CMAKE_MATCH_0)
+    if(CMAKE_MATCH_0)
         message(STATUS "Found cyw43 LED:\t\t true")
-        set(LIBRARIES ${LIBRARIES} pico_cyw43_arch_none)
+        list(APPEND LIBRARIES pico_cyw43_arch_none)
         set(IS_CYW43 1)
     endif()
 endif()
@@ -453,28 +468,28 @@ function(add_impl_library target)
 endfunction()
 
 if(USB_ITF_HID)
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+    list(APPEND PICO_KEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
     )
-    set(INCLUDES ${INCLUDES}
+    list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid
     )
 endif()
 
 if(USB_ITF_CCID)
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+    list(APPEND PICO_KEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
     )
-    set(INCLUDES ${INCLUDES}
+    list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid
     )
 endif()
 
 if(NOT MSVC)
-add_definitions("-fmacro-prefix-map=${CMAKE_CURRENT_LIST_DIR}/=")
+    add_compile_options("-fmacro-prefix-map=${CMAKE_CURRENT_LIST_DIR}/=")
 endif()
 if(MSVC)
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+    list(APPEND PICO_KEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/mman.c
     )
 endif()
@@ -482,23 +497,23 @@ if(ENABLE_EMULATION)
     if(APPLE)
         add_definitions("-Wno-deprecated-declarations")
     endif()
-    add_definitions(-DENABLE_EMULATION)
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+    add_compile_definitions(ENABLE_EMULATION)
+    list(APPEND PICO_KEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
     )
     if(USE_OPENSSL_EMULATION_WRAPPER)
-        set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+        list(APPEND PICO_KEYS_SOURCES
             ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/openssl.c
         )
     endif()
-    set(MBEDTLS_SOURCES ${MBEDTLS_SOURCES}
+    list(APPEND MBEDTLS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aesni.c
     )
-    set(INCLUDES ${INCLUDES}
+    list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
     )
 else()
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+    list(APPEND PICO_KEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )
 endif()
@@ -509,7 +524,8 @@ if(MSVC)
         "${CMAKE_C_FLAGS} -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105 -wd4141 -wd4200"
     )
 
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS
+    add_compile_definitions(
+        _CRT_SECURE_NO_WARNINGS
         __STDC_WANT_SECURE_LIB__=0
         _WIN32_WINNT_WIN10_TH2=0
         _WIN32_WINNT_WIN10_RS1=0
@@ -518,27 +534,28 @@ if(MSVC)
         _WIN32_WINNT_WIN10_RS4=0
         _WIN32_WINNT_WIN10_RS5=0
         _STRALIGN_USE_SECURE_CRT=0
-        NTDDI_WIN11_DT=0)
+        NTDDI_WIN11_DT=0
+    )
 endif()
 
 if(PICO_PLATFORM)
-pico_sdk_init()
+    pico_sdk_init()
 endif()
 
 if(PICO_RP2350)
     pico_set_uf2_family(${CMAKE_PROJECT_NAME} "rp2350-arm-s")
     pico_embed_pt_in_binary(${CMAKE_PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/config/rp2350/pt.json")
-    if (NOT IS_CYW43)
+    if(NOT IS_CYW43)
         pico_set_binary_type(${CMAKE_PROJECT_NAME} copy_to_ram)
     endif()
-    if (SECURE_BOOT_PKEY)
+    if(SECURE_BOOT_PKEY)
         message(STATUS "Secure Boot Key ${SECURE_BOOT_PKEY}")
         pico_sign_binary(${CMAKE_PROJECT_NAME} ${SECURE_BOOT_PKEY})
         pico_hash_binary(${CMAKE_PROJECT_NAME})
     endif()
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE pico_bootrom)
 
-    set(INCLUDES ${INCLUDES}
+    list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt
     )
     if(TARGET mbedtls)
@@ -547,11 +564,11 @@ if(PICO_RP2350)
         )
         target_link_libraries(mbedtls PRIVATE pico_sha256)
     endif()
-    set(PICO_KEYS_SOURCES ${PICO_KEYS_SOURCES}
+    list(APPEND PICO_KEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt/sha256_alt.c
     )
-    add_definitions(-DMBEDTLS_SHA256_ALT=1)
-    set(LIBRARIES ${LIBRARIES} pico_sha256)
+    add_compile_definitions(MBEDTLS_SHA256_ALT=1)
+    list(APPEND LIBRARIES pico_sha256)
 endif()
 set(INTERNAL_SOURCES ${PICO_KEYS_SOURCES})
 

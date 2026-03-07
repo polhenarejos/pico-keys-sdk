@@ -1,23 +1,23 @@
- #
- # This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
- # Copyright (c) 2022 Pol Henarejos.
- #
- # This program is free software: you can redistribute it and/or modify
- # it under the terms of the GNU General Public License as published by
- # the Free Software Foundation, version 3.
- #
- # This program is distributed in the hope that it will be useful, but
- # WITHOUT ANY WARRANTY; without even the implied warranty of
- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- # General Public License for more details.
- #
- # You should have received a copy of the GNU General Public License
- # along with this program. If not, see <http://www.gnu.org/licenses/>.
- #
+#
+# This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
+# Copyright (c) 2022 Pol Henarejos.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 
- cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.16)
 
- if(ESP_PLATFORM)
+if(ESP_PLATFORM)
     set(EXTRA_COMPONENT_DIRS src)
     include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 else()
@@ -35,7 +35,7 @@ else()
         set(__FOR_CI 0)
     endif()
     if(__FOR_CI)
-        add_definitions(-D__FOR_CI)
+        add_compile_definitions(__FOR_CI)
     endif()
 
     add_executable(pico_rescue)
@@ -48,7 +48,7 @@ include(pico_keys_sdk_import.cmake)
 if(NOT ESP_PLATFORM)
     set(SOURCES ${PICO_KEYS_SOURCES})
 endif()
-set(SOURCES ${SOURCES}
+list(APPEND SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/files.c
     ${CMAKE_CURRENT_LIST_DIR}/src/version.c
 )
@@ -63,40 +63,26 @@ if(NOT ESP_PLATFORM)
     target_sources(pico_rescue PUBLIC ${SOURCES})
     target_include_directories(pico_rescue PUBLIC ${INCLUDES})
 
-    target_compile_options(pico_rescue PUBLIC
-        -Wall
-    )
+    target_compile_options(pico_rescue PRIVATE -Wall)
     if(NOT MSVC)
-        target_compile_options(pico_rescue PUBLIC
-            -Werror
-        )
+        target_compile_options(pico_rescue PRIVATE -Werror)
     endif()
 
     if(ENABLE_EMULATION)
         if(NOT MSVC)
-            target_compile_options(pico_rescue PUBLIC
-                -fdata-sections
-                -ffunction-sections
-            )
+            target_compile_options(pico_rescue PRIVATE -fdata-sections -ffunction-sections)
         endif()
         if(APPLE)
-            target_link_options(pico_rescue PUBLIC
-                -Wl,-dead_strip
-            )
+            target_link_options(pico_rescue PRIVATE -Wl,-dead_strip)
         elseif(MSVC)
-            target_compile_options(pico_rescue PUBLIC
-                -WX
-            )
+            target_compile_options(pico_rescue PRIVATE -WX)
 
-            target_link_libraries(pico_rescue PUBLIC wsock32 ws2_32 Bcrypt)
+            target_link_libraries(pico_rescue PRIVATE wsock32 ws2_32 Bcrypt)
         else()
-            target_link_options(pico_rescue PUBLIC
-                -Wl,--gc-sections
-            )
-        endif(APPLE)
+            target_link_options(pico_rescue PRIVATE -Wl,--gc-sections)
+        endif()
         target_link_libraries(pico_rescue PRIVATE pthread m)
     else()
         pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
     endif()
 endif()
-

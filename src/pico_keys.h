@@ -70,9 +70,9 @@
 #include <time.h>
 #endif
 
-extern bool wait_button();
+extern bool wait_button(void);
 
-extern void low_flash_init_core1();
+extern void low_flash_init_core1(void);
 
 static inline uint16_t make_uint16_t_be(uint8_t b1, uint8_t b2) {
     return (b1 << 8) | b2;
@@ -159,12 +159,12 @@ static inline uint32_t put_uint64_t_le(uint64_t n, uint8_t *b) {
     return 8;
 }
 
-extern void low_flash_available();
+extern void low_flash_available(void);
 extern int flash_clear_file(file_t *file);
 
 extern int (*button_pressed_cb)(uint8_t);
 
-extern bool is_req_button_pending();
+extern bool is_req_button_pending(void);
 
 #define SW_BYTES_REMAINING_00()             set_res_sw(0x61, 0x00)
 #define SW_WARNING_STATE_UNCHANGED()        set_res_sw(0x62, 0x00)
@@ -251,8 +251,8 @@ extern uint8_t pico_serial_hash[32];
 #define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
 #endif
 
-extern bool has_set_rtc();
-extern time_t get_rtc_time();
+extern bool has_set_rtc(void);
+extern time_t get_rtc_time(void);
 extern void set_rtc_time(time_t tv_sec);
 
 #endif

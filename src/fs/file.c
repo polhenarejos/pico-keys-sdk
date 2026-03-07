@@ -33,7 +33,7 @@ extern uint16_t flash_read_uint16(uintptr_t addr);
 extern uint8_t flash_read_uint8(uintptr_t addr);
 extern uint8_t *flash_read(uintptr_t addr);
 extern int flash_clear_file(file_t *ef);
-extern void low_flash_available();
+extern void low_flash_available(void);
 
 #ifndef ENABLE_EMULATION
 file_t sef_phy = {.fid = EF_PHY, .parent = 5, .name = NULL, .type = FILE_TYPE_INTERNAL_EF | FILE_DATA_FLASH | FILE_PERSISTENT, .data = NULL, .ef_structure = FILE_EF_TRANSPARENT, .acl = {0xff}};

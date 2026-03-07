@@ -315,7 +315,7 @@ bool otp_is_secure_boot_enabled(uint8_t *bootkey) {
     return false;
 }
 
-bool otp_is_secure_boot_locked() {
+bool otp_is_secure_boot_locked(void) {
     uint8_t bootkey_idx = 0xFF;
     if (otp_is_secure_boot_enabled(&bootkey_idx) == false) {
         return false;
@@ -518,7 +518,7 @@ void otp_migrate_chaff() {
 }
 #endif
 
-void init_otp_files() {
+void init_otp_files(void) {
 
 #ifdef PICO_RP2350
     otp_migrate_chaff();

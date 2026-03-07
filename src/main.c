@@ -47,7 +47,7 @@
 
 extern void do_flash();
 extern void low_flash_init();
-extern void init_otp_files();
+extern void init_otp_files(void);
 
 app_t apps[16];
 uint8_t num_apps = 0;
@@ -109,7 +109,7 @@ void execute_tasks();
 
 static bool req_button_pending = false;
 
-bool is_req_button_pending() {
+bool is_req_button_pending(void) {
     return req_button_pending;
 }
 
@@ -196,7 +196,7 @@ bool picok_board_button_read(void) {
 bool button_pressed_state = false;
 uint32_t button_pressed_time = 0;
 uint8_t button_press = 0;
-bool wait_button() {
+bool wait_button(void) {
     /* Disabled by default. As LED may not be properly configured,
        it will not be possible to indicate button press unless it
        is commissioned. */
@@ -244,7 +244,7 @@ __attribute__((weak)) int picokey_init() {
 
 bool set_rtc = false;
 
-bool has_set_rtc() {
+bool has_set_rtc(void) {
     return set_rtc;
 }
 
@@ -259,7 +259,7 @@ void set_rtc_time(time_t t) {
     set_rtc = true;
 }
 
-time_t get_rtc_time() {
+time_t get_rtc_time(void) {
 #ifdef PICO_PLATFORM
     struct timespec tv;
     aon_timer_get_time(&tv);

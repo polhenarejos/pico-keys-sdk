@@ -230,7 +230,7 @@ void low_flash_init() {
     flash_set_bounds(data_start_addr, data_end_addr);
 }
 
-void low_flash_init_core1() {
+void low_flash_init_core1(void) {
     mutex_enter_blocking(&mtx_flash);
     multicore_lockout_victim_init();
     locked_out = true;
@@ -243,7 +243,7 @@ void wait_flash_finish() {
     sem_acquire_blocking(&sem_flash); //decrease permits
 }
 
-void low_flash_available() {
+void low_flash_available(void) {
     mutex_enter_blocking(&mtx_flash);
     flash_available = true;
     mutex_exit(&mtx_flash);

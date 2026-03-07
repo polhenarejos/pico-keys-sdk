@@ -61,7 +61,7 @@ extern uintptr_t flash_read_uintptr(uintptr_t addr);
 extern uint16_t flash_read_uint16(uintptr_t addr);
 extern uint8_t *flash_read(uintptr_t addr);
 
-extern void low_flash_available();
+extern void low_flash_available(void);
 
 uintptr_t last_base;
 uint32_t num_files = 0;

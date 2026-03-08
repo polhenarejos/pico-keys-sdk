@@ -279,7 +279,6 @@ void scan_region(bool persistent)
         }
     }
 }
-void wait_flash_finish();
 void scan_flash() {
     initialize_flash(false); //soft initialization
     uint32_t r1 = (uint32_t)(*(uintptr_t *) flash_read(end_rom_pool)), r2 = (uint32_t)(*(uintptr_t *) flash_read(end_rom_pool + sizeof(uintptr_t)));
@@ -290,7 +289,6 @@ void scan_flash() {
         flash_program_block(end_data_pool, empty, sizeof(empty));
         flash_program_block(end_rom_pool, empty, sizeof(empty));
         //low_flash_available();
-        //wait_flash_finish();
     }
     printf("SCAN\n");
     scan_region(true);

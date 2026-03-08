@@ -238,7 +238,6 @@ void card_exit(void) {
 }
 extern void hid_task(void);
 extern void ccid_task(void);
-extern void emul_task(void);
 void usb_task(void) {
 #ifdef USB_ITF_HID
     hid_task();

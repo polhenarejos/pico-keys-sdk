@@ -31,10 +31,10 @@ static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 #include "apdu.h"
 #include "usb.h"
 
-extern void init_fido();
+extern void init_fido(void);
 bool is_nk = false;
-uint8_t (*get_version_major)() = NULL;
-uint8_t (*get_version_minor)() = NULL;
+uint8_t (*get_version_major)(void) = NULL;
+uint8_t (*get_version_minor)(void) = NULL;
 
 static usb_buffer_t *hid_rx = NULL, *hid_tx = NULL;
 
@@ -51,12 +51,18 @@ static uint16_t *send_buffer_size = NULL;
 static write_status_t *last_write_result = NULL;
 
 CTAPHID_FRAME *ctap_req = NULL, *ctap_resp = NULL;
-void send_keepalive();
+static void send_keepalive(void);
 int driver_process_usb_packet_hid(uint16_t read);
 int driver_write_hid(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size);
-int driver_process_usb_nopacket_hid();
+static int driver_process_usb_nopacket_hid(void);
+void hid_init(void);
+void hid_task(void);
+#ifdef ENABLE_EMULATION
+uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t report_type, uint8_t *buffer, uint16_t reqlen);
+void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t report_type, uint8_t const *buffer, uint16_t bufsize);
+#endif
 
-void hid_init() {
+void hid_init(void) {
     if (ITF_HID_TOTAL == 0) {
         return;
     }
@@ -74,7 +80,7 @@ void hid_init() {
     }
 }
 
-int driver_init_hid() {
+int driver_init_hid(void) {
 #ifndef ENABLE_EMULATION
     static bool _init = false;
     if (_init == false) {
@@ -96,10 +102,6 @@ int driver_init_hid() {
     hid_tx[ITF_HID_CTAP].w_ptr = hid_tx[ITF_HID_CTAP].r_ptr = 0;
     send_buffer_size[ITF_HID_CTAP] = 0;
     return 0;
-}
-
-uint16_t *get_send_buffer_size(uint8_t itf) {
-    return &send_buffer_size[itf];
 }
 
 //--------------------------------------------------------------------+
@@ -127,7 +129,7 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
     return reqlen;
 }
 
-uint32_t hid_write_offset(uint16_t size, uint16_t offset) {
+static uint32_t hid_write_offset(uint16_t size, uint16_t offset) {
     if (hid_tx[ITF_HID_CTAP].buffer[offset] != 0x81) {
         DEBUG_PAYLOAD(&hid_tx[ITF_HID_CTAP].buffer[offset], size);
     }
@@ -136,7 +138,7 @@ uint32_t hid_write_offset(uint16_t size, uint16_t offset) {
     return size;
 }
 
-uint32_t hid_write(uint16_t size) {
+static uint32_t hid_write(uint16_t size) {
     return hid_write_offset(size, 0);
 }
 
@@ -309,7 +311,7 @@ uint8_t thread_type = 0; //1 is APDU, 2 is CBOR
 extern bool cancel_button;
 extern int cbor_process(uint8_t last_cmd, const uint8_t *data, size_t len);
 
-int driver_process_usb_nopacket_hid() {
+int driver_process_usb_nopacket_hid(void) {
     if (last_packet_time > 0 && last_packet_time + 500 < board_millis()) {
         ctap_error(CTAP1_ERR_MSG_TIMEOUT);
         last_packet_time = 0;
@@ -320,6 +322,10 @@ int driver_process_usb_nopacket_hid() {
 
 extern const uint8_t fido_aid[], u2f_aid[], oath_aid[];
 extern void *cbor_thread(void *);
+
+uint16_t *get_send_buffer_size(uint8_t itf) {
+    return &send_buffer_size[itf];
+}
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
@@ -549,7 +555,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
     return apdu_sent;
 }
 
-void send_keepalive() {
+static void send_keepalive(void) {
     if (thread_type == 1) {
         return;
     }
@@ -593,7 +599,7 @@ void driver_exec_finished_cont_hid(uint8_t itf, uint16_t size_next, uint16_t off
     }
 }
 
-void hid_task() {
+void hid_task(void) {
 #ifdef ENABLE_EMULATION
     uint16_t rx_len = emul_read(ITF_HID);
     if (rx_len) {

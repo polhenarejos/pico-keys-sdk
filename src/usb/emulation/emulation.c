@@ -60,7 +60,7 @@ extern int cbor_parse(uint8_t cmd, const uint8_t *data, size_t len);
 pthread_t hcore0, hcore1;
 
 #ifndef _MSC_VER
-int msleep(long msec) {
+static int msleep(long msec) {
     struct timespec ts;
     int res;
 
@@ -80,7 +80,7 @@ int msleep(long msec) {
 }
 #endif
 
-int emul_init(char *host, uint16_t port) {
+int emul_init(const char *host, uint16_t port) {
     struct sockaddr_in serv_addr;
     fprintf(stderr, "\n Starting emulation envionrment\n");
 #ifdef _MSC_VER
@@ -167,7 +167,7 @@ int emul_init(char *host, uint16_t port) {
     return 0;
 }
 
-socket_t get_sock_itf(uint8_t itf) {
+static socket_t get_sock_itf(uint8_t itf) {
 #ifdef USB_ITF_CCID
     if (itf == ITF_CCID) {
         return ccid_sock;
@@ -333,7 +333,7 @@ uint16_t emul_read(uint8_t itf) {
     return emul_rx_size;
 }
 
-void emul_task() {
+void emul_task(void) {
 #ifdef USB_ITF_CCID
     emul_read(ITF_CCID);
 #endif

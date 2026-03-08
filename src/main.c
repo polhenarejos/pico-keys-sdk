@@ -41,12 +41,11 @@
 #endif
 
 #include "random.h"
+#include "hwrng.h"
 #include "apdu.h"
 #include "usb.h"
 #include "mbedtls/sha256.h"
 
-extern void do_flash();
-extern void low_flash_init();
 extern void init_otp_files(void);
 
 app_t apps[16];
@@ -105,7 +104,7 @@ int select_app(const uint8_t *aid, size_t aid_len) {
 
 int (*button_pressed_cb)(uint8_t) = NULL;
 
-void execute_tasks();
+static void execute_tasks(void);
 
 static bool req_button_pending = false;
 
@@ -146,12 +145,12 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
 #endif
 #if !defined(ENABLE_EMULATION)
 #ifdef ESP_PLATFORM
-bool picok_board_button_read() {
+static bool picok_board_button_read(void) {
     int boot_state = gpio_get_level(BOOT_PIN);
     return boot_state == 0;
 }
 #elif defined(PICO_PLATFORM)
-bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
+static bool __no_inline_not_in_flash_func(picok_get_bootsel_button)(void) {
     const uint CS_PIN_INDEX = 1;
 
     // Must disable interrupts, as interrupt handlers may be in flash, and we
@@ -168,7 +167,7 @@ bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
 
     // The HI GPIO registers in SIO can observe and control the 6 QSPI pins.
     // Note the button pulls the pin *low* when pressed.
-#if PICO_RP2040
+#ifdef PICO_RP2040
     #define CS_BIT (1u << 1)
 #else
     #define CS_BIT SIO_GPIO_HI_IN_QSPI_CSN_BITS
@@ -185,11 +184,11 @@ bool __no_inline_not_in_flash_func(picok_get_bootsel_button)() {
 
     return button_state;
 }
-bool picok_board_button_read(void) {
+static bool picok_board_button_read(void) {
   return picok_get_bootsel_button();
 }
 #else
-bool picok_board_button_read(void) {
+static bool picok_board_button_read(void) {
     return true; // always unpressed
 }
 #endif
@@ -236,7 +235,7 @@ bool wait_button(void) {
     return timeout || cancel_button;
 }
 
-__attribute__((weak)) int picokey_init() {
+__attribute__((weak)) int picokey_init(void) {
     return 0;
 }
 
@@ -273,7 +272,7 @@ time_t get_rtc_time(void) {
 
 struct apdu apdu;
 
-void init_rtc() {
+static void init_rtc(void) {
 #ifdef PICO_PLATFORM
     struct timespec tv = {0};
     tv.tv_sec = 1577836800; // 2020-01-01
@@ -281,9 +280,7 @@ void init_rtc() {
 #endif
 }
 
-extern void hwrng_task();
-extern void usb_task();
-void execute_tasks()
+static void execute_tasks(void)
 {
 #if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
     tud_task(); // tinyusb device task
@@ -292,7 +289,8 @@ void execute_tasks()
     led_blinking_task();
 }
 
-void core0_loop() {
+static void core0_loop(void *arg) {
+    (void)arg;
     while (1) {
         execute_tasks();
         hwrng_task();
@@ -331,7 +329,7 @@ pico_unique_board_id_t pico_serial;
 extern tinyusb_config_t tusb_cfg;
 extern const uint8_t desc_config[];
 TaskHandle_t hcore0 = NULL, hcore1 = NULL;
-int app_main() {
+int app_main(void) {
 #else
 #ifndef PICO_PLATFORM
 #define pico_get_unique_board_id(a) memset(a, 0, sizeof(*(a)))
@@ -405,7 +403,7 @@ int main(void) {
 #ifdef ESP_PLATFORM
     xTaskCreatePinnedToCore(core0_loop, "core0", 4096*ITF_TOTAL*2, NULL, CONFIG_TINYUSB_TASK_PRIORITY - 1, &hcore0, ESP32_CORE0);
 #else
-    core0_loop();
+    core0_loop(NULL);
 #endif
 
     return 0;

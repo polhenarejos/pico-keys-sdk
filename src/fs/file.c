@@ -26,15 +26,6 @@ extern const uintptr_t end_data_pool;
 extern const uintptr_t start_data_pool;
 extern const uintptr_t end_rom_pool;
 extern const uintptr_t start_rom_pool;
-extern int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len);
-extern int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len);
-extern uintptr_t flash_read_uintptr(uintptr_t addr);
-extern uint16_t flash_read_uint16(uintptr_t addr);
-extern uint8_t flash_read_uint8(uintptr_t addr);
-extern uint8_t *flash_read(uintptr_t addr);
-extern int flash_clear_file(file_t *ef);
-extern void low_flash_available(void);
-
 #ifndef ENABLE_EMULATION
 file_t sef_phy = {.fid = EF_PHY, .parent = 5, .name = NULL, .type = FILE_TYPE_INTERNAL_EF | FILE_DATA_FLASH | FILE_PERSISTENT, .data = NULL, .ef_structure = FILE_EF_TRANSPARENT, .acl = {0xff}};
 file_t *ef_phy = &sef_phy;
@@ -55,7 +46,8 @@ void process_fci(const file_t *pe, int fmd) {
     res_APDU[res_APDU_size++] = 2;
     if (pe->data) {
         if ((pe->type & FILE_DATA_FUNC) == FILE_DATA_FUNC) {
-            uint16_t len = (uint16_t)((int (*)(const file_t *, int))(pe->data))(pe, 0);
+            int (*data_fn)(const file_t *, int) = (int (*)(const file_t *, int))(uintptr_t)pe->data;
+            uint16_t len = (uint16_t)data_fn(pe, 0);
             res_APDU_size += put_uint16_t_be(len, res_APDU + res_APDU_size);
         }
         else {
@@ -115,7 +107,7 @@ file_t dynamic_file[MAX_DYNAMIC_FILES];
 
 bool card_terminated = false;
 
-bool is_parent(const file_t *child, const file_t *parent) {
+static bool is_parent(const file_t *child, const file_t *parent) {
     if (child == parent) {
         return true;
     }
@@ -166,7 +158,7 @@ file_t *search_file(const uint16_t fid) {
     return search_dynamic_file(fid);
 }
 
-uint8_t make_path_buf(const file_t *pe, uint8_t *buf, uint8_t buflen, const file_t *top) {
+static uint8_t make_path_buf(const file_t *pe, uint8_t *buf, uint8_t buflen, const file_t *top) {
     if (!buflen) {
         return 0;
     }
@@ -177,7 +169,7 @@ uint8_t make_path_buf(const file_t *pe, uint8_t *buf, uint8_t buflen, const file
     return make_path_buf(&file_entries[pe->parent], buf + 2, buflen - 2, top) + 2;
 }
 
-uint8_t make_path(const file_t *pe, const file_t *top, uint8_t *path) {
+static uint8_t make_path(const file_t *pe, const file_t *top, uint8_t *path) {
     uint8_t buf[MAX_DEPTH * 2], *p = path;
     put_uint16_t_be(pe->fid, buf);
     uint8_t depth = make_path_buf(&file_entries[pe->parent], buf + 2, sizeof(buf) - 2, top) + 2;
@@ -243,7 +235,7 @@ void initialize_flash(bool hard) {
 
 extern uintptr_t last_base;
 extern uint32_t num_files;
-void scan_region(bool persistent)
+static void scan_region(bool persistent)
 {
     uintptr_t endp = end_data_pool, startp = start_data_pool;
     if (persistent) {
@@ -279,9 +271,10 @@ void scan_region(bool persistent)
         }
     }
 }
-void scan_flash() {
+void scan_flash(void) {
     initialize_flash(false); //soft initialization
-    uint32_t r1 = (uint32_t)(*(uintptr_t *) flash_read(end_rom_pool)), r2 = (uint32_t)(*(uintptr_t *) flash_read(end_rom_pool + sizeof(uintptr_t)));
+    uint32_t r1 = (uint32_t)flash_read_uintptr(end_rom_pool);
+    uint32_t r2 = (uint32_t)flash_read_uintptr(end_rom_pool + sizeof(uintptr_t));
     if ((r1 == 0xffffffff || r1 == 0xefefefef) && (r2 == 0xffffffff || r2 == 0xefefefef)) {
         printf("First initialization (or corrupted!)\n");
         uint8_t empty[sizeof(uintptr_t) * 2 + sizeof(uint32_t)];

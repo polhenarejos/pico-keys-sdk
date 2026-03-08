@@ -467,6 +467,64 @@ function(add_impl_library target)
     target_compile_definitions(${target} INTERFACE LIB_${TARGET_UPPER}=1)
 endfunction()
 
+# Apply strict warning flags to a caller-provided source list.
+# Usage:
+#   pico_keys_apply_strict_flags(SOURCES ${SOURCES} FILTER_REGEX "/src/fido/")
+function(pico_keys_apply_strict_flags)
+    set(options)
+    set(oneValueArgs FILTER_REGEX)
+    set(multiValueArgs SOURCES)
+    cmake_parse_arguments(PKAS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    if(NOT PKAS_SOURCES)
+        return()
+    endif()
+
+    set(PICO_KEYS_STRICT_FLAGS
+        -Wextra
+        -pipe
+        -funsigned-char
+        -fstrict-aliasing
+        -Wchar-subscripts
+        -Wundef
+        -Wshadow
+        -Wcast-align
+        -Wwrite-strings
+        -Wunused
+        -Wuninitialized
+        -Wpointer-arith
+        -Wredundant-decls
+        -Winline
+        -Wformat
+        -Wformat-security
+        -Wswitch-enum
+        -Winit-self
+        -Wmissing-include-dirs
+        -Wempty-body
+        -fdiagnostics-color=auto
+        -Wmissing-prototypes
+        -Wstrict-prototypes
+        -Wold-style-definition
+        -Wbad-function-cast
+        -Wnested-externs
+        -Wmissing-declarations
+        -Werror
+    )
+
+    if(NOT ENABLE_EMULATION)
+        list(APPEND PICO_KEYS_STRICT_FLAGS -D_FORTIFY_SOURCE=2)
+    endif()
+
+    foreach(src IN LISTS PKAS_SOURCES)
+        if(PKAS_FILTER_REGEX)
+            if(NOT src MATCHES "${PKAS_FILTER_REGEX}")
+                continue()
+            endif()
+        endif()
+        set_property(SOURCE "${src}" APPEND PROPERTY COMPILE_OPTIONS ${PICO_KEYS_STRICT_FLAGS})
+    endforeach()
+endfunction()
+
 if(USB_ITF_HID)
     list(APPEND PICO_KEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c

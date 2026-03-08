@@ -71,6 +71,7 @@
 #endif
 
 extern bool wait_button(void);
+extern int picokey_init(void);
 
 extern void low_flash_init_core1(void);
 

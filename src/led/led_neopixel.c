@@ -45,7 +45,7 @@ tNeopixel pixel[] = {
     #define NEOPIXEL_PIN GPIO_NUM_27
 #endif
 
-void led_driver_init_neopixel() {
+void led_driver_init_neopixel(void) {
     uint8_t gpio = NEOPIXEL_PIN;
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;

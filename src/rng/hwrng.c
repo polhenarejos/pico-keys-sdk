@@ -18,10 +18,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include "hwrng.h"
 
 #if defined(PICO_PLATFORM)
 #include "pico/stdlib.h"
-#include "hwrng.h"
 #include "bsp/board.h"
 #include "pico/rand.h"
 #elif defined(ESP_PLATFORM)
@@ -35,7 +35,7 @@
 #include "board.h"
 #endif
 
-void hwrng_start() {
+static void hwrng_start(void) {
 #if defined(ENABLE_EMULATION)
     srand(time(0));
 #elif defined(ESP_PLATFORM)
@@ -46,13 +46,13 @@ void hwrng_start() {
 static uint64_t random_word = 0xcbf29ce484222325;
 static uint8_t hwrng_mix_round = 0;
 
-static void hwrng_mix_init() {
+static void hwrng_mix_init(void) {
     random_word = 0xcbf29ce484222325;
     hwrng_mix_round = 0;
 }
 
 /* Here, we assume a little endian architecture.  */
-static int hwrng_mix_process() {
+static int hwrng_mix_process(void) {
     if (hwrng_mix_round == 0) {
         hwrng_mix_init();
     }
@@ -119,7 +119,7 @@ static uint32_t hwrng_buf_del(struct hwrng_buf *rb) {
 
 static struct hwrng_buf ring_buffer;
 
-void *hwrng_task() {
+void *hwrng_task(void) {
     struct hwrng_buf *rb = &ring_buffer;
 
     int n;
@@ -154,7 +154,7 @@ void hwrng_flush(void) {
     }
 }
 
-uint32_t hwrng_get() {
+uint32_t hwrng_get(void) {
     struct hwrng_buf *rb = &ring_buffer;
     uint32_t v;
 
@@ -166,7 +166,7 @@ uint32_t hwrng_get() {
     return v;
 }
 
-void hwrng_wait_full() {
+void hwrng_wait_full(void) {
     struct hwrng_buf *rb = &ring_buffer;
 #ifdef ESP_PLATFORM
     uint8_t core = xTaskGetCurrentTaskHandle() == hcore1 ? 1 : 0;

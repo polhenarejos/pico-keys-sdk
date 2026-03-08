@@ -29,8 +29,8 @@ extern char __flash_binary_start;
 extern char __flash_binary_end;
 #endif
 
-int rescue_process_apdu();
-int rescue_unload();
+static int rescue_process_apdu(void);
+static int rescue_unload(void);
 
 const uint8_t rescue_aid[] = {
     8,
@@ -55,7 +55,7 @@ extern uint8_t PICO_PRODUCT;
 extern uint8_t PICO_VERSION_MAJOR;
 extern uint8_t PICO_VERSION_MINOR;
 
-int rescue_select(app_t *a, uint8_t force) {
+static int rescue_select(app_t *a, uint8_t force) {
     a->process_apdu = rescue_process_apdu;
     a->unload = rescue_unload;
     res_APDU_size = 0;
@@ -76,7 +76,7 @@ INITIALIZER ( rescue_ctor ) {
     register_app(rescue_select, rescue_aid);
 }
 
-int rescue_unload() {
+static int rescue_unload(void) {
     return PICOKEY_OK;
 }
 
@@ -112,7 +112,7 @@ static int load_internal_keydev(mbedtls_ecp_keypair *ecp, mbedtls_ecp_group_id e
     return PICOKEY_OK;
 }
 
-int cmd_keydev_sign() {
+static int cmd_keydev_sign(void) {
     uint8_t p1 = P1(apdu);
     if (p1 == 0x01) {
         if (apdu.nc != 32) {
@@ -210,7 +210,7 @@ int cmd_keydev_sign() {
 }
 
 // Blocking CORE1
-void led_3_blinks() {
+static void led_3_blinks(void) {
 #ifndef ENABLE_EMULATION
     uint32_t mode = led_get_mode();
     led_set_mode(MODE_PROCESSING);
@@ -219,7 +219,7 @@ void led_3_blinks() {
 #endif
 }
 
-int cmd_write() {
+static int cmd_write(void) {
     if (apdu.nc < 2) {
         return SW_WRONG_LENGTH();
     }
@@ -268,7 +268,7 @@ int cmd_write() {
     return SW_OK();
 }
 
-int cmd_read() {
+static int cmd_read(void) {
     if (apdu.nc != 0) {
         return SW_WRONG_LENGTH();
     }
@@ -340,7 +340,7 @@ int cmd_read() {
 }
 
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
-int cmd_secure() {
+static int cmd_secure(void) {
     if (apdu.nc != 0) {
         return SW_WRONG_LENGTH();
     }
@@ -358,7 +358,7 @@ int cmd_secure() {
 #endif
 
 #ifdef PICO_PLATFORM
-int cmd_reboot_bootsel() {
+static int cmd_reboot_bootsel(void) {
     if (apdu.nc != 0) {
         return SW_WRONG_LENGTH();
     }
@@ -398,7 +398,7 @@ static const cmd_t cmds[] = {
     { 0x00, 0x0 }
 };
 
-int rescue_process_apdu() {
+static int rescue_process_apdu(void) {
     if (CLA(apdu) != 0x80) {
         return SW_CLA_NOT_SUPPORTED();
     }

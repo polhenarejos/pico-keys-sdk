@@ -35,11 +35,11 @@ void led_set_mode(uint32_t mode) {
     led_mode = mode;
 }
 
-uint32_t led_get_mode() {
+uint32_t led_get_mode(void) {
     return led_mode;
 }
 
-void led_blinking_task() {
+void led_blinking_task(void) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
     static uint32_t start_ms = 0;
     static uint32_t stop_ms = 0;
@@ -81,7 +81,7 @@ void led_blinking_task() {
 #endif
 }
 
-void led_off_all() {
+void led_off_all(void) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
     led_driver->set_color(LED_COLOR_OFF, 0, 0);
 #endif
@@ -93,11 +93,11 @@ extern led_driver_t led_driver_ws2812;
 extern led_driver_t led_driver_neopixel;
 extern led_driver_t led_driver_pimoroni;
 
-void led_driver_init_dummy() {
+static void led_driver_init_dummy(void) {
     // Do nothing
 }
 
-void led_driver_color_dummy(uint8_t color, uint32_t led_brightness, float progress) {
+static void led_driver_color_dummy(uint8_t color, uint32_t led_brightness, float progress) {
     (void)color;
     (void)led_brightness;
     (void)progress;
@@ -109,7 +109,7 @@ led_driver_t led_driver_dummy = {
     .set_color = led_driver_color_dummy,
 };
 
-void led_init() {
+void led_init(void) {
     led_driver = &led_driver_dummy;
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
     // Guess default driver

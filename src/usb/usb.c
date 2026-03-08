@@ -40,7 +40,6 @@ static uint8_t card_locked_itf = 0; // no locked
 static void *(*card_locked_func)(void *) = NULL;
 #ifndef ENABLE_EMULATION
 static mutex_t mutex;
-extern void usb_desc_setup();
 #endif
 #if !defined(PICO_PLATFORM) && !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #ifdef _MSC_VER
@@ -53,14 +52,14 @@ pthread_t hcore0, hcore1;
     uint8_t ITF_HID_CTAP = ITF_INVALID, ITF_HID_KB = ITF_INVALID;
     uint8_t ITF_HID = ITF_INVALID, ITF_KEYBOARD = ITF_INVALID;
     uint8_t ITF_HID_TOTAL = 0;
-    extern void hid_init();
+    extern void hid_init(void);
 #endif
 
 #ifdef USB_ITF_CCID
     uint8_t ITF_SC_CCID = ITF_INVALID, ITF_SC_WCID = ITF_INVALID;
     uint8_t ITF_CCID = ITF_INVALID, ITF_WCID = ITF_INVALID;
     uint8_t ITF_SC_TOTAL = 0;
-    extern void ccid_init();
+    extern void ccid_init(void);
 #endif
 uint8_t ITF_TOTAL = 0;
 
@@ -75,7 +74,7 @@ queue_t card_to_usb_q = {0};
 extern tusb_desc_device_t desc_device;
 extern char *string_desc_itf[4], *string_desc_arr[];
 #endif
-void usb_init()
+void usb_init(void)
 {
 #ifndef ENABLE_EMULATION
     if (phy_data.vidpid_present) {
@@ -158,15 +157,15 @@ void usb_init()
 }
 
 uint32_t timeout = 0;
-void timeout_stop() {
+void timeout_stop(void) {
     timeout = 0;
 }
 
-void timeout_start() {
+void timeout_start(void) {
     timeout = board_millis();
 }
 
-bool is_busy() {
+bool is_busy(void) {
     return timeout > 0;
 }
 
@@ -187,8 +186,7 @@ void usb_send_event(uint32_t flag) {
 #endif
 }
 
-extern void low_flash_init();
-void card_init_core1() {
+void card_init_core1(void) {
     low_flash_init_core1();
 }
 
@@ -210,7 +208,7 @@ void card_start(uint8_t itf, void *(*func)(void *)) {
     }
 }
 
-void card_exit() {
+void card_exit(void) {
     if (card_locked_itf != ITF_TOTAL || card_locked_func != NULL) {
         usb_send_event(EV_EXIT);
         uint32_t m;
@@ -238,10 +236,10 @@ void card_exit() {
     card_locked_itf = ITF_TOTAL;
     card_locked_func = NULL;
 }
-extern void hid_task();
-extern void ccid_task();
-extern void emul_task();
-void usb_task() {
+extern void hid_task(void);
+extern void ccid_task(void);
+extern void emul_task(void);
+void usb_task(void) {
 #ifdef USB_ITF_HID
     hid_task();
 #endif

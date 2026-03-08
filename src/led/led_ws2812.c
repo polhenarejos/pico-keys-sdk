@@ -69,7 +69,7 @@ static inline void ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, 
     pio_sm_set_enabled(pio, sm, true);
 }
 
-void led_driver_init_ws2812() {
+static void led_driver_init_ws2812(void) {
     PIO pio = pio0;
     int sm = 0;
     uint offset = pio_add_program(pio, &ws2812_program);
@@ -115,7 +115,7 @@ static inline void ws2812_put_pixel(uint32_t u32_pixel) {
     pio_sm_put_blocking(pio0, 0, u32_pixel << 8u);
 }
 
-void led_driver_color_ws2812(uint8_t color, uint32_t led_brightness, float progress) {
+static void led_driver_color_ws2812(uint8_t color, uint32_t led_brightness, float progress) {
     if (!(phy_data.opts & PHY_OPT_DIMM)) {
         progress = progress >= 0.5 ? 1 : 0;
     }

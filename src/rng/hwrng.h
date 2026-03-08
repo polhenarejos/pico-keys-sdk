@@ -20,8 +20,9 @@
 #include <stdint.h>
 
 void hwrng_init(uint32_t *buf, uint8_t size);
-uint32_t hwrng_get();
+uint32_t hwrng_get(void);
 void hwrng_flush(void);
-void hwrng_wait_full();
+void hwrng_wait_full(void);
+void *hwrng_task(void);
 
 #endif

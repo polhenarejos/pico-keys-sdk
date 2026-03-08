@@ -115,7 +115,7 @@ extern file_t *search_by_name(uint8_t *name, uint16_t namelen);
 extern file_t *search_by_path(const uint8_t *pe_path, uint8_t pathlen, const file_t *parent);
 extern bool authenticate_action(const file_t *ef, uint8_t op);
 extern void process_fci(const file_t *pe, int fmd);
-extern void scan_flash();
+extern void scan_flash(void);
 extern void initialize_flash(bool);
 
 extern file_t file_entries[];
@@ -142,11 +142,26 @@ extern int meta_delete(uint16_t fid);
 extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
 extern int delete_file(file_t *ef);
 
-extern uint32_t flash_free_space();
-extern uint32_t flash_used_space();
-extern uint32_t flash_total_space();
-extern uint32_t flash_num_files();
-extern uint32_t flash_size();
+extern uint32_t flash_free_space(void);
+extern uint32_t flash_used_space(void);
+extern uint32_t flash_total_space(void);
+extern uint32_t flash_num_files(void);
+extern uint32_t flash_size(void);
+
+extern void flash_set_bounds(uintptr_t start, uintptr_t end);
+extern int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len);
+extern int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len);
+extern int flash_program_halfword(uintptr_t addr, uint16_t data);
+extern int flash_program_word(uintptr_t addr, uint32_t data);
+extern int flash_program_uintptr(uintptr_t addr, uintptr_t data);
+extern uintptr_t flash_read_uintptr(uintptr_t addr);
+extern uint16_t flash_read_uint16(uintptr_t addr);
+extern uint8_t flash_read_uint8(uintptr_t addr);
+extern uint8_t *flash_read(uintptr_t addr);
+extern int flash_erase_page(uintptr_t addr, size_t page_size);
+extern bool flash_check_blank(const uint8_t *p_start, size_t size);
+extern void do_flash(void);
+extern void low_flash_init(void);
 
 #ifndef ENABLE_EMULATION
 extern file_t *ef_phy;

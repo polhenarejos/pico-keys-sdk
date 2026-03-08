@@ -37,16 +37,16 @@ static uint8_t sm_iv[16];
 uint16_t sm_session_pin_len = 0;
 uint8_t sm_session_pin[16];
 
-bool is_secured_apdu() {
+bool is_secured_apdu(void) {
     return CLA(apdu) & 0xC;
 }
 
-void sm_derive_key(const uint8_t *input,
-                   size_t input_len,
-                   uint8_t counter,
-                   const uint8_t *nonce,
-                   size_t nonce_len,
-                   uint8_t *out) {
+static void sm_derive_key(const uint8_t *input,
+                          size_t input_len,
+                          uint8_t counter,
+                          const uint8_t *nonce,
+                          size_t nonce_len,
+                          uint8_t *out) {
     uint8_t *b = (uint8_t *) calloc(1, input_len + nonce_len + 4);
     if (input) {
         memcpy(b, input, input_len);
@@ -82,11 +82,11 @@ void sm_set_protocol(MSE_protocol proto) {
     }
 }
 
-MSE_protocol sm_get_protocol() {
+MSE_protocol sm_get_protocol(void) {
     return sm_protocol;
 }
 
-uint8_t *sm_get_nonce() {
+uint8_t *sm_get_nonce(void) {
     return sm_nonce;
 }
 
@@ -99,7 +99,7 @@ int sm_sign(uint8_t *in, size_t in_len, uint8_t *out) {
                                out);
 }
 
-int sm_unwrap() {
+int sm_unwrap(void) {
     uint8_t sm_indicator = (CLA(apdu) >> 2) & 0x3;
     if (sm_indicator == 0) {
         return PICOKEY_OK;
@@ -144,7 +144,7 @@ int sm_unwrap() {
     return PICOKEY_OK;
 }
 
-int sm_wrap() {
+int sm_wrap(void) {
     uint8_t sm_indicator = (CLA(apdu) >> 2) & 0x3;
     if (sm_indicator == 0) {
         return PICOKEY_OK;
@@ -210,7 +210,7 @@ int sm_wrap() {
     return PICOKEY_OK;
 }
 
-uint16_t sm_get_le() {
+uint16_t sm_get_le(void) {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
@@ -228,7 +228,7 @@ uint16_t sm_get_le() {
     return 0;
 }
 
-void sm_update_iv() {
+void sm_update_iv(void) {
     uint8_t tmp_iv[16], sc_counter[16];
     memset(tmp_iv, 0, sizeof(tmp_iv)); //IV is always 0 for encryption of IV based on counter
     mbedtls_mpi_write_binary(&sm_mSSC, sc_counter, sizeof(sc_counter));
@@ -236,7 +236,7 @@ void sm_update_iv() {
     memcpy(sm_iv, sc_counter, sizeof(sc_counter));
 }
 
-int sm_verify() {
+int sm_verify(void) {
     uint8_t input[USB_BUFFER_SIZE];
     memset(input, 0, sizeof(input));
     uint16_t input_len = 0;

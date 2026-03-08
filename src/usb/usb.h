@@ -73,23 +73,24 @@ enum {
 #define TUSB_SMARTCARD_CCID_EPS 3
 #endif
 
-extern void usb_task();
+extern void usb_task(void);
 extern queue_t usb_to_card_q;
 extern queue_t card_to_usb_q;
 
 extern void card_start(uint8_t, void *(*func)(void *));
-extern void card_exit();
+extern void card_exit(void);
 extern int card_status(uint8_t itf);
-extern void usb_init();
+extern void usb_init(void);
 
 extern uint16_t finished_data_size;
 extern void usb_set_timeout_counter(uint8_t itf, uint32_t v);
-extern void card_init_core1();
+extern void card_init_core1(void);
 
 extern void usb_send_event(uint32_t flag);
-extern void timeout_stop();
-extern void timeout_start();
-extern bool is_busy();
+extern void timeout_stop(void);
+extern void timeout_start(void);
+extern bool is_busy(void);
+extern void usb_desc_setup(void);
 
 #ifdef USB_ITF_HID
 extern void driver_exec_finished_hid(uint16_t size_next);

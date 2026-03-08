@@ -260,6 +260,7 @@ typedef esp_err_t otp_ret_t;
 #endif
 
 bool otp_is_secure_boot_enabled(uint8_t *bootkey) {
+    (void)bootkey;
 #ifdef PICO_RP2350
     const uint8_t *crit1 = otp_buffer(OTP_DATA_CRIT1_ROW);
     if ((crit1[0] & (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB)) == 0) {
@@ -511,7 +512,7 @@ static otp_ret_t otp_migrate_key(uint16_t new_row, uint16_t old_row, uint16_t le
     return BOOTROM_ERROR_INVALID_STATE;
 }
 
-void otp_migrate_chaff() {
+static void otp_migrate_chaff(void) {
     otp_migrate_key(OTP_MKEK_ROW, OTP_OLD_MKEK_ROW, 32);
     otp_migrate_key(OTP_DEVK_ROW, OTP_OLD_DEVK_ROW, 32);
     otp_lock_page(OTP_MKEK_ROW >> 6);
@@ -564,7 +565,7 @@ void init_otp_files(void) {
     }
     OTP_READ(OTP_KEY_2, otp_key_2);
 
-    for (int i = 0; i < sizeof(write_otp)/sizeof(uint16_t); i++) {
+    for (size_t i = 0; i < sizeof(write_otp) / sizeof(write_otp[0]); i++) {
         if (write_otp[i] != 0xFFFF) {
 #if defined(PICO_RP2350)
             otp_lock_page(write_otp[i] >> 6);

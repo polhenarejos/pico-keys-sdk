@@ -76,8 +76,6 @@ extern uint32_t FLASH_SIZE_BYTES;
 
 #define TOTAL_FLASH_PAGES 6
 
-extern void flash_set_bounds(uintptr_t start, uintptr_t end);
-
 extern const uintptr_t start_data_pool;
 extern const uintptr_t end_rom_pool;
 
@@ -105,7 +103,7 @@ bool flash_available = false;
 
 
 //this function has to be called from the core 0
-void do_flash() {
+void do_flash(void) {
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
         if (locked_out == true && flash_available == true && ready_pages > 0) {
             //printf(" DO_FLASH AVAILABLE\n");
@@ -181,10 +179,10 @@ void do_flash() {
 }
 
 #ifdef PICO_RP2040
-void phymarker_write();
+void phymarker_write(void);
 #endif
 //this function has to be called from the core 0
-void low_flash_init() {
+void low_flash_init(void) {
 #ifdef PICO_RP2040
     phymarker_write();
 #endif
@@ -206,21 +204,21 @@ void low_flash_init() {
 
     FLASH_SIZE_BYTES = (1 << rxbuf[3]);
 #ifdef PICO_RP2350
-    __attribute__((aligned(4))) uint8_t workarea[4 * 1024];
-    int rc = rom_load_partition_table(workarea, sizeof(workarea), false);
+    __attribute__((aligned(4))) uint32_t workarea[1024];
+    int rc = rom_load_partition_table((uint8_t *)workarea, sizeof(workarea), false);
     if (rc) {
         reset_usb_boot(0, 0);
     }
 
     uint8_t boot_partition = 1;
-    rc = rom_get_partition_table_info((uint32_t*)workarea, 0x8, PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (boot_partition << 24));
+    rc = rom_get_partition_table_info(workarea, 0x8, PT_INFO_PARTITION_LOCATION_AND_FLAGS | PT_INFO_SINGLE_PARTITION | (boot_partition << 24));
 
     if (rc != 3) {
         data_start_addr = (FLASH_SIZE_BYTES >> 1);
         data_end_addr = FLASH_SIZE_BYTES;
     } else {
-        uint16_t first_sector_number = (((uint32_t*)workarea)[1] & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB;
-        uint16_t last_sector_number = (((uint32_t*)workarea)[1] & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
+        uint16_t first_sector_number = (workarea[1] & PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_FIRST_SECTOR_LSB;
+        uint16_t last_sector_number = (workarea[1] & PICOBIN_PARTITION_LOCATION_LAST_SECTOR_BITS) >> PICOBIN_PARTITION_LOCATION_LAST_SECTOR_LSB;
         data_start_addr = first_sector_number * FLASH_SECTOR_SIZE;
         data_end_addr = (last_sector_number + 1) * FLASH_SECTOR_SIZE;
         if (data_end_addr > FLASH_SIZE_BYTES) {
@@ -259,7 +257,7 @@ void low_flash_available(void) {
     mutex_exit(&mtx_flash);
 }
 
-page_flash_t *find_free_page(uintptr_t addr) {
+static page_flash_t *find_free_page(uintptr_t addr) {
     uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
     page_flash_t *p = NULL;
     for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
@@ -406,7 +404,7 @@ uintptr_t __phymarker_start = (uintptr_t)0x10100000;
 
 const uint64_t PHYSICAL_MARKER_MAGIC = 0x5049434F4B455953ULL; // "PICOKEYS"
 
-void phymarker_write() {
+void phymarker_write(void) {
     const uint64_t magic = *(uint64_t *)__phymarker_start;
     if (magic == PHYSICAL_MARKER_MAGIC) {
         return;

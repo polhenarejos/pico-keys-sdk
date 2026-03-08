@@ -28,16 +28,16 @@ typedef enum MSE_protocol {
 
 extern void sm_derive_all_keys(const uint8_t *input, size_t input_len);
 extern void sm_set_protocol(MSE_protocol proto);
-extern MSE_protocol sm_get_protocol();
-extern uint8_t *sm_get_nonce();
+extern MSE_protocol sm_get_protocol(void);
+extern uint8_t *sm_get_nonce(void);
 extern int sm_sign(uint8_t *in, size_t in_len, uint8_t *out);
-int sm_verify();
-void sm_update_iv();
-uint16_t sm_get_le();
-extern int sm_unwrap();
+int sm_verify(void);
+void sm_update_iv(void);
+uint16_t sm_get_le(void);
+extern int sm_unwrap(void);
 uint16_t sm_remove_padding(const uint8_t *data, uint16_t data_len);
-extern int sm_wrap();
-extern bool is_secured_apdu();
+extern int sm_wrap(void);
+extern bool is_secured_apdu(void);
 extern uint8_t sm_session_pin[16];
 extern uint16_t sm_session_pin_len;
 

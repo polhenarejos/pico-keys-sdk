@@ -25,11 +25,12 @@
 #include <stdbool.h>
 
 #define USB_BUFFER_SIZE 4096
-extern int emul_init(char *host, uint16_t port);
+extern int emul_init(const char *host, uint16_t port);
 extern uint8_t emul_rx[USB_BUFFER_SIZE];
 extern uint16_t emul_rx_size, emul_tx_size;
 extern uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size);
 extern uint16_t emul_read(uint8_t itf);
+extern void emul_task(void);
 
 #ifdef USB_ITF_HID
 typedef uint8_t hid_report_type_t;

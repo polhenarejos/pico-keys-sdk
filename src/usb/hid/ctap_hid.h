@@ -158,6 +158,9 @@ typedef struct {
 
 extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
 extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
+extern int driver_init_hid(void);
+extern int ctap_error(uint8_t error);
+extern uint16_t *get_send_buffer_size(uint8_t itf);
 
 extern bool is_nk;
 

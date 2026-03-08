@@ -26,7 +26,7 @@ extern int gettimeofday(struct timeval *tp, struct timezone *tzp);
 #include <sys/time.h>
 #endif
 
-static inline uint32_t board_millis() {
+static inline uint32_t board_millis(void) {
     struct timeval start;
     gettimeofday(&start, NULL);
     return start.tv_sec * 1000 + start.tv_usec / 1000;

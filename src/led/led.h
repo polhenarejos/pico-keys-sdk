@@ -62,13 +62,13 @@ enum  {
 };
 
 extern void led_set_mode(uint32_t mode);
-extern uint32_t led_get_mode();
-extern void led_blinking_task();
-extern void led_off_all();
-extern void led_init();
+extern uint32_t led_get_mode(void);
+extern void led_blinking_task(void);
+extern void led_off_all(void);
+extern void led_init(void);
 
 typedef struct {
-    void (*init)();
+    void (*init)(void);
     void (*set_color)(uint8_t color, uint32_t led_brightness, float progress);
 } led_driver_t;
 

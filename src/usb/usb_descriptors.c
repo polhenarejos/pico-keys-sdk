@@ -160,7 +160,7 @@ uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf) {
 }
 #endif
 
-void usb_desc_setup() {
+void usb_desc_setup(void) {
     desc_config[4] = ITF_TOTAL;
     TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN;
     uint8_t *p = desc_config + TUD_CONFIG_DESC_LEN;

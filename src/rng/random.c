@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "hwrng.h"
+#include "random.h"
 
 #define RANDOM_BYTES_LENGTH 32
 static uint32_t random_word[RANDOM_BYTES_LENGTH / sizeof(uint32_t)];

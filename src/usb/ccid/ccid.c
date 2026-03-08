@@ -97,21 +97,22 @@ static uint8_t itf_num;
 static usb_buffer_t *ccid_rx = NULL, *ccid_tx = NULL;
 
 int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read);
+void ccid_init(void);
+void ccid_task(void);
+#ifdef ENABLE_EMULATION
+void tud_vendor_rx_cb(uint8_t itf, const uint8_t *buffer, uint16_t bufsize);
+#endif
 
-void ccid_write_offset(uint8_t itf, uint16_t size, uint16_t offset) {
+static void ccid_write_offset(uint8_t itf, uint16_t size, uint16_t offset) {
     ccid_tx[itf].w_ptr += size + offset;
     ccid_tx[itf].r_ptr += offset;
-}
-
-void ccid_write(uint8_t itf, uint16_t size) {
-    ccid_write_offset(itf, size, 0);
 }
 
 ccid_header_t **ccid_response = NULL;
 ccid_header_t **ccid_resp_fast = NULL;
 ccid_header_t **ccid_header = NULL;
 
-uint8_t sc_itf_to_usb_itf(uint8_t itf) {
+static uint8_t sc_itf_to_usb_itf(uint8_t itf) {
     if (itf == ITF_SC_CCID) {
         return ITF_CCID;
     }
@@ -121,7 +122,7 @@ uint8_t sc_itf_to_usb_itf(uint8_t itf) {
     return itf;
 }
 
-void ccid_init_buffers() {
+static void ccid_init_buffers(void) {
     if (ITF_SC_TOTAL == 0) {
         return;
     }
@@ -142,7 +143,7 @@ void ccid_init_buffers() {
     }
 }
 
-int driver_init_ccid(uint8_t itf) {
+static int driver_init_ccid(uint8_t itf) {
     ccid_header[itf] = (ccid_header_t *) (ccid_rx[itf].buffer + ccid_rx[itf].r_ptr);
     ccid_resp_fast[itf] = (ccid_header_t *) (ccid_tx[itf].buffer + sizeof(ccid_tx[itf].buffer) - 64);
 //    apdu.header = &ccid_header->apdu;
@@ -157,6 +158,8 @@ int driver_init_ccid(uint8_t itf) {
 }
 
 void tud_vendor_rx_cb(uint8_t itf, const uint8_t *buffer, uint16_t bufsize) {
+    (void)buffer;
+    (void)bufsize;
     uint32_t len = tud_vendor_n_available(itf);
     do {
         uint16_t tlen = 0;
@@ -173,7 +176,7 @@ void tud_vendor_rx_cb(uint8_t itf, const uint8_t *buffer, uint16_t bufsize) {
     } while (len > 0);
 }
 
-int driver_write_ccid(uint8_t itf, const uint8_t *tx_buffer, uint16_t buffer_size) {
+static int driver_write_ccid(uint8_t itf, const uint8_t *tx_buffer, uint16_t buffer_size) {
     if (*tx_buffer != 0x81) {
         DEBUG_PAYLOAD(tx_buffer, buffer_size);
     }
@@ -193,7 +196,7 @@ int driver_write_ccid(uint8_t itf, const uint8_t *tx_buffer, uint16_t buffer_siz
     return (int)written;
 }
 
-int ccid_write_fast(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
+static int ccid_write_fast(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
     return driver_write_ccid(itf, buffer, buffer_size);
 }
 
@@ -316,7 +319,7 @@ int driver_process_usb_packet_ccid(uint8_t itf, uint16_t rx_read) {
     return 0;
 }
 
-void driver_exec_timeout_ccid(uint8_t itf) {
+static void driver_exec_timeout_ccid(uint8_t itf) {
     ccid_resp_fast[itf]->bMessageType = CCID_DATA_BLOCK_RET;
     ccid_resp_fast[itf]->dwLength = 0;
     ccid_resp_fast[itf]->bSlot = 0;
@@ -341,7 +344,7 @@ void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t of
     ccid_write_offset(itf, size_next+10, offset);
 }
 
-void ccid_task() {
+void ccid_task(void) {
     for (int itf = 0; itf < ITF_SC_TOTAL; itf++) {
         int status = card_status(sc_itf_to_usb_itf(itf));
         if (status == PICOKEY_OK) {
@@ -358,7 +361,7 @@ void ccid_task() {
     }
 }
 
-void ccid_init() {
+void ccid_init(void) {
     ccid_init_buffers();
 }
 

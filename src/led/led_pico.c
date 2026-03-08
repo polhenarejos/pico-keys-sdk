@@ -32,7 +32,7 @@ static uint8_t gpio = 0;
 #endif
 
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-void led_driver_init_pico() {
+static void led_driver_init_pico(void) {
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;
     }
@@ -40,7 +40,8 @@ void led_driver_init_pico() {
     gpio_set_dir(gpio, GPIO_OUT);
 }
 
-void led_driver_color_pico(uint8_t color, uint32_t led_brightness, float progress) {
+static void led_driver_color_pico(uint8_t color, uint32_t led_brightness, float progress) {
+    (void)color;
     (void)led_brightness;
     gpio_put(gpio, progress >= 0.5);
 }

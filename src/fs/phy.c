@@ -165,12 +165,12 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
     return PICOKEY_OK;
 }
 
-int phy_init() {
+int phy_init(void) {
     memset(&phy_data, 0, sizeof(phy_data_t));
     return phy_load();
 }
 
-int phy_save() {
+int phy_save(void) {
     uint8_t tmp[PHY_MAX_SIZE] = {0};
     uint16_t tmp_len = 0;
     int ret = phy_serialize_data(&phy_data, tmp, &tmp_len);
@@ -182,7 +182,7 @@ int phy_save() {
     return PICOKEY_OK;
 }
 
-int phy_load() {
+int phy_load(void) {
     if (file_has_data(ef_phy)) {
         return phy_unserialize_data(file_get_data(ef_phy), file_get_size(ef_phy), &phy_data);
     }

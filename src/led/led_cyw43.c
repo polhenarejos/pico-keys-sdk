@@ -21,7 +21,7 @@
 
 #include "pico/cyw43_arch.h"
 
-void led_driver_init_cyw43() {
+void led_driver_init_cyw43(void) {
     cyw43_arch_init();
 }
 

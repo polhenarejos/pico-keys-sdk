@@ -29,9 +29,9 @@
 
 typedef struct app {
     const uint8_t *aid;
-    int (*process_apdu)();
+    int (*process_apdu)(void);
     int (*select_aid)(struct app *, uint8_t);
-    int (*unload)();
+    int (*unload)(void);
 } app_t;
 
 extern bool app_exists(const uint8_t *aid, size_t aid_len);
@@ -40,7 +40,7 @@ extern int select_app(const uint8_t *aid, size_t aid_len);
 
 typedef struct cmd {
     uint8_t ins;
-    int (*cmd_handler)();
+    int (*cmd_handler)(void);
 } cmd_t;
 
 extern uint8_t num_apps;
@@ -69,11 +69,11 @@ PACK(struct apdu {
 extern struct apdu apdu;
 
 extern uint16_t set_res_sw(uint8_t sw1, uint8_t sw2);
-extern int process_apdu();
+extern int process_apdu(void);
 extern uint16_t apdu_process(uint8_t, const uint8_t *buffer, uint16_t buffer_size);
-extern void apdu_finish();
-extern uint16_t apdu_next();
+extern void apdu_finish(void);
+extern uint16_t apdu_next(void);
 extern void *apdu_thread(void *);
-extern int bulk_cmd(int (*cmd)());
+extern int bulk_cmd(int (*cmd)(void));
 
 #endif

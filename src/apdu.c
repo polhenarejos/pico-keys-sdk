@@ -33,13 +33,15 @@ bool is_chaining = false;
 uint8_t chain_buf[2038];
 uint8_t *chain_ptr = NULL;
 
-int process_apdu() {
+int process_apdu(void) {
     led_set_mode(MODE_PROCESSING);
     if (CLA(apdu) & 0x10) {
+        size_t chain_used = 0;
         if (!is_chaining) {
             chain_ptr = chain_buf;
         }
-        if (chain_ptr - chain_buf + apdu.nc >= sizeof(chain_buf)) {
+        chain_used = (size_t)(chain_ptr - chain_buf);
+        if (chain_used + apdu.nc >= sizeof(chain_buf)) {
             return SW_CLA_NOT_SUPPORTED();
         }
         memcpy(chain_ptr, apdu.data, apdu.nc);
@@ -222,7 +224,7 @@ done:   ;
     return NULL;
 }
 
-void apdu_finish() {
+void apdu_finish(void) {
     put_uint16_t_be(apdu.sw, apdu.rdata + apdu.rlen);
     // timeout_stop();
 #ifndef ENABLE_EMULATION
@@ -233,7 +235,7 @@ void apdu_finish() {
 #endif
 }
 
-uint16_t apdu_next() {
+uint16_t apdu_next(void) {
     if (apdu.sw != 0) {
         if (apdu.rlen <= apdu.ne) {
             return apdu.rlen + 2;
@@ -255,7 +257,7 @@ uint16_t apdu_next() {
     return 0;
 }
 
-int bulk_cmd(int (*cmd)()) {
+int bulk_cmd(int (*cmd)(void)) {
     uint8_t *p = apdu.data;
     uint8_t *rapdu = apdu.rdata;
     uint16_t rapdu_size = 0;

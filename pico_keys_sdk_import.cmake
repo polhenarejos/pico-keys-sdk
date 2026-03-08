@@ -329,6 +329,10 @@ if(ENABLE_PQC)
         ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem
         ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
     )
+    list(APPEND SYSTEM_INCLUDES
+        ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem
+        ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
+    )
     add_compile_definitions(
         MLK_CONFIG_NAMESPACE_PREFIX=mlkem
         MLK_CONFIG_MULTILEVEL_BUILD=1
@@ -383,8 +387,12 @@ list(APPEND INCLUDES
     ${CMAKE_CURRENT_LIST_DIR}/src/fs
     ${CMAKE_CURRENT_LIST_DIR}/src/rng
     ${CMAKE_CURRENT_LIST_DIR}/src/led
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include
     ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library
+)
+set(SYSTEM_INCLUDES
+    ${SYSTEM_INCLUDES}
+    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include
+    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
 )
 
 if(USB_ITF_HID)
@@ -404,10 +412,6 @@ set(CBOR_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c
 )
 
-list(APPEND INCLUDES
-    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
-)
-
 set(LIBRARIES)
 if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
     list(APPEND LIBRARIES mbedtls)
@@ -419,11 +423,11 @@ endif()
 if(NOT ESP_PLATFORM)
     if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
         add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
-        target_include_directories(mbedtls PUBLIC ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include)
+        target_include_directories(mbedtls SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include)
     endif()
     if(USB_ITF_HID)
         add_library(tinycbor STATIC ${CBOR_SOURCES})
-        target_include_directories(tinycbor PUBLIC ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src)
+        target_include_directories(tinycbor SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src)
         list(APPEND LIBRARIES tinycbor)
     endif()
 endif()
@@ -636,5 +640,6 @@ if(NOT TARGET pico_keys_sdk)
     endif()
     target_sources(pico_keys_sdk INTERFACE ${PICO_KEYS_SOURCES})
     target_include_directories(pico_keys_sdk INTERFACE ${INCLUDES})
+    target_include_directories(pico_keys_sdk SYSTEM INTERFACE ${SYSTEM_INCLUDES})
     target_link_libraries(pico_keys_sdk INTERFACE ${LIBRARIES})
 endif()

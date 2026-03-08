@@ -30,5 +30,8 @@ void random_bytes_free(const uint8_t *p);
 
 /* iterator returning a byta at a time */
 extern int random_gen(void *arg, unsigned char *output, size_t output_len);
+#ifdef ENABLE_PQC
+extern void randombytes(uint8_t *buf, size_t n);
+#endif
 
 #endif

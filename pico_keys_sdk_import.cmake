@@ -511,10 +511,6 @@ function(pico_keys_apply_strict_flags)
         -Werror
     )
 
-    if(NOT ENABLE_EMULATION)
-        list(APPEND PICO_KEYS_STRICT_FLAGS -D_FORTIFY_SOURCE=2)
-    endif()
-
     foreach(src IN LISTS PKAS_SOURCES)
         if(PKAS_FILTER_REGEX)
             if(NOT src MATCHES "${PKAS_FILTER_REGEX}")

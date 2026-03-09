@@ -50,6 +50,12 @@ typedef struct state_node {
 } state_node_t;
 
 const mbedtls_ecp_curve_info *openssl_mbedtls_ecp_curve_info_from_grp_id(mbedtls_ecp_group_id grp_id);
+int openssl_mbedtls_cipher_cmac(const mbedtls_cipher_info_t *cipher_info,
+                                const unsigned char *key,
+                                size_t key_bitlen,
+                                const unsigned char *input,
+                                size_t ilen,
+                                unsigned char *output);
 
 static void mpi_zero(mbedtls_mpi *X) {
     X->MBEDTLS_PRIVATE(p) = NULL;
@@ -501,24 +507,14 @@ static void state_del(state_node_t **head, const void *ctx, void (*cleanup)(void
 }
 
 static const EVP_MD *evp_md_from_type(mbedtls_md_type_t md_type) {
-    switch (md_type) {
-        case MBEDTLS_MD_MD5:
-            return EVP_md5();
-        case MBEDTLS_MD_RIPEMD160:
-            return EVP_ripemd160();
-        case MBEDTLS_MD_SHA1:
-            return EVP_sha1();
-        case MBEDTLS_MD_SHA224:
-            return EVP_sha224();
-        case MBEDTLS_MD_SHA256:
-            return EVP_sha256();
-        case MBEDTLS_MD_SHA384:
-            return EVP_sha384();
-        case MBEDTLS_MD_SHA512:
-            return EVP_sha512();
-        default:
-            return NULL;
-    }
+    if (md_type == MBEDTLS_MD_MD5) return EVP_md5();
+    if (md_type == MBEDTLS_MD_RIPEMD160) return EVP_ripemd160();
+    if (md_type == MBEDTLS_MD_SHA1) return EVP_sha1();
+    if (md_type == MBEDTLS_MD_SHA224) return EVP_sha224();
+    if (md_type == MBEDTLS_MD_SHA256) return EVP_sha256();
+    if (md_type == MBEDTLS_MD_SHA384) return EVP_sha384();
+    if (md_type == MBEDTLS_MD_SHA512) return EVP_sha512();
+    return NULL;
 }
 
 typedef struct {
@@ -539,24 +535,14 @@ static const openssl_md_info_t *openssl_md_info(const mbedtls_md_info_t *md_info
 }
 
 const mbedtls_md_info_t *openssl_mbedtls_md_info_from_type(mbedtls_md_type_t md_type) {
-    switch (md_type) {
-        case MBEDTLS_MD_MD5:
-            return (const mbedtls_md_info_t *) &g_md_md5;
-        case MBEDTLS_MD_RIPEMD160:
-            return (const mbedtls_md_info_t *) &g_md_ripemd160;
-        case MBEDTLS_MD_SHA1:
-            return (const mbedtls_md_info_t *) &g_md_sha1;
-        case MBEDTLS_MD_SHA224:
-            return (const mbedtls_md_info_t *) &g_md_sha224;
-        case MBEDTLS_MD_SHA256:
-            return (const mbedtls_md_info_t *) &g_md_sha256;
-        case MBEDTLS_MD_SHA384:
-            return (const mbedtls_md_info_t *) &g_md_sha384;
-        case MBEDTLS_MD_SHA512:
-            return (const mbedtls_md_info_t *) &g_md_sha512;
-        default:
-            return NULL;
-    }
+    if (md_type == MBEDTLS_MD_MD5) return (const mbedtls_md_info_t *) &g_md_md5;
+    if (md_type == MBEDTLS_MD_RIPEMD160) return (const mbedtls_md_info_t *) &g_md_ripemd160;
+    if (md_type == MBEDTLS_MD_SHA1) return (const mbedtls_md_info_t *) &g_md_sha1;
+    if (md_type == MBEDTLS_MD_SHA224) return (const mbedtls_md_info_t *) &g_md_sha224;
+    if (md_type == MBEDTLS_MD_SHA256) return (const mbedtls_md_info_t *) &g_md_sha256;
+    if (md_type == MBEDTLS_MD_SHA384) return (const mbedtls_md_info_t *) &g_md_sha384;
+    if (md_type == MBEDTLS_MD_SHA512) return (const mbedtls_md_info_t *) &g_md_sha512;
+    return NULL;
 }
 
 unsigned char openssl_mbedtls_md_get_size(const mbedtls_md_info_t *md_info) {
@@ -1447,16 +1433,10 @@ static const openssl_cipher_info_t g_cipher_aes_256_ecb = {
 };
 
 const mbedtls_cipher_info_t *openssl_mbedtls_cipher_info_from_type(const mbedtls_cipher_type_t cipher_type) {
-    switch (cipher_type) {
-        case MBEDTLS_CIPHER_AES_128_ECB:
-            return (const mbedtls_cipher_info_t *) &g_cipher_aes_128_ecb;
-        case MBEDTLS_CIPHER_AES_192_ECB:
-            return (const mbedtls_cipher_info_t *) &g_cipher_aes_192_ecb;
-        case MBEDTLS_CIPHER_AES_256_ECB:
-            return (const mbedtls_cipher_info_t *) &g_cipher_aes_256_ecb;
-        default:
-            return NULL;
-    }
+    if (cipher_type == MBEDTLS_CIPHER_AES_128_ECB) return (const mbedtls_cipher_info_t *) &g_cipher_aes_128_ecb;
+    if (cipher_type == MBEDTLS_CIPHER_AES_192_ECB) return (const mbedtls_cipher_info_t *) &g_cipher_aes_192_ecb;
+    if (cipher_type == MBEDTLS_CIPHER_AES_256_ECB) return (const mbedtls_cipher_info_t *) &g_cipher_aes_256_ecb;
+    return NULL;
 }
 
 int openssl_mbedtls_cipher_cmac(const mbedtls_cipher_info_t *cipher_info,
@@ -1639,19 +1619,23 @@ static int pkcs1_build_digest_info(mbedtls_md_type_t md_alg,
         return MBEDTLS_ERR_RSA_BAD_INPUT_DATA;
     }
 
-    switch (md_alg) {
-        case MBEDTLS_MD_SHA1:
-            prefix = sha1_prefix; prefix_len = sizeof(sha1_prefix); md_len = 20; break;
-        case MBEDTLS_MD_SHA224:
-            prefix = sha224_prefix; prefix_len = sizeof(sha224_prefix); md_len = 28; break;
-        case MBEDTLS_MD_SHA256:
-            prefix = sha256_prefix; prefix_len = sizeof(sha256_prefix); md_len = 32; break;
-        case MBEDTLS_MD_SHA384:
-            prefix = sha384_prefix; prefix_len = sizeof(sha384_prefix); md_len = 48; break;
-        case MBEDTLS_MD_SHA512:
-            prefix = sha512_prefix; prefix_len = sizeof(sha512_prefix); md_len = 64; break;
-        default:
-            return MBEDTLS_ERR_RSA_BAD_INPUT_DATA;
+    if (md_alg == MBEDTLS_MD_SHA1) {
+        prefix = sha1_prefix; prefix_len = sizeof(sha1_prefix); md_len = 20;
+    }
+    else if (md_alg == MBEDTLS_MD_SHA224) {
+        prefix = sha224_prefix; prefix_len = sizeof(sha224_prefix); md_len = 28;
+    }
+    else if (md_alg == MBEDTLS_MD_SHA256) {
+        prefix = sha256_prefix; prefix_len = sizeof(sha256_prefix); md_len = 32;
+    }
+    else if (md_alg == MBEDTLS_MD_SHA384) {
+        prefix = sha384_prefix; prefix_len = sizeof(sha384_prefix); md_len = 48;
+    }
+    else if (md_alg == MBEDTLS_MD_SHA512) {
+        prefix = sha512_prefix; prefix_len = sizeof(sha512_prefix); md_len = 64;
+    }
+    else {
+        return MBEDTLS_ERR_RSA_BAD_INPUT_DATA;
     }
     if (hashlen != md_len || prefix_len + hashlen > *outlen) {
         return MBEDTLS_ERR_RSA_BAD_INPUT_DATA;
@@ -1761,20 +1745,17 @@ out:
 static int ec_nid_from_group(mbedtls_ecp_group_id gid) {
     const mbedtls_ecp_curve_info *info = NULL;
     int nid = NID_undef;
-    switch (gid) {
-        case MBEDTLS_ECP_DP_SECP192R1: return NID_X9_62_prime192v1;
-        case MBEDTLS_ECP_DP_SECP224R1: return NID_secp224r1;
-        case MBEDTLS_ECP_DP_SECP256R1: return NID_X9_62_prime256v1;
-        case MBEDTLS_ECP_DP_SECP192K1: return NID_secp192k1;
-        case MBEDTLS_ECP_DP_SECP224K1: return NID_secp224k1;
-        case MBEDTLS_ECP_DP_SECP256K1: return NID_secp256k1;
-        case MBEDTLS_ECP_DP_SECP384R1: return NID_secp384r1;
-        case MBEDTLS_ECP_DP_SECP521R1: return NID_secp521r1;
-        case MBEDTLS_ECP_DP_BP256R1: return NID_brainpoolP256r1;
-        case MBEDTLS_ECP_DP_BP384R1: return NID_brainpoolP384r1;
-        case MBEDTLS_ECP_DP_BP512R1: return NID_brainpoolP512r1;
-        default: break;
-    }
+    if (gid == MBEDTLS_ECP_DP_SECP192R1) return NID_X9_62_prime192v1;
+    if (gid == MBEDTLS_ECP_DP_SECP224R1) return NID_secp224r1;
+    if (gid == MBEDTLS_ECP_DP_SECP256R1) return NID_X9_62_prime256v1;
+    if (gid == MBEDTLS_ECP_DP_SECP192K1) return NID_secp192k1;
+    if (gid == MBEDTLS_ECP_DP_SECP224K1) return NID_secp224k1;
+    if (gid == MBEDTLS_ECP_DP_SECP256K1) return NID_secp256k1;
+    if (gid == MBEDTLS_ECP_DP_SECP384R1) return NID_secp384r1;
+    if (gid == MBEDTLS_ECP_DP_SECP521R1) return NID_secp521r1;
+    if (gid == MBEDTLS_ECP_DP_BP256R1) return NID_brainpoolP256r1;
+    if (gid == MBEDTLS_ECP_DP_BP384R1) return NID_brainpoolP384r1;
+    if (gid == MBEDTLS_ECP_DP_BP512R1) return NID_brainpoolP512r1;
     info = openssl_mbedtls_ecp_curve_info_from_grp_id(gid);
     if (info != NULL && info->name != NULL) {
         nid = OBJ_sn2nid(info->name);
@@ -2666,21 +2647,19 @@ mbedtls_ecp_curve_type openssl_mbedtls_ecp_get_type(const mbedtls_ecp_group *grp
         return MBEDTLS_ECP_TYPE_NONE;
     }
     gid = grp->id;
-    switch (gid) {
-        case MBEDTLS_ECP_DP_CURVE25519:
-        case MBEDTLS_ECP_DP_CURVE448:
-            return MBEDTLS_ECP_TYPE_MONTGOMERY;
-        case MBEDTLS_ECP_DP_ED25519:
-        case MBEDTLS_ECP_DP_ED448:
-            return MBEDTLS_ECP_TYPE_EDWARDS;
-        case MBEDTLS_ECP_DP_NONE:
-            return MBEDTLS_ECP_TYPE_NONE;
-        default:
-            return MBEDTLS_ECP_TYPE_SHORT_WEIERSTRASS;
+    if (gid == MBEDTLS_ECP_DP_CURVE25519 || gid == MBEDTLS_ECP_DP_CURVE448) {
+        return MBEDTLS_ECP_TYPE_MONTGOMERY;
     }
+    if (gid == MBEDTLS_ECP_DP_ED25519 || gid == MBEDTLS_ECP_DP_ED448) {
+        return MBEDTLS_ECP_TYPE_EDWARDS;
+    }
+    if (gid == MBEDTLS_ECP_DP_NONE) {
+        return MBEDTLS_ECP_TYPE_NONE;
+    }
+    return MBEDTLS_ECP_TYPE_SHORT_WEIERSTRASS;
 }
 
-void openssl_mbedtls_ecp_point_init(mbedtls_ecp_point *pt) {
+static void openssl_mbedtls_ecp_point_init(mbedtls_ecp_point *pt) {
     if (pt == NULL) {
         return;
     }
@@ -2689,7 +2668,7 @@ void openssl_mbedtls_ecp_point_init(mbedtls_ecp_point *pt) {
     openssl_mbedtls_mpi_init(&pt->MBEDTLS_PRIVATE(Z));
 }
 
-void openssl_mbedtls_ecp_point_free(mbedtls_ecp_point *pt) {
+static void openssl_mbedtls_ecp_point_free(mbedtls_ecp_point *pt) {
     if (pt == NULL) {
         return;
     }

@@ -78,7 +78,7 @@ typedef struct file {
     const uint8_t *name;
     uint8_t *data;              //should include 2 bytes len at begining
     const uint16_t fid;
-    const uint8_t acl[7];
+    uint8_t acl[7];
     const uint8_t parent;       //entry number in the whole table!!
     const uint8_t type;
     const uint8_t ef_structure;

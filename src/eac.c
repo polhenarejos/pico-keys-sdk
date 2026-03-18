@@ -34,6 +34,7 @@ static MSE_protocol sm_protocol = MSE_NONE;
 static mbedtls_mpi sm_mSSC;
 static uint8_t sm_blocksize = 0;
 static uint8_t sm_iv[16];
+static bool sm_active = false;
 uint16_t sm_session_pin_len = 0;
 uint8_t sm_session_pin[16];
 
@@ -60,11 +61,13 @@ void sm_derive_all_keys(const uint8_t *derived, size_t derived_len) {
     memcpy(sm_nonce, random_bytes_get(8), 8);
     sm_derive_key(derived, derived_len, 1, sm_nonce, sizeof(sm_nonce), sm_kenc);
     sm_derive_key(derived, derived_len, 2, sm_nonce, sizeof(sm_nonce), sm_kmac);
+    mbedtls_mpi_free(&sm_mSSC);
     mbedtls_mpi_init(&sm_mSSC);
     mbedtls_mpi_grow(&sm_mSSC, sm_blocksize);
     mbedtls_mpi_lset(&sm_mSSC, 0);
     memset(sm_iv, 0, sizeof(sm_iv));
     sm_session_pin_len = 0;
+    sm_active = true;
 }
 
 void sm_set_protocol(MSE_protocol proto) {
@@ -75,6 +78,15 @@ void sm_set_protocol(MSE_protocol proto) {
     else if (proto == MSE_3DES) {
         sm_blocksize = 8;
     }
+    else {
+        sm_blocksize = 0;
+    }
+    memset(sm_kenc, 0, sizeof(sm_kenc));
+    memset(sm_kmac, 0, sizeof(sm_kmac));
+    memset(sm_nonce, 0, sizeof(sm_nonce));
+    memset(sm_iv, 0, sizeof(sm_iv));
+    sm_session_pin_len = 0;
+    sm_active = false;
 }
 
 MSE_protocol sm_get_protocol(void) {
@@ -93,6 +105,9 @@ int sm_unwrap(void) {
     uint8_t sm_indicator = (CLA(apdu) >> 2) & 0x3;
     if (sm_indicator == 0) {
         return PICOKEY_OK;
+    }
+    if (!sm_active || sm_blocksize == 0) {
+        return PICOKEY_EXEC_ERROR;
     }
     int r = sm_verify();
     if (r != PICOKEY_OK) {
@@ -137,6 +152,9 @@ int sm_wrap(void) {
     uint8_t sm_indicator = (CLA(apdu) >> 2) & 0x3;
     if (sm_indicator == 0) {
         return PICOKEY_OK;
+    }
+    if (!sm_active || sm_blocksize == 0) {
+        return PICOKEY_EXEC_ERROR;
     }
     uint8_t input[USB_BUFFER_SIZE];
     size_t input_len = 0;

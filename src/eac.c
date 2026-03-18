@@ -35,8 +35,6 @@ static mbedtls_mpi sm_mSSC;
 static uint8_t sm_blocksize = 0;
 static uint8_t sm_iv[16];
 static bool sm_active = false;
-uint16_t sm_session_pin_len = 0;
-uint8_t sm_session_pin[16];
 
 bool is_secured_apdu(void) {
     return CLA(apdu) & 0xC;
@@ -66,7 +64,6 @@ void sm_derive_all_keys(const uint8_t *derived, size_t derived_len) {
     mbedtls_mpi_grow(&sm_mSSC, sm_blocksize);
     mbedtls_mpi_lset(&sm_mSSC, 0);
     memset(sm_iv, 0, sizeof(sm_iv));
-    sm_session_pin_len = 0;
     sm_active = true;
 }
 
@@ -85,7 +82,6 @@ void sm_set_protocol(MSE_protocol proto) {
     memset(sm_kmac, 0, sizeof(sm_kmac));
     memset(sm_nonce, 0, sizeof(sm_nonce));
     memset(sm_iv, 0, sizeof(sm_iv));
-    sm_session_pin_len = 0;
     sm_active = false;
 }
 

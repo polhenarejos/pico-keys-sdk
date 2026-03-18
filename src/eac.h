@@ -38,7 +38,5 @@ extern int sm_unwrap(void);
 uint16_t sm_remove_padding(const uint8_t *data, uint16_t data_len);
 extern int sm_wrap(void);
 extern bool is_secured_apdu(void);
-extern uint8_t sm_session_pin[16];
-extern uint16_t sm_session_pin_len;
 
 #endif

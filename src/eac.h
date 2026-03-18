@@ -30,7 +30,7 @@ extern void sm_derive_all_keys(const uint8_t *input, size_t input_len);
 extern void sm_set_protocol(MSE_protocol proto);
 extern MSE_protocol sm_get_protocol(void);
 extern uint8_t *sm_get_nonce(void);
-extern int sm_sign(uint8_t *in, size_t in_len, uint8_t *out);
+extern int sm_sign(uint8_t *in, size_t in_len, uint8_t out[16]);
 int sm_verify(void);
 void sm_update_iv(void);
 uint16_t sm_get_le(void);

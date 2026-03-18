@@ -41,12 +41,7 @@ bool is_secured_apdu(void) {
     return CLA(apdu) & 0xC;
 }
 
-static void sm_derive_key(const uint8_t *input,
-                          size_t input_len,
-                          uint8_t counter,
-                          const uint8_t *nonce,
-                          size_t nonce_len,
-                          uint8_t *out) {
+static void sm_derive_key(const uint8_t *input, size_t input_len, uint8_t counter, const uint8_t *nonce, size_t nonce_len, uint8_t *out) {
     uint8_t *b = (uint8_t *) calloc(1, input_len + nonce_len + 4);
     if (input) {
         memcpy(b, input, input_len);
@@ -90,13 +85,8 @@ uint8_t *sm_get_nonce(void) {
     return sm_nonce;
 }
 
-int sm_sign(uint8_t *in, size_t in_len, uint8_t *out) {
-    return mbedtls_cipher_cmac(mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_ECB),
-                               sm_kmac,
-                               128,
-                               in,
-                               in_len,
-                               out);
+int sm_sign(uint8_t *in, size_t in_len, uint8_t out[16]) {
+    return mbedtls_cipher_cmac(mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_ECB), sm_kmac, 128, in, in_len, out);
 }
 
 int sm_unwrap(void) {
@@ -118,8 +108,7 @@ int sm_unwrap(void) {
     uint16_t tag_len = 0;
     asn1_ctx_t ctxi;
     asn1_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
-    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data))
-    {
+    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x87 || tag == 0x85) {
             body = tag_data;
             body_size = tag_len;
@@ -289,7 +278,7 @@ int sm_verify(void) {
             mac_len = tag_len;
         }
     }
-    if (!mac) {
+    if (!mac || mac_len != 8) {
         return PICOKEY_WRONG_DATA;
     }
     if (some_added) {

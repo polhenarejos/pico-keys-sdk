@@ -38,6 +38,7 @@
 #define EV_EXEC_FINISHED      8
 #define EV_RX_DATA_READY     16
 #define EV_PRESS_BUTTON      32
+#define EV_RESET             64
 
 /* Card thread */
 #define EV_MODIFY_CMD_AVAILABLE   1

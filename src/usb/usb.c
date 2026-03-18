@@ -20,6 +20,7 @@
 #if defined(PICO_PLATFORM)
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/sync.h"
 #include "bsp/board.h"
 #endif
 #include "usb.h"
@@ -156,6 +157,54 @@ void usb_init(void)
 #endif
 }
 
+#ifdef PICO_PLATFORM
+extern char __end__, __HeapLimit;
+extern char __StackBottom, __StackTop;
+extern char __StackOneBottom, __StackOneTop;
+static uint8_t reboot_temp_stack[1024] __attribute__((aligned(8)));
+
+static inline void secure_bzero(void *ptr, size_t len) {
+    volatile uint8_t *p = (volatile uint8_t *) ptr;
+    while (len--) {
+        *p++ = 0xFF;
+    }
+}
+
+static void __attribute__((noreturn, noinline)) usb_secure_reboot_now(void) {
+    uintptr_t heap_start = (uintptr_t) &__end__;
+    uintptr_t heap_end = (uintptr_t) &__HeapLimit;
+    uintptr_t stack0_start = (uintptr_t) &__StackBottom;
+    uintptr_t stack0_end = (uintptr_t) &__StackTop;
+    uintptr_t stack1_start = (uintptr_t) &__StackOneBottom;
+    uintptr_t stack1_end = (uintptr_t) &__StackOneTop;
+
+    (void) save_and_disable_interrupts();
+    multicore_reset_core1();
+
+    if (stack1_end > stack1_start) {
+        secure_bzero((void *) stack1_start, stack1_end - stack1_start);
+    }
+
+    uintptr_t new_sp = (((uintptr_t) reboot_temp_stack) + sizeof(reboot_temp_stack)) & ~(uintptr_t)0x7;
+#if defined(__arm__) || defined(__thumb__)
+    __asm volatile ("msr msp, %0" :: "r"(new_sp) : "memory");
+#endif
+
+    if (heap_end > heap_start) {
+        secure_bzero((void *) heap_start, heap_end - heap_start);
+    }
+    if (stack0_end > stack0_start) {
+        secure_bzero((void *) stack0_start, stack0_end - stack0_start);
+    }
+    secure_bzero(reboot_temp_stack, sizeof(reboot_temp_stack));
+
+    reset_usb_boot(0, 0);
+    while (true) {
+        tight_loop_contents();
+    }
+}
+#endif
+
 uint32_t timeout = 0;
 void timeout_stop(void) {
     timeout = 0;
@@ -276,6 +325,11 @@ int card_status(uint8_t itf) {
             else if (m == EV_PRESS_BUTTON) {
                 uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
                 queue_try_add(&usb_to_card_q, &flag);
+            }
+#endif
+#ifdef PICO_PLATFORM
+            else if (m == EV_RESET) {
+                usb_secure_reboot_now();
             }
 #endif
             return PICOKEY_ERR_FILE_NOT_FOUND;

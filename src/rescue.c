@@ -23,6 +23,7 @@
 #include "mbedtls/sha256.h"
 #include "random.h"
 #include "crypto_utils.h"
+#include "usb.h"
 
 #ifdef PICO_PLATFORM
 extern char __flash_binary_start;
@@ -365,7 +366,8 @@ static int cmd_reboot_bootsel(void) {
 
     if (P1(apdu) == 0x1) {
         // Reboot to BOOTSEL
-        reset_usb_boot(0, 0);
+        uint32_t val = EV_RESET;
+        queue_try_add(&card_to_usb_q, &val);
     }
     else if (P1(apdu) == 0x0) {
         // Reboot to normal mode

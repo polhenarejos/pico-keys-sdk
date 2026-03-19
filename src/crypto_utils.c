@@ -80,11 +80,19 @@ void pin_derive_kenc(const uint8_t pin_token[32], uint8_t kenc[32]) {
     mbedtls_hkdf(SHA256(), pico_serial_hash, sizeof(pico_serial_hash), pin_token, 32, (const uint8_t *)"PIN/ENC", 7, kenc, 32);
 }
 
+void pin_derive_kenc2(const uint8_t pin_token[32], uint8_t kenc[32]) {
+    uint8_t kbase[64];
+    derive_kbase(kbase);
+    memcpy(kbase + 32, pin_token, 32);
+    mbedtls_hkdf(SHA256(), pico_serial_hash, sizeof(pico_serial_hash), kbase, 64, (const uint8_t *)"PIN/ENC2", 8, kenc, 32);
+    mbedtls_platform_zeroize(kbase, sizeof(kbase));
+}
+
 // ------------------------------------------------------------------
 // Encrypt 32-byte device key using AES-256-GCM
 // Output: [nonce|ciphertext|tag]  =  12 + in_len + 16 = 60 bytes
 // ------------------------------------------------------------------
-int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t *out_buf) {
+int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t version, uint8_t *out_buf) {
     uint8_t *nonce = out_buf;
     uint8_t *ct    = out_buf + 12;
     uint8_t *tag   = out_buf + 12 + in_len;
@@ -94,7 +102,11 @@ int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
     mbedtls_gcm_context gcm;
     mbedtls_gcm_init(&gcm);
     uint8_t kenc[32];
-    pin_derive_kenc(key, kenc);
+    if (version == 2) {
+        pin_derive_kenc2(key, kenc);
+    } else {
+        pin_derive_kenc(key, kenc);
+    }
     int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
     mbedtls_platform_zeroize(kenc, sizeof(kenc));
     if (rc != 0) {
@@ -111,7 +123,7 @@ int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
 // Input: [nonce|ciphertext|tag]  =  in_len bytes
 // Output: decrypted = in_len - 12 - 16 bytes
 // ------------------------------------------------------------------
-int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t *out_buf) {
+int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t version, uint8_t *out_buf) {
     const uint8_t *nonce = in_buf;
     const uint8_t *ct    = in_buf + 12;
     const uint8_t *tag   = in_buf + in_len - 16;
@@ -119,7 +131,11 @@ int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
     mbedtls_gcm_context gcm;
     mbedtls_gcm_init(&gcm);
     uint8_t kenc[32];
-    pin_derive_kenc(key, kenc);
+    if (version == 2) {
+        pin_derive_kenc2(key, kenc);
+    } else {
+        pin_derive_kenc(key, kenc);
+    }
     int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
     mbedtls_platform_zeroize(kenc, sizeof(kenc));
     if (rc != 0) {

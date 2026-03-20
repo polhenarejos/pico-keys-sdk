@@ -325,7 +325,11 @@ char const *string_desc_arr [] = {
     "Config"               // 4: Vendor Interface
     , "HID Interface"
     , "HID Keyboard Interface"
+#ifdef USB_ITF_HID
     , "CCID OTP FIDO Interface"
+#else
+    , "CCID Interface"
+#endif
     , "WebCCID Interface"
 };
 

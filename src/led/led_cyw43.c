@@ -21,12 +21,16 @@
 
 #include "pico/cyw43_arch.h"
 
+void led_driver_init_cyw43(void);
+void led_driver_color_cyw43(uint8_t color, uint32_t led_brightness, float progress);
+
 void led_driver_init_cyw43(void) {
     cyw43_arch_init();
 }
 
 void led_driver_color_cyw43(uint8_t color, uint32_t led_brightness, float progress) {
     (void)led_brightness;
+    (void)color;
     uint8_t gpio = CYW43_WL_GPIO_LED_PIN;
     if (phy_data.led_gpio_present) {
         gpio = phy_data.led_gpio;

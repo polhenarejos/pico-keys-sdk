@@ -33,7 +33,7 @@ macro(HEX2DEC VAR VAL)
 endmacro()
 
 macro(SET_VERSION MAJOR MINOR FILE)
-    set(ROLLBACK 3)
+    set(ROLLBACK 4)
     file(READ ${FILE} ver)
     string(REGEX MATCHALL "0x([0-9A-F])([0-9A-F])([0-9A-F])([0-9A-F])" _ ${ver})
     string(CONCAT ver_major ${CMAKE_MATCH_1}${CMAKE_MATCH_2})

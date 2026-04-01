@@ -100,7 +100,7 @@ __attribute__ ((packed))
 #endif
 file_t;
 
-extern bool file_has_data(file_t *);
+extern bool file_has_data(const file_t *);
 
 extern file_t *currentEF;
 extern file_t *currentDF;

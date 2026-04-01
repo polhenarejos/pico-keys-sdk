@@ -506,7 +506,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     return PICOKEY_OK;
 }
 
-bool file_has_data(file_t *f) {
+bool file_has_data(const file_t *f) {
     return f != NULL && f->data != NULL && file_get_size(f) > 0;
 }
 

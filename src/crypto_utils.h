@@ -38,6 +38,14 @@
 
 #define IV_SIZE 16
 
+typedef enum {
+    PIN_KDF_V1 = 1,
+    PIN_KDF_V2 = 2,
+    PIN_KDF_UNKNOWN = 0xff
+} pin_kdf_version_t;
+
+#define PIN_KDF_DEFAULT_VERSION PIN_KDF_V2
+
 extern int ct_memcmp(const void *a, const void *b, size_t n);
 // Newer and safe functions
 extern void derive_kbase(uint8_t kbase[32]);
@@ -46,8 +54,8 @@ extern void pin_derive_kenc(const uint8_t pin_token[32], uint8_t kenc[32]);
 extern void pin_derive_kenc2(const uint8_t pin_token[32], uint8_t kenc[32]);
 extern void pin_derive_session(const uint8_t *pin, size_t pin_len, uint8_t pin_token[32]);
 extern void pin_derive_verifier(const uint8_t *pin, size_t pin_len, uint8_t verifier[32]);
-extern int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t version, uint8_t *out_buf);
-extern int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, uint8_t version, uint8_t *out_buf);
+extern int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, const pin_kdf_version_t version, uint8_t *out_buf);
+extern int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, const pin_kdf_version_t version, uint8_t *out_buf);
 extern void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]);
 extern void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]);
 extern void hash256(const uint8_t *input, size_t len, uint8_t output[32]);
@@ -58,5 +66,7 @@ extern int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *d
 extern int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len);
 extern mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t prime_len);
 extern uint32_t crc32c(const uint8_t *buf, size_t len);
+
+#define PIN_KDF_SIZE(x)  (12 + (x) + 16)
 
 #endif

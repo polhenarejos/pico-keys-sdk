@@ -159,7 +159,7 @@ if(NOT ESP_PLATFORM)
 
     else()
         set(MBEDTLS_ORIGIN "https://github.com/Mbed-TLS/mbedtls.git")
-        set(MBEDTLS_REF "v3.6.5")
+        set(MBEDTLS_REF "v3.6.6")
 
         execute_process(
             COMMAND git -C ${MBEDTLS_PATH} describe --tags --exact-match

@@ -51,6 +51,7 @@
 #define PHY_USB_ITF_WCID 0x2
 #define PHY_USB_ITF_HID 0x4
 #define PHY_USB_ITF_KB 0x8
+#define PHY_USB_ITF_LWIP 0x10
 
 #define PHY_LED_DRIVER_PICO     0x1
 #define PHY_LED_DRIVER_PIMORONI 0x2

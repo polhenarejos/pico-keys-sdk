@@ -62,6 +62,12 @@ pthread_t hcore0, hcore1;
     uint8_t ITF_SC_TOTAL = 0;
     extern void ccid_init(void);
 #endif
+
+#ifdef USB_ITF_LWIP
+    uint8_t ITF_LWIP_NET = ITF_INVALID, ITF_LWIP = ITF_INVALID;
+    uint8_t ITF_LWIP_TOTAL = 0;
+    extern void lwip_init(void);
+#endif
 uint8_t ITF_TOTAL = 0;
 
 void usb_set_timeout_counter(uint8_t itf, uint32_t v) {
@@ -92,7 +98,7 @@ void usb_init(void)
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
 
-    uint8_t enabled_usb_itf = PHY_USB_ITF_CCID | PHY_USB_ITF_WCID | PHY_USB_ITF_HID | PHY_USB_ITF_KB;
+    uint8_t enabled_usb_itf = PHY_USB_ITF_CCID | PHY_USB_ITF_WCID | PHY_USB_ITF_HID | PHY_USB_ITF_KB | PHY_USB_ITF_LWIP;
 #ifndef ENABLE_EMULATION
     if (phy_data.enabled_usb_itf_present) {
         enabled_usb_itf = phy_data.enabled_usb_itf;
@@ -105,20 +111,23 @@ void usb_init(void)
 #ifdef USB_ITF_CCID
     ITF_SC_TOTAL = 0;
 #endif
+#ifdef USB_ITF_LWIP
+    ITF_LWIP_TOTAL = 0;
+#endif
     ITF_TOTAL = 0;
 #ifdef USB_ITF_HID
     if (enabled_usb_itf & PHY_USB_ITF_HID) {
         ITF_HID_CTAP = ITF_HID_TOTAL++;
         ITF_HID = ITF_TOTAL++;
 #ifndef ENABLE_EMULATION
-        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[5];
+        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[6];
 #endif
     }
     if (enabled_usb_itf & PHY_USB_ITF_KB) {
         ITF_HID_KB = ITF_HID_TOTAL++;
         ITF_KEYBOARD = ITF_TOTAL++;
 #ifndef ENABLE_EMULATION
-        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[6];
+        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[7];
 #endif
     }
 #endif
@@ -127,14 +136,23 @@ void usb_init(void)
         ITF_SC_CCID = ITF_SC_TOTAL++;
         ITF_CCID = ITF_TOTAL++;
 #ifndef ENABLE_EMULATION
-        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[7];
+        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[8];
 #endif
     }
     if (enabled_usb_itf & PHY_USB_ITF_WCID) {
         ITF_SC_WCID = ITF_SC_TOTAL++;
         ITF_WCID = ITF_TOTAL++;
 #ifndef ENABLE_EMULATION
-        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[8];
+        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[9];
+#endif
+    }
+#endif
+#ifdef USB_ITF_LWIP
+    if (enabled_usb_itf & PHY_USB_ITF_LWIP) {
+        ITF_LWIP_NET = ITF_LWIP_TOTAL++;
+        ITF_LWIP = ITF_TOTAL++;
+#ifndef ENABLE_EMULATION
+        string_desc_itf[ITF_TOTAL - 1] = string_desc_arr[10];
 #endif
     }
 #endif
@@ -150,6 +168,11 @@ void usb_init(void)
 #ifdef USB_ITF_CCID
     if (ITF_SC_TOTAL > 0) {
         ccid_init();
+    }
+#endif
+#ifdef USB_ITF_LWIP
+    if (ITF_LWIP_TOTAL > 0) {
+        lwip_itf_init();
     }
 #endif
 #ifdef ESP_PLATFORM

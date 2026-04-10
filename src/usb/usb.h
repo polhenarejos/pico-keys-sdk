@@ -61,6 +61,12 @@ enum { ITF_INVALID = 0xFF };
     extern uint8_t ITF_CCID, ITF_WCID;
     extern uint8_t ITF_SC_TOTAL;
 #endif
+
+#ifdef USB_ITF_LWIP
+    extern uint8_t ITF_LWIP, ITF_LWIP_NET;
+    extern uint8_t ITF_LWIP_TOTAL;
+#endif
+
 extern uint8_t ITF_TOTAL;
 
 enum {
@@ -125,5 +131,10 @@ typedef enum {
     WRITE_FAILED,
     WRITE_SUCCESS,
 } write_status_t;
+
+#ifdef USB_ITF_LWIP
+extern int lwip_itf_init(void);
+extern void service_traffic(void);
+#endif
 
 #endif

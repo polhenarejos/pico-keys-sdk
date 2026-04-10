@@ -103,6 +103,10 @@ if(USB_ITF_CCID)
         message(STATUS "USB WebCCID Interface:\t enabled")
     endif()
 endif()
+if(USB_ITF_LWIP)
+    add_compile_definitions(USB_ITF_LWIP=1)
+    message(STATUS "USB LWIP Interface:\t\t enabled")
+endif()
 add_compile_definitions(DEBUG_APDU=${DEBUG_APDU})
 if(NOT ESP_PLATFORM)
     add_compile_definitions(MBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/config/mbedtls_config.h")
@@ -444,6 +448,12 @@ if(PICO_PLATFORM)
         tinyusb_board
         hardware_pio
     )
+    if(USB_ITF_LWIP)
+        list(APPEND LIBRARIES
+            pico_lwip
+            pico_lwip_nosys
+        )
+    endif()
 endif()
 
 if(ENABLE_PQC)
@@ -543,6 +553,7 @@ if(USB_ITF_CCID)
     )
 endif()
 
+
 if(NOT MSVC)
     add_compile_options("-fmacro-prefix-map=${CMAKE_CURRENT_LIST_DIR}/=")
 endif()
@@ -598,6 +609,22 @@ endif()
 
 if(PICO_PLATFORM)
     pico_sdk_init()
+endif()
+
+if(USB_ITF_LWIP)
+    list(APPEND PICO_KEYS_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/lwip.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/rest_server.c
+        ${PICO_TINYUSB_PATH}/lib/networking/dhserver.c
+        ${PICO_TINYUSB_PATH}/lib/networking/dnserver.c
+    )
+    list(APPEND INCLUDES
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip
+        ${PICO_TINYUSB_PATH}/lib/networking
+        ${PICO_LWIP_PATH}/src/include/lwip/apps
+    )
+    message(STATUS "TINYUSB_PATH:\t\t ${PICO_TINYUSB_PATH}")
+    message(STATUS "LWIP_PATH:\t\t ${PICO_LWIP_PATH}")
 endif()
 
 if(PICO_RP2350)

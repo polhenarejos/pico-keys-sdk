@@ -94,6 +94,9 @@ enum {
 #ifdef USB_ITF_CCID
     + TUSB_SMARTCARD_CCID_DESC_LEN + TUSB_SMARTCARD_WCID_DESC_LEN
 #endif
+#ifdef USB_ITF_LWIP
+    + TUD_CDC_NCM_DESC_LEN
+#endif
 )
 };
 
@@ -106,7 +109,8 @@ uint8_t const desc_hid_report_kb[] = {
 };
 #endif
 
-enum {
+enum
+{
     EPNUM_DUMMY = 0,
 #ifdef USB_ITF_CCID
     EPNUM_CCID,
@@ -118,6 +122,10 @@ enum {
 #ifdef USB_ITF_HID
     EPNUM_HID,
     EPNUM_HID_KB,
+#endif
+#ifdef USB_ITF_LWIP
+    EPNUM_LWIP_NOTIF,
+    EPNUM_LWIP,
 #endif
     EPNUM_TOTAL
 };
@@ -167,13 +175,13 @@ void usb_desc_setup(void) {
 #ifdef USB_ITF_HID
     if (ITF_HID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_INOUT_DESC_LEN;
-        const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
+        const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID + 6, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
         memcpy(p, desc, sizeof(desc));
         p += sizeof(desc);
     }
     if (ITF_KEYBOARD != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_DESC_LEN;
-        const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID_KB, 16, 5) };
+        const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 6, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID_KB, 16, 5) };
         memcpy(p, desc_kb, sizeof(desc_kb));
         p += sizeof(desc_kb);
     }
@@ -181,15 +189,23 @@ void usb_desc_setup(void) {
 #ifdef USB_ITF_CCID
     if (ITF_CCID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUSB_SMARTCARD_CCID_DESC_LEN;
-        const uint8_t desc_ccid[] = { TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID + 5, EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID_INT, 64) };
+        const uint8_t desc_ccid[] = { TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID + 6, EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID_INT, 64) };
         memcpy(p, desc_ccid, sizeof(desc_ccid));
         p += sizeof(desc_ccid);
     }
     if (ITF_WCID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUSB_SMARTCARD_WCID_DESC_LEN;
-        const uint8_t desc_wcid[] = { TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID + 5, EPNUM_WCID, TUSB_DIR_IN_MASK | EPNUM_WCID, 64) };
+        const uint8_t desc_wcid[] = { TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID + 6, EPNUM_WCID, TUSB_DIR_IN_MASK | EPNUM_WCID, 64) };
         memcpy(p, desc_wcid, sizeof(desc_wcid));
         p += sizeof(desc_wcid);
+    }
+#endif
+#ifdef USB_ITF_LWIP
+    if (ITF_LWIP != ITF_INVALID) {
+        TUSB_DESC_TOTAL_LEN += TUD_CDC_NCM_DESC_LEN;
+        const uint8_t desc_lwip[] = { TUD_CDC_NCM_DESCRIPTOR(ITF_LWIP, ITF_LWIP + 6, 5, EPNUM_LWIP_NOTIF, 64, EPNUM_LWIP, EPNUM_LWIP | TUSB_DIR_IN_MASK, CFG_TUD_NET_ENDPOINT_SIZE, CFG_TUD_NET_MTU) };
+        memcpy(p, desc_lwip, sizeof(desc_lwip));
+        p += sizeof(desc_lwip);
     }
 #endif
     desc_config[2] = TUSB_DESC_TOTAL_LEN & 0xFF;
@@ -207,7 +223,11 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
 #ifdef USB_ITF_WCID
 
 #define BOS_TOTAL_LEN     (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
+#ifdef USB_ITF_LWIP
+#define MS_OS_20_DESC_LEN  0xCE
+#else
 #define MS_OS_20_DESC_LEN  0xB2
+#endif
 
 enum
 {
@@ -224,9 +244,7 @@ const tusb_desc_webusb_url_t desc_url =
   .bScheme         = 1, // 0: http, 1: https
   .url             = URL
 };
-#define BOS_TOTAL_LEN      (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
 
-#define MS_OS_20_DESC_LEN  0xB2
 uint8_t desc_ms_os_20[] = {
   // Set header: length, type, windows version, total length
   U16_TO_U8S_LE(0x000A), U16_TO_U8S_LE(MS_OS_20_SET_HEADER_DESCRIPTOR), U32_TO_U8S_LE(0x06030000), U16_TO_U8S_LE(MS_OS_20_DESC_LEN),
@@ -234,25 +252,35 @@ uint8_t desc_ms_os_20[] = {
   // Configuration subset header: length, type, configuration index, reserved, configuration total length
   U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_CONFIGURATION), 0, 0, U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A),
 
-  // Function Subset header: length, type, first interface, reserved, subset length
-  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), 0/*ITF_WCID*/, 0, U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A-0x08),
+  // Function Subset header for WebCCID (WINUSB): length, type, first interface, reserved, subset length
+  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), 0/*ITF_WCID*/, 0, U16_TO_U8S_LE(0x00A0),
 
   // MS OS 2.0 Compatible ID descriptor: length, type, compatible ID, sub compatible ID
   U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID), 'W', 'I', 'N', 'U', 'S', 'B', 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // sub-compatible
 
   // MS OS 2.0 Registry property descriptor: length, type
-  U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A-0x08-0x08-0x14), U16_TO_U8S_LE(MS_OS_20_FEATURE_REG_PROPERTY),
+  U16_TO_U8S_LE(0x0084), U16_TO_U8S_LE(MS_OS_20_FEATURE_REG_PROPERTY),
   U16_TO_U8S_LE(0x0007), U16_TO_U8S_LE(0x002A), // wPropertyDataType, wPropertyNameLength and PropertyName "DeviceInterfaceGUIDs\0" in UTF-16
   'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00, 'e', 0x00, 'I', 0x00, 'n', 0x00, 't', 0x00, 'e', 0x00,
   'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00, 'e', 0x00, 'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 's', 0x00, 0x00, 0x00,
   U16_TO_U8S_LE(0x0050), // wPropertyDataLength
-	//bPropertyData: “{975F44D9-0D08-43FD-8B3E-127CA8AFFF9D}”.
+  //bPropertyData: “{975F44D9-0D08-43FD-8B3E-127CA8AFFF9D}”.
   '{', 0x00, '9', 0x00, '7', 0x00, '5', 0x00, 'F', 0x00, '4', 0x00, '4', 0x00, 'D', 0x00, '9', 0x00, '-', 0x00,
   '0', 0x00, 'D', 0x00, '0', 0x00, '8', 0x00, '-', 0x00, '4', 0x00, '3', 0x00, 'F', 0x00, 'D', 0x00, '-', 0x00,
   '8', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, '-', 0x00, '1', 0x00, '2', 0x00, '7', 0x00, 'C', 0x00, 'A', 0x00,
   '8', 0x00, 'A', 0x00, 'F', 0x00, 'F', 0x00, 'F', 0x00, '9', 0x00, 'D', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00
+#ifdef USB_ITF_LWIP
+  ,
+  // Function Subset header for NCM (WINNCM): length, type, first interface, reserved, subset length
+  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), 0/*ITF_LWIP*/, 0, U16_TO_U8S_LE(0x001C),
+
+  // MS OS 2.0 Compatible ID descriptor for NCM
+  U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID), 'W', 'I', 'N', 'N', 'C', 'M', 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+#endif
 };
+TU_VERIFY_STATIC(sizeof(desc_ms_os_20) == MS_OS_20_DESC_LEN, "Incorrect size");
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request) {
     // nothing to with DATA & ACK stage
     if (stage != CONTROL_STAGE_SETUP)
@@ -269,6 +297,9 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
                         // Get Microsoft OS 2.0 compatible descriptor
                         uint16_t total_len;
                         desc_ms_os_20[22] = ITF_WCID;
+#ifdef USB_ITF_LWIP
+                        desc_ms_os_20[182] = ITF_LWIP;
+#endif
                         memcpy(&total_len, desc_ms_os_20+8, 2);
                         return tud_control_xfer(rhport, request, (void*)(uintptr_t) desc_ms_os_20, total_len);
                     }
@@ -322,7 +353,8 @@ char const *string_desc_arr [] = {
     "Pol Henarejos",                     // 1: Manufacturer
     "Pico Key",                       // 2: Product
     "11223344",                      // 3: Serials, should use chip ID
-    "Config"               // 4: Vendor Interface
+    "Config",               // 4: Vendor Interface
+    "MAC"                   // 5: MAC address string, handled separately
     , "HID Interface"
     , "HID Keyboard Interface"
 #ifdef USB_ITF_HID
@@ -331,6 +363,7 @@ char const *string_desc_arr [] = {
     , "CCID Interface"
 #endif
     , "WebCCID Interface"
+    , "Network Interface"
 };
 
 #ifdef ESP_PLATFORM
@@ -370,12 +403,21 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
                 str = phy_data.usb_product;
             }
         }
-        else if (index >= 5 && string_desc_itf[index - 5] != NULL) {
-            str = string_desc_itf[index - 5];
+        else if (index >= 6 && string_desc_itf[index - 6] != NULL) {
+            str = string_desc_itf[index - 6];
+        }
+        else if (index == 5) {
+#ifdef USB_ITF_LWIP
+            unsigned int chr_count = 0;
+            for (unsigned i = 0; i < sizeof(tud_network_mac_address); i++) {
+                _desc_str[1 + chr_count++] = "0123456789ABCDEF"[(tud_network_mac_address[i] >> 4) & 0xf];
+                _desc_str[1 + chr_count++] = "0123456789ABCDEF"[(tud_network_mac_address[i] >> 0) & 0xf];
+            }
+#endif
         }
 
         uint8_t buff_avail = sizeof(_desc_str) / sizeof(_desc_str[0]) - 1;
-        if (index >= 4) {
+        if (index >= 6) {
             const char *product = phy_data.usb_product_present ? phy_data.usb_product : string_desc_arr[2];
             uint8_t len = (uint8_t)MIN(strlen(product), buff_avail);
             for (size_t ix = 0; ix < len; chr_count++, ix++) {

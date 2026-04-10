@@ -23,12 +23,14 @@
  *
  */
 
-#ifndef _TUSB_CONFIG_H_
-#define _TUSB_CONFIG_H_
+#ifndef TUSB_CONFIG_H_
+#define TUSB_CONFIG_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "lwipopts.h"
 
 //--------------------------------------------------------------------+
 // Board Specific Configuration
@@ -36,12 +38,12 @@ extern "C" {
 
 // RHPort number used for device can be defined by board.mk, default to port 0
 #ifndef BOARD_TUD_RHPORT
-#define BOARD_TUD_RHPORT      0
+  #define BOARD_TUD_RHPORT 0
 #endif
 
 // RHPort max operational speed can defined by board.mk
 #ifndef BOARD_TUD_MAX_SPEED
-#define BOARD_TUD_MAX_SPEED   OPT_MODE_DEFAULT_SPEED
+  #define BOARD_TUD_MAX_SPEED OPT_MODE_DEFAULT_SPEED
 #endif
 
 //--------------------------------------------------------------------
@@ -50,33 +52,22 @@ extern "C" {
 
 // defined by compiler flags for flexibility
 #ifndef CFG_TUSB_MCU
-#error CFG_TUSB_MCU must be defined
+  #error CFG_TUSB_MCU must be defined
 #endif
 
 #ifndef CFG_TUSB_OS
-#if CFG_TUSB_MCU == OPT_MCU_RP2040
-#define CFG_TUSB_OS           OPT_OS_PICO
-#elif CFG_TUSB_MCU == OPT_MCU_ESP32S2 || CFG_TUSB_MCU == OPT_MCU_ESP32S3
-#define CFG_TUSB_OS           OPT_OS_FREERTOS
-#elif CFG_TUSB_MCU == OPT_MCU_NONE
-#define CFG_TUSB_OS           OPT_OS_NONE
-#define TUP_DCD_ENDPOINT_MAX 16
-#endif
-#endif
-
-#ifndef CFG_TUSB_RHPORT0_MODE
-#define CFG_TUSB_RHPORT0_MODE    (OPT_MODE_DEVICE | OPT_MODE_FULL_SPEED)
+  #define CFG_TUSB_OS OPT_OS_NONE
 #endif
 
 #ifndef CFG_TUSB_DEBUG
-#define CFG_TUSB_DEBUG        0
+  #define CFG_TUSB_DEBUG 0
 #endif
 
 // Enable Device stack
-#define CFG_TUD_ENABLED       1
+#define CFG_TUD_ENABLED 1
 
 // Default is max speed that hardware controller could support with on-chip PHY
-#define CFG_TUD_MAX_SPEED     BOARD_TUD_MAX_SPEED
+#define CFG_TUD_MAX_SPEED BOARD_TUD_MAX_SPEED
 
 /* USB DMA on some MCUs can only access a specific SRAM region with restriction on alignment.
  * Tinyusb use follows macros to declare transferring memory so that they can be put
@@ -86,15 +77,49 @@ extern "C" {
  * - CFG_TUSB_MEM_ALIGN   : __attribute__ ((aligned(4)))
  */
 #ifndef CFG_TUSB_MEM_SECTION
-#define CFG_TUSB_MEM_SECTION
+  #define CFG_TUSB_MEM_SECTION
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
-#ifdef _MSC_VER
-#define CFG_TUSB_MEM_ALIGN        __declspec(align(4))
-#else
-#define CFG_TUSB_MEM_ALIGN        __attribute__((aligned(4)))
+  #define CFG_TUSB_MEM_ALIGN __attribute__((aligned(4)))
 #endif
+
+// Use different configurations to test all net devices (also due to resource limitations)
+#ifndef USE_ECM
+#if TU_CHECK_MCU(OPT_MCU_LPC15XX, OPT_MCU_LPC40XX, OPT_MCU_LPC51UXX, OPT_MCU_LPC54)
+  #define USE_ECM 1
+#elif TU_CHECK_MCU(OPT_MCU_SAMD21, OPT_MCU_SAML2X)
+  #define USE_ECM 1
+#elif TU_CHECK_MCU(OPT_MCU_STM32F0, OPT_MCU_STM32F1)
+  #define USE_ECM 1
+#elif TU_CHECK_MCU(OPT_MCU_MAX32690, OPT_MCU_MAX32650, OPT_MCU_MAX32666, OPT_MCU_MAX78002)
+  #define USE_ECM 1
+#else
+  #define USE_ECM 0
+  #define INCLUDE_IPERF
+#endif
+#endif
+
+//--------------------------------------------------------------------
+// NCM CLASS CONFIGURATION, SEE "ncm.h" FOR PERFORMANCE TUNING
+//--------------------------------------------------------------------
+
+// Must be >> MTU
+// Can be set to 2048 without impact
+#define CFG_TUD_NCM_IN_NTB_MAX_SIZE (2 * TCP_MSS + 100)
+
+// Must be >> MTU
+// Can be set to smaller values if wNtbOutMaxDatagrams==1
+#define CFG_TUD_NCM_OUT_NTB_MAX_SIZE (2 * TCP_MSS + 100)
+
+// Number of NCM transfer blocks for reception side
+#ifndef CFG_TUD_NCM_OUT_NTB_N
+  #define CFG_TUD_NCM_OUT_NTB_N 1
+#endif
+
+// Number of NCM transfer blocks for transmission side
+#ifndef CFG_TUD_NCM_IN_NTB_N
+  #define CFG_TUD_NCM_IN_NTB_N 1
 #endif
 
 //--------------------------------------------------------------------
@@ -102,41 +127,19 @@ extern "C" {
 //--------------------------------------------------------------------
 
 #ifndef CFG_TUD_ENDPOINT0_SIZE
-#define CFG_TUD_ENDPOINT0_SIZE    64
+  #define CFG_TUD_ENDPOINT0_SIZE 64
 #endif
-
-#define CFG_TUD_VENDOR_RX_BUFSIZE (TUD_OPT_HIGH_SPEED ? 512 : 64)
-#define CFG_TUD_VENDOR_TX_BUFSIZE 2048
 
 //------------- CLASS -------------//
-#define CFG_TUD_CDC               0
-#define CFG_TUD_MSC               0
-#ifdef USB_ITF_HID
-#define CFG_TUD_HID               2
-#else
-#define CFG_TUD_HID               0
-#endif
-#define CFG_TUD_MIDI              0
-#ifdef USB_ITF_CCID
-#define CFG_TUD_VENDOR            2
-#else
-#define CFG_TUD_VENDOR            0
-#endif
-#ifdef USB_ITF_LWIP
-#define CFG_TUD_NCM               1
-#endif
 
-// HID buffer size Should be sufficient to hold ID (if any) + Data
-#define CFG_TUD_HID_EP_BUFSIZE    64
-// CDC FIFO size of TX and RX
-#define CFG_TUD_CDC_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
-#define CFG_TUD_CDC_TX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
-
-// CDC Endpoint transfer buffer size, more is faster
-#define CFG_TUD_CDC_EP_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
+// Network class has 2 drivers: ECM/RNDIS and NCM.
+// Only one of the drivers can be enabled
+#define CFG_TUD_ECM_RNDIS     USE_ECM
+#define CFG_TUD_NCM           (1 - CFG_TUD_ECM_RNDIS)
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _TUSB_CONFIG_H_ */
+#endif /* TUSB_CONFIG_H_ */
+

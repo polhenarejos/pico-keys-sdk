@@ -53,10 +53,6 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #include "lwip/timeouts.h"
 #include "rest_server.h"
 
-#ifdef INCLUDE_IPERF
-  #include "lwip/apps/lwiperf.h"
-#endif
-
 #define INIT_IP4(a, b, c, d) \
   { PP_HTONL(LWIP_MAKEU32(a, b, c, d)) }
 
@@ -222,11 +218,6 @@ int lwip_itf_init(void) {
   while (dhserv_init(&dhcp_config) != ERR_OK);
   while (dnserv_init(IP_ADDR_ANY, 53, dns_query_proc) != ERR_OK);
   while (rest_server_init() != ERR_OK);
-
-#ifdef INCLUDE_IPERF
-  // test with: iperf -c 192.168.7.1 -e -i 1 -M 5000 -l 8192 -r
-  lwiperf_start_tcp_server_default(NULL, NULL);
-#endif
 
   return 0;
 }

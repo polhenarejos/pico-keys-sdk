@@ -39,15 +39,15 @@ const uint8_t rescue_aid[] = {
 };
 
 #ifdef PICO_RP2350
-#define PICO_MCU 1
+const uint8_t PICO_MCU = 1;
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
-#define PICO_MCU 2
+const uint8_t PICO_MCU = 2;
 #elif defined(ENABLE_EMULATION)
-#define PICO_MCU 3
+const uint8_t PICO_MCU = 3;
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
-#define PICO_MCU 4
+const uint8_t PICO_MCU = 4;
 #else
-#define PICO_MCU 0
+const uint8_t PICO_MCU = 0;
 #endif
 
 #define EF_DEVCERT_KEY 0xE0C1
@@ -71,6 +71,18 @@ static int rescue_select(app_t *a, uint8_t force) {
         scan_flash();
     }
     return PICOKEY_OK;
+}
+
+const uint8_t atr_rescue[] = {
+    24,
+    0x3B, 0xFE, 0x18, 0x00, 0x00, 0x81, 0x31, 0xFE, 0x45, 0x80, 0x31, 0x81, 0x54, 0x48, 0x53, 0x4D,
+    0x31, 0x73, 0x80, 0x21, 0x40, 0x81, 0x07, 0xFA
+};
+
+extern const uint8_t *ccid_atr;
+__attribute__((weak)) int set_atr(void) {
+    ccid_atr = atr_rescue;
+    return 0;
 }
 
 INITIALIZER ( rescue_ctor ) {

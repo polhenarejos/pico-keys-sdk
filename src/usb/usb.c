@@ -178,6 +178,7 @@ void usb_init(void)
 #ifdef ESP_PLATFORM
     usb_desc_setup();
 #endif
+    set_atr();
 }
 
 #ifdef PICO_PLATFORM

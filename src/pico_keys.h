@@ -256,4 +256,6 @@ extern bool has_set_rtc(void);
 extern time_t get_rtc_time(void);
 extern void set_rtc_time(time_t tv_sec);
 
+extern int set_atr(void);
+
 #endif

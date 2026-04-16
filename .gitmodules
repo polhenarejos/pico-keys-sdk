@@ -7,3 +7,6 @@
 [submodule "mlkem"]
 	path = third-party/mlkem
 	url = https://github.com/pq-code-package/mlkem-native/
+[submodule "third-party/cjson"]
+	path = third-party/cjson
+	url = https://github.com/davegamble/cjson

@@ -6,7 +6,7 @@ set(PICO_KEYS_INCLUDE_DIRS
     ${PICO_KEYS_SDK_DIR}/src/rng
     ${PICO_KEYS_SDK_DIR}/src/usb
     ${PICO_KEYS_SDK_DIR}/src/led
-    ${PICO_KEYS_SDK_DIR}/tinycbor/src
+    ${PICO_KEYS_SDK_DIR}/third-party/tinycbor/src
 )
 
 set(PICO_KEYS_REQUIRES
@@ -20,7 +20,7 @@ set(PICO_KEYS_REQUIRES
 
 if(ENABLE_PQC)
     list(APPEND PICO_KEYS_INCLUDE_DIRS
-        ${PICO_KEYS_SDK_DIR}/mlkem/mlkem
+        ${PICO_KEYS_SDK_DIR}/third-party/mlkem/mlkem
         ${PICO_KEYS_SDK_DIR}/config/mlkem
     )
     list(APPEND PICO_KEYS_REQUIRES

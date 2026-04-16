@@ -1,4 +1,4 @@
-set(MLKEM_DIR ${CMAKE_CURRENT_LIST_DIR}/../../../../mlkem/mlkem)
+set(MLKEM_DIR ${CMAKE_CURRENT_LIST_DIR}/../../../../third-party/mlkem/mlkem)
 
 file(GLOB_RECURSE MLKEM_SOURCES
     ${MLKEM_DIR}/src/*.c

@@ -127,7 +127,7 @@ if(NOT ESP_PLATFORM)
         "EdDSA support:\t\t disabled"
     )
 
-    set(MBEDTLS_PATH "${CMAKE_SOURCE_DIR}/pico-keys-sdk/mbedtls")
+    set(MBEDTLS_PATH "${CMAKE_SOURCE_DIR}/pico-keys-sdk/third-party/mbedtls")
     execute_process(
         COMMAND git config --global --add safe.directory ${MBEDTLS_PATH}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -239,65 +239,65 @@ if(ENABLE_PQC)
 endif()
 
 set(MBEDTLS_SOURCES
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aes.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1parse.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/asn1write.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/bignum.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/bignum_core.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ccm.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cipher.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cipher_wrap.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/constant_time.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecdsa.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecdh.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ecp_curves.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/gcm.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/hkdf.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/md5.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/oid.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkcs5.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/platform_util.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/rsa.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/rsa_alt_helpers.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha1.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha256.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha512.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chachapoly.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/chacha20.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/poly1305.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/ripemd160.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/des.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_csr.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/base64.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pem.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/aes.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/asn1parse.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/asn1write.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/bignum.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/bignum_core.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ccm.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/cmac.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/cipher.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/cipher_wrap.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/constant_time.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ecdsa.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ecdh.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ecp.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ecp_curves.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/gcm.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/hkdf.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/md.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/md5.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/oid.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pkcs5.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/platform_util.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/rsa.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/rsa_alt_helpers.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/sha1.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/sha256.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/sha512.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/chachapoly.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/chacha20.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/poly1305.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ripemd160.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/des.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509write.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509write_crt.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509_create.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509write_csr.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/base64.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pem.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pk.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pk_wrap.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pkwrite.c
 )
 
 if(ENABLE_EDDSA)
     list(APPEND MBEDTLS_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/eddsa.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/sha3.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/eddsa.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/sha3.c
     )
 endif()
 
 if(ENABLE_PQC)
     if(NOT ESP_PLATFORM)
         file(GLOB_RECURSE MLKEM_SOURCES
-            ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src/*.c
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mlkem/mlkem/src/*.c
         )
         list(FILTER MLKEM_SOURCES EXCLUDE REGEX "/native/")
 
         add_library(mlkem512 STATIC ${MLKEM_SOURCES})
         target_include_directories(mlkem512 PRIVATE
-            ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mlkem/mlkem/src
             ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
         )
         target_compile_definitions(mlkem512 PRIVATE
@@ -308,7 +308,7 @@ if(ENABLE_PQC)
 
         add_library(mlkem768 STATIC ${MLKEM_SOURCES})
         target_include_directories(mlkem768 PRIVATE
-            ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mlkem/mlkem/src
             ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
         )
         target_compile_definitions(mlkem768 PRIVATE
@@ -319,7 +319,7 @@ if(ENABLE_PQC)
 
         add_library(mlkem1024 STATIC ${MLKEM_SOURCES})
         target_include_directories(mlkem1024 PRIVATE
-            ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem/src
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mlkem/mlkem/src
             ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
         )
         target_compile_definitions(mlkem1024 PRIVATE
@@ -330,11 +330,11 @@ if(ENABLE_PQC)
     endif()
 
     list(APPEND INCLUDES
-        ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mlkem/mlkem
         ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
     )
     list(APPEND SYSTEM_INCLUDES
-        ${CMAKE_CURRENT_LIST_DIR}/mlkem/mlkem
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mlkem/mlkem
         ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
     )
     add_compile_definitions(
@@ -380,7 +380,7 @@ endif()
 ## mbedTLS reports an stringop overflow for cmac.c
 if(NOT ENABLE_EMULATION AND NOT APPLE)
     set_source_files_properties(
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/cmac.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/cmac.c
         PROPERTIES
         COMPILE_FLAGS "-Wno-error=stringop-overflow= -Wno-stringop-overflow"
     )
@@ -391,29 +391,29 @@ list(APPEND INCLUDES
     ${CMAKE_CURRENT_LIST_DIR}/src/fs
     ${CMAKE_CURRENT_LIST_DIR}/src/rng
     ${CMAKE_CURRENT_LIST_DIR}/src/led
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
 )
 set(SYSTEM_INCLUDES
     ${SYSTEM_INCLUDES}
-    ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include
-    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src
 )
 
 if(USB_ITF_HID)
     list(APPEND MBEDTLS_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_crt.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509_create.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/x509write_csr.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pk_wrap.c
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/pkwrite.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509write_crt.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509_create.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509write_csr.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pk.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pk_wrap.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pkwrite.c
     )
 endif()
 
 set(CBOR_SOURCES
-    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborencoder.c
-    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser.c
-    ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src/cborparser_dup_string.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src/cborencoder.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src/cborparser.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src/cborparser_dup_string.c
 )
 
 set(LIBRARIES)
@@ -427,11 +427,11 @@ endif()
 if(NOT ESP_PLATFORM)
     if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
         add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
-        target_include_directories(mbedtls SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/mbedtls/include)
+        target_include_directories(mbedtls SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include)
     endif()
     if(USB_ITF_HID)
         add_library(tinycbor STATIC ${CBOR_SOURCES})
-        target_include_directories(tinycbor SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/tinycbor/src)
+        target_include_directories(tinycbor SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src)
         list(APPEND LIBRARIES tinycbor)
     endif()
 endif()
@@ -576,7 +576,7 @@ if(ENABLE_EMULATION)
         )
     endif()
     list(APPEND MBEDTLS_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/mbedtls/library/aesni.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/aesni.c
     )
     list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
@@ -613,18 +613,24 @@ endif()
 
 if(USB_ITF_LWIP)
     list(APPEND PICO_KEYS_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/lwip.c
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/rest_server.c
-        ${PICO_TINYUSB_PATH}/lib/networking/dhserver.c
-        ${PICO_TINYUSB_PATH}/lib/networking/dnserver.c
     )
     list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip
-        ${PICO_TINYUSB_PATH}/lib/networking
-        ${PICO_LWIP_PATH}/src/include/lwip/apps
     )
-    message(STATUS "TINYUSB_PATH:\t\t ${PICO_TINYUSB_PATH}")
-    message(STATUS "LWIP_PATH:\t\t ${PICO_LWIP_PATH}")
+    if(NOT ENABLE_EMULATION)
+        list(APPEND PICO_KEYS_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/lwip.c
+            ${PICO_TINYUSB_PATH}/lib/networking/dhserver.c
+            ${PICO_TINYUSB_PATH}/lib/networking/dnserver.c
+        )
+        list(APPEND INCLUDES
+            ${PICO_TINYUSB_PATH}/lib/networking
+            ${PICO_LWIP_PATH}/src/include/lwip/apps
+        )
+        message(STATUS "TINYUSB_PATH:\t\t ${PICO_TINYUSB_PATH}")
+        message(STATUS "LWIP_PATH:\t\t ${PICO_LWIP_PATH}")
+    endif()
 endif()
 
 if(PICO_RP2350)

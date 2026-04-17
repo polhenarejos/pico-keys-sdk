@@ -397,6 +397,7 @@ set(SYSTEM_INCLUDES
     ${SYSTEM_INCLUDES}
     ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
     ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson
 )
 
 if(USB_ITF_HID)
@@ -416,6 +417,10 @@ set(CBOR_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src/cborparser_dup_string.c
 )
 
+set(CJSON_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson/cJSON.c
+)
+
 set(LIBRARIES)
 if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
     list(APPEND LIBRARIES mbedtls)
@@ -433,6 +438,11 @@ if(NOT ESP_PLATFORM)
         add_library(tinycbor STATIC ${CBOR_SOURCES})
         target_include_directories(tinycbor SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src)
         list(APPEND LIBRARIES tinycbor)
+    endif()
+    if(USB_ITF_LWIP)
+        add_library(cjson STATIC ${CJSON_SOURCES})
+        target_include_directories(cjson SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson)
+        list(APPEND LIBRARIES cjson)
     endif()
 endif()
 

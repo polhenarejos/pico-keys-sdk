@@ -135,6 +135,7 @@ typedef enum {
 #ifdef USB_ITF_LWIP
 extern int lwip_itf_init(void);
 extern void service_traffic(void);
+extern void rest_task(void);
 #endif
 
 #endif

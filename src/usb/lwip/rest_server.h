@@ -67,4 +67,6 @@ const rest_route_t *rest_get_routes(size_t *count);
 err_t rest_server_init(void);
 int lwip_itf_init(void);
 
+extern int rest_server_error(rest_response_t *response, int status_code, const char *message);
+
 #endif

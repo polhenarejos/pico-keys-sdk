@@ -284,9 +284,12 @@ static void execute_tasks(void)
 {
 #if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
     tud_task(); // tinyusb device task
+#endif
 #ifdef USB_ITF_LWIP
+#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
     service_traffic();
 #endif
+    rest_task();
 #endif
     usb_task();
     led_blinking_task();

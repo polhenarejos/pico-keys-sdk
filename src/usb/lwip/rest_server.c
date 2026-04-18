@@ -1,4 +1,6 @@
 #include "rest_server.h"
+#include "pico_keys.h"
+#include "usb.h"
 
 #include <stdbool.h>
 #include <ctype.h>
@@ -26,6 +28,41 @@
 #define REST_MAX_CONNS 4
 #define REST_MAX_REQUEST_SIZE 1024
 #define REST_MAX_METHOD_SIZE 8
+#define REST_MAX_CONTENT_TYPE_SIZE 64
+
+#ifdef DEBUG_APDU
+static void debug_dump_payload(const char *tag, const char *buffer, size_t len) {
+    size_t i;
+    if (buffer == NULL) {
+        printf("[rest-debug] %s: <null>\n", tag);
+        return;
+    }
+
+    printf("[rest-debug] %s (%lu bytes): \"", tag, (unsigned long)len);
+    for (i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)buffer[i];
+        if (c == '\r') {
+            printf("\\r");
+        } else if (c == '\n') {
+            printf("\\n");
+        } else if (c == '\t') {
+            printf("\\t");
+        } else if (c >= 32 && c <= 126) {
+            putchar((int)c);
+        } else {
+            printf("\\x%02X", c);
+        }
+    }
+    printf("\"\n");
+    if (tag[2] == 's') {
+        printf("\n");
+    }
+}
+#define REST_DEBUG_LOG(...) printf(__VA_ARGS__)
+#else
+#define debug_dump_payload(tag, buffer, len) do { (void)(tag); (void)(buffer); (void)(len); } while (0)
+#define REST_DEBUG_LOG(...) do {} while (0)
+#endif
 
 typedef struct {
     bool in_use;
@@ -47,6 +84,143 @@ static pthread_t rest_thread;
 #endif
 #endif
 static rest_conn_t conns[REST_MAX_CONNS];
+
+typedef struct {
+    bool pending;
+    rest_conn_t *conn;
+    rest_route_handler_t handler;
+    const rest_request_t *request;
+} rest_core1_job_t;
+
+typedef struct {
+    bool ready;
+    rest_response_t response;
+} rest_core1_result_t;
+
+static rest_core1_job_t rest_core1_job = {0};
+static rest_core1_result_t rest_core1_result = {0};
+
+static void *rest_core1_thread(void *arg);
+static void send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const char *body, size_t body_len);
+static void send_json(rest_conn_t *conn, int status_code, const char *status_text, const char *json_body);
+static const char *status_text_from_code(uint16_t code);
+
+static int execute_route_handler(const rest_request_t *request, rest_route_handler_t handler, rest_response_t *response) {
+    if (request == NULL || handler == NULL || response == NULL) {
+        return -1;
+    }
+
+    memset(response, 0, sizeof(*response));
+    response->status_code = 200;
+    response->content_type = "application/json";
+    response->body = "{\"ok\":true}";
+    response->json = cJSON_CreateObject();
+    if (response->json == NULL) {
+        return -1;
+    }
+
+    if (handler(request, response) != 0) {
+        cJSON_Delete(response->json);
+        response->json = NULL;
+        return -1;
+    }
+    if (response->content_type == NULL || response->body == NULL) {
+        cJSON_Delete(response->json);
+        response->json = NULL;
+        return -1;
+    }
+    if (response->status_code == 0 || response->status_code == 200) {
+        char *body = cJSON_PrintUnformatted(response->json);
+        cJSON_Delete(response->json);
+        response->json = NULL;
+        if (body == NULL) {
+            return -1;
+        }
+        response->body = body;
+    }
+
+    response->status_code = (response->status_code == 0) ? 200 : response->status_code;
+    response->body_len = (response->body_len == 0) ? strlen(response->body) : response->body_len;
+    return 0;
+}
+
+static int rest_start_core1_job(rest_conn_t *conn, const rest_request_t *request, rest_route_handler_t handler) {
+    if (conn == NULL || request == NULL || handler == NULL || rest_core1_job.pending) {
+        return -1;
+    }
+
+    memset(&rest_core1_job, 0, sizeof(rest_core1_job));
+    memset(&rest_core1_result, 0, sizeof(rest_core1_result));
+
+    rest_core1_job.pending = true;
+    rest_core1_job.conn = conn;
+    rest_core1_job.handler = handler;
+    rest_core1_job.request = request;
+
+    card_start(ITF_LWIP, rest_core1_thread);
+    usb_send_event(EV_CMD_AVAILABLE);
+    return 0;
+}
+
+static void *rest_core1_thread(void *arg) {
+    (void)arg;
+    card_init_core1();
+    while (1) {
+        uint32_t m = 0;
+        uint32_t flag;
+        queue_remove_blocking(&usb_to_card_q, &m);
+        flag = m + 1;
+        if (m != EV_CMD_AVAILABLE) {
+            queue_add_blocking(&card_to_usb_q, &flag);
+        }
+        if (m == EV_EXIT) {
+            break;
+        }
+        if (m == EV_CMD_AVAILABLE) {
+            rest_core1_result.ready = false;
+            memset(&rest_core1_result.response, 0, sizeof(rest_core1_result.response));
+            if (!rest_core1_job.pending || rest_core1_job.handler == NULL || execute_route_handler(rest_core1_job.request, rest_core1_job.handler, &rest_core1_result.response) != 0) {
+                rest_server_error(&rest_core1_result.response, 500, "internal_error");
+            }
+            rest_core1_result.ready = true;
+            flag = EV_EXEC_FINISHED;
+            queue_add_blocking(&card_to_usb_q, &flag);
+        }
+#ifdef ESP_PLATFORM
+        vTaskDelay(pdMS_TO_TICKS(10));
+#endif
+    }
+    return NULL;
+}
+
+void rest_task(void) {
+    int status;
+    rest_conn_t *conn;
+    if (!rest_core1_job.pending) {
+        return;
+    }
+    status = card_status(ITF_LWIP);
+    if (status != PICOKEY_OK) {
+        return;
+    }
+
+    conn = rest_core1_job.conn;
+    if (conn != NULL) {
+        if (rest_core1_result.ready && rest_core1_result.response.body != NULL && rest_core1_result.response.content_type != NULL) {
+            uint16_t code = rest_core1_result.response.status_code == 0 ? 200 : rest_core1_result.response.status_code;
+            send_response(conn, code, status_text_from_code(code), rest_core1_result.response.content_type,
+                          rest_core1_result.response.body, rest_core1_result.response.body_len);
+        } else {
+            send_json(conn, 500, "Internal Server Error", "{\"error\":\"internal_error\"}");
+        }
+    }
+
+    if (rest_core1_result.response.body != NULL) {
+        free(rest_core1_result.response.body);
+    }
+    memset(&rest_core1_result, 0, sizeof(rest_core1_result));
+    memset(&rest_core1_job, 0, sizeof(rest_core1_job));
+}
 
 __attribute__((weak)) const rest_route_t *rest_get_routes(size_t *count) {
     if (count != NULL) {
@@ -83,6 +257,9 @@ static void clear_conn(rest_conn_t *conn) {
         return;
     }
     memset(conn, 0, sizeof(*conn));
+#ifdef ENABLE_EMULATION
+    conn->sock = -1;
+#endif
 }
 
 static void close_conn(rest_conn_t *conn) {
@@ -122,6 +299,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     size_t sent_total = 0;
 #else
     err_t err;
+    int retries;
 #endif
     if (
         conn == NULL
@@ -133,6 +311,15 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     ) {
         return;
     }
+
+    REST_DEBUG_LOG(
+        "[rest-debug] response: status=%d content_type=%s body_len=%lu\n",
+        status_code,
+        (content_type != NULL) ? content_type : "(null)",
+        (unsigned long)body_len
+    );
+    debug_dump_payload("response-body", body, body_len);
+
     header_len = snprintf(headers, sizeof(headers),
                           "HTTP/1.0 %d %s\r\n"
                           "Content-Type: %s\r\n"
@@ -172,12 +359,24 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     }
 #else
     err = tcp_write(conn->pcb, headers, (uint16_t)header_len, TCP_WRITE_FLAG_COPY);
-    if (err == ERR_OK && body_len > 0) {
+    if (err != ERR_OK) {
+        close_conn(conn);
+        return;
+    }
+    retries = 0;
+    while (body_len > 0) {
         err = tcp_write(conn->pcb, body, (uint16_t)body_len, TCP_WRITE_FLAG_COPY);
-    }
-    if (err == ERR_OK) {
+        if (err == ERR_OK) {
+            break;
+        }
+        if (err != ERR_MEM || retries >= 4) {
+            close_conn(conn);
+            return;
+        }
         (void)tcp_output(conn->pcb);
+        retries++;
     }
+    (void)tcp_output(conn->pcb);
 #endif
     close_conn(conn);
 }
@@ -202,8 +401,25 @@ static const char *status_text_from_code(uint16_t code) {
             return "Unsupported Media Type";
         case 500:
             return "Internal Server Error";
+        case 503:
+            return "Service Unavailable";
         default:
             return "OK";
+    }
+}
+
+static const char *method_str_from_request_method(rest_http_method_t method) {
+    switch (method) {
+        case REST_HTTP_GET:
+            return "GET";
+        case REST_HTTP_POST:
+            return "POST";
+        case REST_HTTP_PUT:
+            return "PUT";
+        case REST_HTTP_DELETE:
+            return "DELETE";
+        default:
+            return "UNKNOWN";
     }
 }
 
@@ -301,11 +517,15 @@ static int is_json(const char *content_type) {
 
 static void handle_request(rest_conn_t *conn) {
     rest_request_t request = {0};
-    rest_response_t response = {0};
     const rest_route_t *routes;
     size_t route_count = 0, i;
     bool path_exists_for_other_method = false;
     int parsed;
+
+    if (rest_core1_job.pending) {
+        send_json(conn, 503, "Service Unavailable", "{\"error\":\"busy\"}");
+        return;
+    }
 
     parsed = parse_request(conn, &request);
     if (parsed <= 0) {
@@ -314,6 +534,14 @@ static void handle_request(rest_conn_t *conn) {
         }
         return;
     }
+
+    REST_DEBUG_LOG(
+        "[rest-debug] request: %s %s\n",
+        method_str_from_request_method(request.method),
+        request.path
+    );
+    debug_dump_payload("request-body", request.body, request.body_len);
+
     if (request.method == REST_HTTP_POST || request.method == REST_HTTP_PUT) {
         if (!is_json(request.content_type)) {
             send_json(conn, 415, "Unsupported Media Type", "{\"error\":\"content_type_must_be_application_json\"}");
@@ -332,32 +560,8 @@ static void handle_request(rest_conn_t *conn) {
             path_exists_for_other_method = true;
             continue;
         }
-        response.status_code = 200;
-        response.content_type = "application/json";
-        response.body = "{\"ok\":true}";
-        response.json = cJSON_CreateObject();
-
-        if (routes[i].handler(&request, &response) != 0) {
+        if (rest_start_core1_job(conn, &request, routes[i].handler) != 0) {
             send_json(conn, 500, "Internal Server Error", "{\"error\":\"internal_error\"}");
-            cJSON_Delete(response.json);
-            return;
-        }
-        if (response.content_type == NULL || response.body == NULL) {
-            send_json(conn, 500, "Internal Server Error", "{\"error\":\"invalid_response\"}");
-            cJSON_Delete(response.json);
-            return;
-        }
-        response.body = cJSON_PrintUnformatted(response.json);
-        cJSON_Delete(response.json);
-        if (response.body == NULL) {
-            send_json(conn, 500, "Internal Server Error", "{\"error\":\"internal_error\"}");
-            return;
-        }
-        response.status_code = (response.status_code == 0) ? 200 : response.status_code;
-        response.body_len = (response.body_len == 0) ? strlen(response.body) : response.body_len;
-        send_response(conn, response.status_code, status_text_from_code(response.status_code), response.content_type, response.body, response.body_len);
-        if (response.body) {
-            free(response.body);
         }
         return;
     }
@@ -407,6 +611,9 @@ static err_t rest_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err
 static err_t rest_poll(void *arg, struct tcp_pcb *pcb) {
     rest_conn_t *conn = (rest_conn_t *)arg;
     LWIP_UNUSED_ARG(pcb);
+    if (rest_core1_job.pending && rest_core1_job.conn == conn) {
+        return ERR_OK;
+    }
     close_conn(conn);
     return ERR_OK;
 }
@@ -562,3 +769,21 @@ int lwip_itf_init(void) {
     return rest_server_init();
 }
 #endif
+
+int rest_server_error(rest_response_t *response, int status_code, const char *message) {
+    if (response == NULL) {
+        return -1;
+    }
+    char json_template[256];
+    int json_len = snprintf(json_template, sizeof(json_template), "{\"error\":\"%s\"}", message);
+    if (json_len <= 0 || (size_t)json_len >= sizeof(json_template)) {
+        return -1;
+    }
+    response->status_code = status_code;
+    response->body = strdup(json_template);
+    if (response->body == NULL) {
+        return -1;
+    }
+    response->body_len = (size_t)json_len;
+    return 0;
+}

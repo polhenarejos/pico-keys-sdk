@@ -29,5 +29,6 @@
 
 #define CJSON_ADD_STRING(ptr, item, value) CJSON_ADD_GENERIC(cJSON_AddStringToObject, (ptr)->json, item, value)
 #define CJSON_ADD_NUMBER(ptr, item, value) CJSON_ADD_GENERIC(cJSON_AddNumberToObject, (ptr)->json, item, value)
+#define CJSON_ADD_BOOL(ptr, item, value)   CJSON_ADD_GENERIC(cJSON_AddBoolToObject, (ptr)->json, item, value)
 
 #endif // _JSON_H_

@@ -159,7 +159,7 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
         }
     }
     if (!phy_data.enabled_usb_itf_present) {
-        phy_data.enabled_usb_itf = PHY_USB_ITF_CCID | PHY_USB_ITF_WCID | PHY_USB_ITF_HID | PHY_USB_ITF_KB;
+        phy_data.enabled_usb_itf = PHY_USB_ITF_ALL;
         phy_data.enabled_usb_itf_present = true;
     }
     return PICOKEY_OK;

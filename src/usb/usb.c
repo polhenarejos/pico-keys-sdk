@@ -98,7 +98,7 @@ void usb_init(void)
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
 
-    uint8_t enabled_usb_itf = PHY_USB_ITF_CCID | PHY_USB_ITF_WCID | PHY_USB_ITF_HID | PHY_USB_ITF_KB | PHY_USB_ITF_LWIP;
+    uint8_t enabled_usb_itf = PHY_USB_ITF_ALL;
 #ifndef ENABLE_EMULATION
     if (phy_data.enabled_usb_itf_present) {
         enabled_usb_itf = phy_data.enabled_usb_itf;

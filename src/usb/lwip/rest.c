@@ -19,7 +19,7 @@
 #include <strings.h>
 
 #ifdef DEBUG_APDU
-void debug_dump_payload(const char *tag, const char *buffer, size_t len) {
+void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len) {
     size_t i;
     if (buffer == NULL) {
         printf("[rest] %s: <null>\n", tag);
@@ -52,7 +52,7 @@ void debug_dump_payload(const char *tag, const char *buffer, size_t len) {
 }
 #endif
 
-int execute_route_handler(const rest_request_t *request, rest_route_handler_t handler, rest_response_t *response) {
+int rest_execute_route_handler(const rest_request_t *request, rest_route_handler_t handler, rest_response_t *response) {
     if (request == NULL || handler == NULL || response == NULL) {
         return -1;
     }

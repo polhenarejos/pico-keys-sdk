@@ -106,7 +106,7 @@ static void *rest_core1_thread(void *arg) {
         if (m == EV_CMD_AVAILABLE) {
             rest_core1_result.ready = false;
             memset(&rest_core1_result.response, 0, sizeof(rest_core1_result.response));
-            if (!rest_core1_job.pending || rest_core1_job.handler == NULL || execute_route_handler(&rest_core1_job.request, rest_core1_job.handler, &rest_core1_result.response) != 0) {
+            if (!rest_core1_job.pending || rest_core1_job.handler == NULL || rest_execute_route_handler(&rest_core1_job.request, rest_core1_job.handler, &rest_core1_result.response) != 0) {
                 rest_server_error(&rest_core1_result.response, 500, "internal_error");
             }
             rest_core1_result.ready = true;
@@ -197,7 +197,7 @@ static void clear_conn(rest_conn_t *conn) {
 #endif
 }
 
-void close_conn(rest_conn_t *conn) {
+void rest_close_conn(rest_conn_t *conn) {
 #ifdef ENABLE_EMULATION
     if (conn == NULL) {
         return;
@@ -260,7 +260,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
         (content_type != NULL) ? content_type : "(null)",
         (unsigned long)body_len
     );
-    debug_dump_payload("response-body", body, body_len);
+    rest_debug_dump_payload("response-body", body, body_len);
 
     header_len = snprintf(headers, sizeof(headers),
                           "HTTP/1.0 %d %s\r\n"
@@ -270,7 +270,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
                           "\r\n",
                           status_code, status_text, content_type, (unsigned long)body_len);
     if (header_len <= 0 || (size_t)header_len >= sizeof(headers)) {
-        close_conn(conn);
+        rest_close_conn(conn);
         return;
     }
 
@@ -283,13 +283,13 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
             ret = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)headers + written, (size_t)header_len - written);
             if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
                 if (++want_retries > 2048) {
-                    close_conn(conn);
+                    rest_close_conn(conn);
                     return;
                 }
                 continue;
             }
             if (ret <= 0) {
-                close_conn(conn);
+                rest_close_conn(conn);
                 return;
             }
             want_retries = 0;
@@ -301,13 +301,13 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
             ret = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)body + written, body_len - written);
             if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
                 if (++want_retries > 2048) {
-                    close_conn(conn);
+                    rest_close_conn(conn);
                     return;
                 }
                 continue;
             }
             if (ret <= 0) {
-                close_conn(conn);
+                rest_close_conn(conn);
                 return;
             }
             want_retries = 0;
@@ -315,7 +315,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
         }
 
         (void)mbedtls_ssl_close_notify(&conn->ssl);
-        close_conn(conn);
+        rest_close_conn(conn);
         return;
     }
 #ifdef ENABLE_EMULATION
@@ -326,7 +326,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
         int n = -1;
 #endif
         if (n <= 0) {
-            close_conn(conn);
+            rest_close_conn(conn);
             return;
         }
         sent_total += (size_t)n;
@@ -339,7 +339,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
         int n = -1;
 #endif
         if (n <= 0) {
-            close_conn(conn);
+            rest_close_conn(conn);
             return;
         }
         sent_total += (size_t)n;
@@ -347,7 +347,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
 #else
     err = tcp_write(conn->pcb, headers, (uint16_t)header_len, TCP_WRITE_FLAG_COPY);
     if (err != ERR_OK) {
-        close_conn(conn);
+        rest_close_conn(conn);
         return;
     }
     retries = 0;
@@ -357,7 +357,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
             break;
         }
         if (err != ERR_MEM || retries >= 4) {
-            close_conn(conn);
+            rest_close_conn(conn);
             return;
         }
         (void)tcp_output(conn->pcb);
@@ -365,7 +365,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     }
     (void)tcp_output(conn->pcb);
 #endif
-    close_conn(conn);
+    rest_close_conn(conn);
 }
 
 static void send_json(rest_conn_t *conn, int status_code, const char *status_text, const char *json_body) {
@@ -457,7 +457,7 @@ static int parse_request(rest_conn_t *conn, rest_request_t *request) {
     return 1;
 }
 
-void handle_request(rest_conn_t *conn) {
+void rest_handle_request(rest_conn_t *conn) {
     rest_request_t *request = &rest_core1_job.request;
     const rest_route_t *routes;
     size_t route_count = 0, i;
@@ -484,7 +484,7 @@ void handle_request(rest_conn_t *conn) {
         rest_method_to_string(request->method),
         request->path
     );
-    debug_dump_payload("request-body", request->body, request->body_len);
+    rest_debug_dump_payload("request-body", request->body, request->body_len);
 
     if (request->method == REST_HTTP_POST || request->method == REST_HTTP_PUT) {
         if (!rest_content_type_is_json(request->content_type)) {
@@ -607,11 +607,11 @@ static err_t rest_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err
         if (p != NULL) {
             pbuf_free(p);
         }
-        close_conn(conn);
+        rest_close_conn(conn);
         return err;
     }
     if (p == NULL) {
-        close_conn(conn);
+        rest_close_conn(conn);
         return ERR_OK;
     }
     if (conn == NULL) {
@@ -631,7 +631,7 @@ static err_t rest_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err
         tcp_recved(pcb, p->tot_len);
         pbuf_free(p);
         if (conn->conn_type == REST_CONN_TLS) {
-            close_conn(conn);
+            rest_close_conn(conn);
             return ERR_ABRT;
         }
         send_json(conn, 413, "Payload Too Large", "{\"error\":\"payload_too_large\"}");
@@ -644,7 +644,7 @@ static err_t rest_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err
     if (conn->conn_type == REST_CONN_TLS) {
         return tls_progress_conn(conn);
     }
-    handle_request(conn);
+    rest_handle_request(conn);
     return ERR_OK;
 }
 
@@ -657,7 +657,7 @@ static err_t rest_poll(void *arg, struct tcp_pcb *pcb) {
     if (conn->conn_type == REST_CONN_TLS) {
         return tls_progress_conn(conn);
     }
-    close_conn(conn);
+    rest_close_conn(conn);
     return ERR_OK;
 }
 
@@ -677,7 +677,7 @@ static void rest_err(void *arg, err_t err) {
     if (conn == NULL) {
         return;
     }
-    clear_conn(conn);
+    rest_close_conn(conn);
 }
 
 static err_t rest_accept(void *arg, struct tcp_pcb *newpcb, err_t err) {
@@ -698,7 +698,7 @@ static err_t rest_accept(void *arg, struct tcp_pcb *newpcb, err_t err) {
     if (conn->conn_type == REST_CONN_TLS) {
         mbedtls_ssl_init(&conn->ssl);
         if (mbedtls_ssl_setup(&conn->ssl, &tls_conf) != 0) {
-            close_conn(conn);
+            rest_close_conn(conn);
             return ERR_ABRT;
         }
         mbedtls_ssl_set_bio(&conn->ssl, conn, tls_send_cb, tls_recv_cb, NULL);
@@ -799,7 +799,7 @@ static void *rest_emulation_thread(void *arg) {
         if (conn->conn_type == REST_CONN_TLS) {
             mbedtls_ssl_init(&conn->ssl);
             if (mbedtls_ssl_setup(&conn->ssl, &tls_conf) != 0) {
-                close_conn(conn);
+                rest_close_conn(conn);
                 continue;
             }
             mbedtls_ssl_set_bio(&conn->ssl, &conn->sock, tls_send_cb, tls_recv_cb, NULL);
@@ -808,14 +808,14 @@ static void *rest_emulation_thread(void *arg) {
             if (conn->conn_type == REST_CONN_TLS) {
                 /* TLS on emulation reads directly from socket through mbedtls BIO callbacks. */
                 if (tls_progress_conn(conn) != ERR_OK) {
-                    close_conn(conn);
+                    rest_close_conn(conn);
                     break;
                 }
             }
             else {
                 ssize_t n = recv(conn->sock, conn->request + conn->request_len, REST_MAX_REQUEST_SIZE - conn->request_len, 0);
                 if (n <= 0) {
-                    close_conn(conn);
+                    rest_close_conn(conn);
                     break;
                 }
                 conn->request_len += (size_t)n;
@@ -823,7 +823,7 @@ static void *rest_emulation_thread(void *arg) {
                     send_json(conn, 413, "Payload Too Large", "{\"error\":\"payload_too_large\"}");
                     break;
                 }
-                handle_request(conn);
+                rest_handle_request(conn);
             }
         }
     }

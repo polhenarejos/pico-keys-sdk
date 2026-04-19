@@ -24,8 +24,8 @@
 #include <string.h>
 #include <strings.h>
 
-extern void close_conn(rest_conn_t *conn);
-extern void handle_request(rest_conn_t *conn);
+extern void rest_close_conn(rest_conn_t *conn);
+extern void rest_handle_request(rest_conn_t *conn);
 
 static const int tls_ciphersuites[] = {
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
@@ -279,7 +279,7 @@ err_t tls_progress_conn(rest_conn_t *conn) {
             if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
                 return ERR_OK;
             }
-            close_conn(conn);
+            rest_close_conn(conn);
             return ERR_ABRT;
         }
         conn->handshake_done = true;
@@ -292,19 +292,19 @@ err_t tls_progress_conn(rest_conn_t *conn) {
             return ERR_OK;
         }
         if (ret <= 0) {
-            close_conn(conn);
+            rest_close_conn(conn);
             return ERR_ABRT;
         }
         conn->request_len += (size_t)ret;
         conn->request[conn->request_len] = '\0';
         ret = request_is_complete(conn->request, conn->request_len, &payload_offset, &payload_len);
         if (ret < 0) {
-            close_conn(conn);
+            rest_close_conn(conn);
             return ERR_ABRT;
         }
         if (ret == 0) {
             if (conn->request_len >= REST_MAX_REQUEST_SIZE) {
-                close_conn(conn);
+                rest_close_conn(conn);
                 return ERR_ABRT;
             }
             continue;
@@ -314,7 +314,7 @@ err_t tls_progress_conn(rest_conn_t *conn) {
 
     if (!conn->request_dispatched) {
         conn->request_dispatched = true;
-        handle_request(conn);
+        rest_handle_request(conn);
     }
     return ERR_OK;
 }

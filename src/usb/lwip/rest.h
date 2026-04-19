@@ -61,7 +61,7 @@ typedef struct {
 } rest_route_t;
 
 
-extern int execute_route_handler(const rest_request_t *request, rest_route_handler_t handler, rest_response_t *response);
+extern int rest_execute_route_handler(const rest_request_t *request, rest_route_handler_t handler, rest_response_t *response);
 extern int rest_response_set_error(rest_response_t *response, int status_code, const char *message);
 const char *rest_status_text_from_code(uint16_t code);
 const char *rest_method_to_string(rest_http_method_t method);
@@ -70,10 +70,10 @@ bool rest_content_type_is_json(const char *content_type);
 const rest_route_t *rest_get_routes(size_t *count);
 
 #ifdef DEBUG_APDU
-extern void debug_dump_payload(const char *tag, const char *buffer, size_t len);
+extern void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len);
 #define REST_DEBUG_LOG(...) printf(__VA_ARGS__)
 #else
-#define debug_dump_payload(tag, buffer, len) do { (void)(tag); (void)(buffer); (void)(len); } while (0)
+#define rest_debug_dump_payload(tag, buffer, len) do { (void)(tag); (void)(buffer); (void)(len); } while (0)
 #define REST_DEBUG_LOG(...) do {} while (0)
 #endif
 

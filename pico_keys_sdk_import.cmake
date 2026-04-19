@@ -400,6 +400,25 @@ set(SYSTEM_INCLUDES
     ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson
 )
 
+if(USB_ITF_LWIP)
+    add_compile_definitions(
+        MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
+        MBEDTLS_SSL_PROTO_TLS1_2
+        MBEDTLS_SSL_SRV_C
+        MBEDTLS_SSL_TLS_C
+    )
+    list(APPEND MBEDTLS_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pkparse.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pk_ecc.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pkcs12.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ssl_ciphersuites.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ssl_msg.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ssl_tls.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/ssl_tls12_server.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509.c
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509_crt.c
+    )
+endif()
 if(USB_ITF_HID)
     list(APPEND MBEDTLS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/x509write_crt.c
@@ -623,7 +642,9 @@ endif()
 
 if(USB_ITF_LWIP)
     list(APPEND PICO_KEYS_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/rest.c
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/rest_server.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/rest_server_tls.c
     )
     list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip

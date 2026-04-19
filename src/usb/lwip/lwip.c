@@ -52,6 +52,7 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #include "lwip/init.h"
 #include "lwip/timeouts.h"
 #include "rest_server.h"
+#include "rest_server_tls.h"
 
 #define INIT_IP4(a, b, c, d) \
   { PP_HTONL(LWIP_MAKEU32(a, b, c, d)) }
@@ -217,7 +218,7 @@ int lwip_itf_init(void) {
   while (!netif_is_up(&netif_data));
   while (dhserv_init(&dhcp_config) != ERR_OK);
   while (dnserv_init(IP_ADDR_ANY, 53, dns_query_proc) != ERR_OK);
-  while (rest_server_init() != ERR_OK);
+  while (rest_server_init(REST_CONN_ALL) != ERR_OK);
 
   return 0;
 }

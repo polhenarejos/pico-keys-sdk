@@ -17,7 +17,8 @@
 
 #include "picokeys.h"
 #include "serial.h"
- #include "crypto_utils.h"
+#include "crypto_utils.h"
+#include <stdio.h>
 #ifdef PICO_PLATFORM
  #include "hardware/flash.h"
  #include "hardware/sync.h"

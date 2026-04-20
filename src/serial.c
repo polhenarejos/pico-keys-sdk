@@ -21,6 +21,7 @@
 #if defined(ESP_PLATFORM)
 #include "esp_efuse.h"
 #endif
+#include <stdio.h>
 
 char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
 uint8_t pico_serial_hash[32];

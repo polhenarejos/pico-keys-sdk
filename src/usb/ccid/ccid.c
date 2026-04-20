@@ -15,8 +15,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "picokeys.h"
+#include "led/led.h"
 #include "random.h"
-#include "pico_keys.h"
 #ifdef PICO_PLATFORM
 #include "bsp/board.h"
 #endif
@@ -27,7 +28,6 @@
 #include "emulation.h"
 #endif
 #include "ccid.h"
-#include "usb_descriptors.h"
 #include "apdu.h"
 #include "usb.h"
 
@@ -154,7 +154,7 @@ static int driver_init_ccid(uint8_t itf) {
 
     //ccid_tx[itf].w_ptr = ccid_tx[itf].r_ptr = 0;
 
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 void tud_vendor_rx_cb(uint8_t itf, const uint8_t *buffer, uint16_t bufsize) {
@@ -347,10 +347,10 @@ void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t of
 void ccid_task(void) {
     for (int itf = 0; itf < ITF_SC_TOTAL; itf++) {
         int status = card_status(sc_itf_to_usb_itf(itf));
-        if (status == PICOKEY_OK) {
+        if (status == PICOKEYS_OK) {
             driver_exec_finished_ccid(itf, finished_data_size);
         }
-        else if (status == PICOKEY_ERR_BLOCKED) {
+        else if (status == PICOKEYS_ERR_BLOCKED) {
             driver_exec_timeout_ccid(itf);
         }
         if (ccid_tx[itf].w_ptr > ccid_tx[itf].r_ptr) {

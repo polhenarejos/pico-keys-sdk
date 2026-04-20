@@ -15,6 +15,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "picokeys.h"
+#include "pico_time.h"
 #include "rest.h"
 #include <strings.h>
 #include "random.h"

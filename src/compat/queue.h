@@ -19,8 +19,8 @@
 #define QUEUE_H
 
 #ifdef _MSC_VER
-#include "pthread_win32.h"
-#include "semaphore_win32.h"
+#include "compat/pthread_win32.h"
+#include "compat/semaphore_win32.h"
 #else
 #include <pthread.h>
 #include <semaphore.h>

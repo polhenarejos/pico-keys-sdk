@@ -15,24 +15,19 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdint.h>
-#include <string.h>
-#include <stdio.h>
+#include "picokeys.h"
 #include "hwrng.h"
 
 #if defined(PICO_PLATFORM)
-#include "pico/stdlib.h"
 #include "bsp/board.h"
 #include "pico/rand.h"
 #elif defined(ESP_PLATFORM)
 #include "bootloader_random.h"
 #include "esp_random.h"
-#include "esp_compat.h"
+#include "compat/esp_compat.h"
 #else
-#include <stdbool.h>
-#include <stdlib.h>
 #include <time.h>
-#include "board.h"
+#include "compat/board.h"
 #endif
 
 static void hwrng_start(void) {

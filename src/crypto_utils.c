@@ -15,21 +15,16 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#if defined(ESP_PLATFORM)
-#include "esp_compat.h"
-#elif defined(PICO_PLATFORM)
-#include <pico/unique_id.h>
-#endif
+#include "picokeys.h"
+#include "serial.h"
 #include "mbedtls/md.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/aes.h"
 #include "mbedtls/hkdf.h"
 #include "mbedtls/gcm.h"
 #include "crypto_utils.h"
-#include "pico_keys.h"
 #include "otp.h"
 #include "random.h"
-#include <stdio.h>
 
 int ct_memcmp(const void *a, const void *b, size_t n) {
     const volatile uint8_t *x = (const volatile uint8_t *)a;
@@ -109,7 +104,7 @@ int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
         pin_derive_kenc(key, kenc);
     }
     else {
-        return PICOKEY_WRONG_DATA;
+        return PICOKEYS_WRONG_DATA;
     }
     int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
     mbedtls_platform_zeroize(kenc, sizeof(kenc));
@@ -141,7 +136,7 @@ int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
         pin_derive_kenc(key, kenc);
     }
     else {
-        return PICOKEY_WRONG_DATA;
+        return PICOKEYS_WRONG_DATA;
     }
     int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
     mbedtls_platform_zeroize(kenc, sizeof(kenc));
@@ -210,9 +205,9 @@ int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     }
     int r = mbedtls_aes_setkey_enc(&aes, key, key_size);
     if (r != 0) {
-        return PICOKEY_EXEC_ERROR;
+        return PICOKEYS_EXEC_ERROR;
     }
-    if (mode == PICO_KEYS_AES_MODE_CBC) {
+    if (mode == PICOKEYS_AES_MODE_CBC) {
         return mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, len, tmp_iv, data, data);
     }
     return mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, len, &iv_offset, tmp_iv, data, data);
@@ -229,9 +224,9 @@ int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     }
     int r = mbedtls_aes_setkey_dec(&aes, key, key_size);
     if (r != 0) {
-        return PICOKEY_EXEC_ERROR;
+        return PICOKEYS_EXEC_ERROR;
     }
-    if (mode == PICO_KEYS_AES_MODE_CBC) {
+    if (mode == PICOKEYS_AES_MODE_CBC) {
         return mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, len, tmp_iv, data, data);
     }
     r = mbedtls_aes_setkey_enc(&aes, key, key_size); //CFB requires set_enc instead set_dec
@@ -239,10 +234,10 @@ int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
 }
 
 int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len) {
-    return aes_encrypt(key, iv, 256, PICO_KEYS_AES_MODE_CFB, data, len);
+    return aes_encrypt(key, iv, 256, PICOKEYS_AES_MODE_CFB, data, len);
 }
 int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len) {
-    return aes_decrypt(key, iv, 256, PICO_KEYS_AES_MODE_CFB, data, len);
+    return aes_decrypt(key, iv, 256, PICOKEYS_AES_MODE_CFB, data, len);
 }
 
 struct lv_data {

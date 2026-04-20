@@ -15,12 +15,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "picokeys.h"
 #include "file.h"
-#include "pico_keys.h"
-#include <string.h>
-#include <stdio.h>
 #include "asn1.h"
 #include "apdu.h"
+#include <stdio.h>
 
 extern const uintptr_t end_data_pool;
 extern const uintptr_t start_data_pool;
@@ -48,11 +47,11 @@ void process_fci(const file_t *pe, int fmd) {
         if ((pe->type & FILE_DATA_FUNC) == FILE_DATA_FUNC) {
             int (*data_fn)(const file_t *, int) = (int (*)(const file_t *, int))(uintptr_t)pe->data;
             uint16_t len = (uint16_t)data_fn(pe, 0);
-            res_APDU_size += put_uint16_t_be(len, res_APDU + res_APDU_size);
+            res_APDU_size += put_uint16_be(len, res_APDU + res_APDU_size);
         }
         else {
             uint16_t v = file_get_size(pe);
-            res_APDU_size += put_uint16_t_be(v, res_APDU + res_APDU_size);
+            res_APDU_size += put_uint16_be(v, res_APDU + res_APDU_size);
         }
     }
     else {
@@ -78,7 +77,7 @@ void process_fci(const file_t *pe, int fmd) {
 
     res_APDU[res_APDU_size++] = 0x83;
     res_APDU[res_APDU_size++] = 2;
-    res_APDU_size += put_uint16_t_be(pe->fid, res_APDU + res_APDU_size);
+    res_APDU_size += put_uint16_be(pe->fid, res_APDU + res_APDU_size);
     if (pe->name) {
         res_APDU[res_APDU_size++] = 0x84;
         res_APDU[res_APDU_size++] = MIN(pe->name[0], 16);
@@ -165,13 +164,13 @@ static uint8_t make_path_buf(const file_t *pe, uint8_t *buf, uint8_t buflen, con
     if (pe == top) { //MF or relative DF
         return 0;
     }
-    put_uint16_t_be(pe->fid, buf);
+    put_uint16_be(pe->fid, buf);
     return make_path_buf(&file_entries[pe->parent], buf + 2, buflen - 2, top) + 2;
 }
 
 static uint8_t make_path(const file_t *pe, const file_t *top, uint8_t *path) {
     uint8_t buf[MAX_DEPTH * 2], *p = path;
-    put_uint16_t_be(pe->fid, buf);
+    put_uint16_be(pe->fid, buf);
     uint8_t depth = make_path_buf(&file_entries[pe->parent], buf + 2, sizeof(buf) - 2, top) + 2;
     for (int d = depth - 2; d >= 0; d -= 2) {
         memcpy(p, buf + d, 2);
@@ -330,7 +329,7 @@ file_t *search_dynamic_file(uint16_t fid) {
 
 int delete_dynamic_file(file_t *f) {
     if (f == NULL) {
-        return PICOKEY_ERR_FILE_NOT_FOUND;
+        return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
     for (int i = 0; i < dynamic_files; i++) {
         if (dynamic_file[i].fid == f->fid) {
@@ -338,10 +337,10 @@ int delete_dynamic_file(file_t *f) {
                 memcpy(&dynamic_file[j - 1], &dynamic_file[j], sizeof(file_t));
             }
             dynamic_files--;
-            return PICOKEY_OK;
+            return PICOKEYS_OK;
         }
     }
-    return PICOKEY_ERR_FILE_NOT_FOUND;
+    return PICOKEYS_ERR_FILE_NOT_FOUND;
 }
 
 file_t *file_new(uint16_t fid) {
@@ -381,7 +380,7 @@ uint16_t meta_find(uint16_t fid, uint8_t **out) {
         if (tag_len < 2) {
             continue;
         }
-        uint16_t cfid = get_uint16_t_be(tag_data);
+        uint16_t cfid = get_uint16_be(tag_data);
         if (cfid == fid) {
             if (out) {
                 *out = tag_data + 2;
@@ -394,7 +393,7 @@ uint16_t meta_find(uint16_t fid, uint8_t **out) {
 int meta_delete(uint16_t fid) {
     file_t *ef = search_file(EF_META);
     if (!ef) {
-        return PICOKEY_ERR_FILE_NOT_FOUND;
+        return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
@@ -407,7 +406,7 @@ int meta_delete(uint16_t fid) {
         if (tag_len < 2) {
             continue;
         }
-        uint16_t cfid = get_uint16_t_be(tag_data);
+        uint16_t cfid = get_uint16_be(tag_data);
         if (cfid == fid) {
             uint16_t new_len = ctxi.len - 1 - tag_len - format_tlv_len(tag_len, NULL);
             if (new_len == 0) {
@@ -423,21 +422,21 @@ int meta_delete(uint16_t fid) {
                 }
                 int r = file_put_data(ef, fdata, new_len);
                 free(fdata);
-                if (r != PICOKEY_OK) {
-                    return PICOKEY_EXEC_ERROR;
+                if (r != PICOKEYS_OK) {
+                    return PICOKEYS_EXEC_ERROR;
                 }
             }
             low_flash_available();
             break;
         }
     }
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     int r;
     file_t *ef = search_file(EF_META);
     if (!ef) {
-        return PICOKEY_ERR_FILE_NOT_FOUND;
+        return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
     uint16_t ef_size = file_get_size(ef);
     uint8_t *fdata = (uint8_t *) calloc(1, ef_size);
@@ -451,16 +450,16 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
         if (tag_len < 2) {
             continue;
         }
-        uint16_t cfid = get_uint16_t_be(tag_data);
+        uint16_t cfid = get_uint16_be(tag_data);
         if (cfid == fid) {
             if (tag_len - 2 == len) { //an update
                 memcpy(p - tag_len + 2, data, len);
                 r = file_put_data(ef, fdata, ef_size);
                 free(fdata);
-                if (r != PICOKEY_OK) {
-                    return PICOKEY_EXEC_ERROR;
+                if (r != PICOKEYS_OK) {
+                    return PICOKEYS_EXEC_ERROR;
                 }
-                return PICOKEY_OK;
+                return PICOKEYS_OK;
             }
             else {   //needs reallocation
                 uint8_t *tpos = p - asn1_len_tag(tag, tag_len);
@@ -475,20 +474,20 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                     }
                     else {
                         free(fdata);
-                        return PICOKEY_ERR_MEMORY_FATAL;
+                        return PICOKEYS_ERR_MEMORY_FATAL;
                     }
                 }
                 uint8_t *f = fdata + meta_offset;
                 *f++ = fid & 0xff;
                 f += format_tlv_len(len + 2, f);
-                f += put_uint16_t_be(fid, f);
+                f += put_uint16_be(fid, f);
                 memcpy(f, data, len);
                 r = file_put_data(ef, fdata, ef_size);
                 free(fdata);
-                if (r != PICOKEY_OK) {
-                    return PICOKEY_EXEC_ERROR;
+                if (r != PICOKEYS_OK) {
+                    return PICOKEYS_EXEC_ERROR;
                 }
-                return PICOKEY_OK;
+                return PICOKEYS_OK;
             }
         }
     }
@@ -496,14 +495,14 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     uint8_t *f = fdata + ef_size;
     *f++ = fid & 0x1f;
     f += format_tlv_len(len + 2, f);
-    f += put_uint16_t_be(fid, f);
+    f += put_uint16_be(fid, f);
     memcpy(f, data, len);
     r = file_put_data(ef, fdata, ef_size + (uint16_t)asn1_len_tag(fid & 0x1f, len + 2));
     free(fdata);
-    if (r != PICOKEY_OK) {
-        return PICOKEY_EXEC_ERROR;
+    if (r != PICOKEYS_OK) {
+        return PICOKEYS_EXEC_ERROR;
     }
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 bool file_has_data(const file_t *f) {
@@ -512,15 +511,15 @@ bool file_has_data(const file_t *f) {
 
 int delete_file(file_t *ef) {
     if (ef == NULL) {
-        return PICOKEY_OK;
+        return PICOKEYS_OK;
     }
     meta_delete(ef->fid);
-    if (flash_clear_file(ef) != PICOKEY_OK) {
-        return PICOKEY_EXEC_ERROR;
+    if (flash_clear_file(ef) != PICOKEYS_OK) {
+        return PICOKEYS_EXEC_ERROR;
     }
-    if (delete_dynamic_file(ef) != PICOKEY_OK) {
-        return PICOKEY_EXEC_ERROR;
+    if (delete_dynamic_file(ef) != PICOKEYS_OK) {
+        return PICOKEYS_EXEC_ERROR;
     }
     low_flash_available();
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }

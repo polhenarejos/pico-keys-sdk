@@ -15,7 +15,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "pico_keys.h"
 #include "emulation.h"
 #include <stdio.h>
 #ifndef _MSC_VER

@@ -15,25 +15,23 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include "pico_keys.h"
+#include "picokeys.h"
+#include "usb.h"
+#include "led/led.h"
+#include "button.h"
 #if defined(PICO_PLATFORM)
-#include "pico/stdlib.h"
+#include "pico/bootrom.h"
 #include "pico/multicore.h"
 #include "hardware/sync.h"
 #include "bsp/board.h"
+#define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
 #endif
-#include "usb.h"
 #include "apdu.h"
 #ifndef ENABLE_EMULATION
 #include "tusb.h"
 #else
 #include "emulation.h"
 #endif
-
-// For memcpy
-#include <string.h>
-#include <stdlib.h>
 
 // Device specific functions
 static uint32_t *timeout_counter = NULL;
@@ -44,7 +42,7 @@ static mutex_t mutex;
 #endif
 #if !defined(PICO_PLATFORM) && !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
 #ifdef _MSC_VER
-#include "pthread_win32.h"
+#include "compat/pthread_win32.h"
 #endif
 pthread_t hcore0, hcore1;
 #endif
@@ -327,7 +325,7 @@ void usb_task(void) {
 int card_status(uint8_t itf) {
     if (card_locked_itf == itf) {
         if (timeout == 0) {
-            return PICOKEY_ERR_FILE_NOT_FOUND;
+            return PICOKEYS_ERR_FILE_NOT_FOUND;
         }
         uint32_t m = 0x0;
 #ifndef ENABLE_EMULATION
@@ -343,11 +341,11 @@ int card_status(uint8_t itf) {
             if (m == EV_EXEC_FINISHED) {
                 timeout_stop();
                 led_set_mode(MODE_MOUNTED);
-                return PICOKEY_OK;
+                return PICOKEYS_OK;
             }
 #ifndef ENABLE_EMULATION
             else if (m == EV_PRESS_BUTTON) {
-                uint32_t flag = wait_button() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
+                uint32_t flag = button_wait() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
                 queue_try_add(&usb_to_card_q, &flag);
             }
 #endif
@@ -356,18 +354,18 @@ int card_status(uint8_t itf) {
                 usb_secure_reboot_now();
             }
 #endif
-            return PICOKEY_ERR_FILE_NOT_FOUND;
+            return PICOKEYS_ERR_FILE_NOT_FOUND;
         }
         else {
             if (timeout > 0) {
                 if (timeout + timeout_counter[itf] < board_millis()) {
                     timeout = board_millis();
-                    return PICOKEY_ERR_BLOCKED;
+                    return PICOKEYS_ERR_BLOCKED;
                 }
             }
         }
     }
-    return PICOKEY_ERR_FILE_NOT_FOUND;
+    return PICOKEYS_ERR_FILE_NOT_FOUND;
 }
 
 #ifndef USB_ITF_CCID

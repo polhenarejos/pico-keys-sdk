@@ -15,7 +15,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "pico_keys.h"
+#include "picokeys.h"
+#include "serial.h"
 #ifndef ENABLE_EMULATION
 #include "tusb.h"
 #if defined(PICO_PLATFORM)
@@ -27,7 +28,7 @@ static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 #include "emulation.h"
 #endif
 #include "ctap_hid.h"
-#include "pico_keys_version.h"
+#include "picokeys_version.h"
 #include "apdu.h"
 #include "usb.h"
 
@@ -399,8 +400,8 @@ int driver_process_usb_packet_hid(uint16_t read) {
             memcpy(resp->nonce, req->nonce, sizeof(resp->nonce));
             resp->cid = 0x01000000;
             resp->versionInterface = CTAPHID_IF_VERSION;
-            resp->versionMajor = get_version_major ? get_version_major() : PICO_KEYS_SDK_VERSION_MAJOR;
-            resp->versionMinor = get_version_minor ? get_version_minor() : PICO_KEYS_SDK_VERSION_MINOR;
+            resp->versionMajor = get_version_major ? get_version_major() : PICOKEYS_SDK_VERSION_MAJOR;
+            resp->versionMinor = get_version_minor ? get_version_minor() : PICOKEYS_SDK_VERSION_MINOR;
             resp->capFlags = CAPFLAG_WINK | CAPFLAG_CBOR;
 
             ctap_resp->cid = ctap_req->cid;
@@ -467,8 +468,8 @@ int driver_process_usb_packet_hid(uint16_t read) {
         else if (ctap_req->init.cmd == CTAPHID_VERSION) {
             ctap_resp->cid = ctap_req->cid;
             ctap_resp->init.cmd = ctap_req->init.cmd;
-            ctap_resp->init.data[0] = PICO_KEYS_SDK_VERSION_MAJOR;
-            ctap_resp->init.data[1] = PICO_KEYS_SDK_VERSION_MINOR;
+            ctap_resp->init.data[0] = PICOKEYS_SDK_VERSION_MAJOR;
+            ctap_resp->init.data[1] = PICOKEYS_SDK_VERSION_MINOR;
             ctap_resp->init.bcntl = 4;
             driver_write_hid(ITF_HID_CTAP, (const uint8_t *)ctap_resp, 64);
             msg_packet.len = msg_packet.current_len = 0;
@@ -577,7 +578,7 @@ void driver_exec_finished_hid(uint16_t size_next) {
         else {
             if (is_nk) {
                 memmove(apdu.rdata + 2, apdu.rdata, size_next - 2);
-                put_uint16_t_be(apdu.sw, apdu.rdata);
+                put_uint16_be(apdu.sw, apdu.rdata);
             }
             driver_exec_finished_cont_hid(ITF_HID_CTAP, size_next, 7);
         }
@@ -620,10 +621,10 @@ void hid_task(void) {
         driver_process_usb_nopacket_hid();
     }
     int status = card_status(ITF_HID);
-    if (status == PICOKEY_OK) {
+    if (status == PICOKEYS_OK) {
         driver_exec_finished_hid(finished_data_size);
     }
-    else if (status == PICOKEY_ERR_BLOCKED) {
+    else if (status == PICOKEYS_ERR_BLOCKED) {
         send_keepalive();
     }
     if (hid_tx[ITF_HID_CTAP].w_ptr > hid_tx[ITF_HID_CTAP].r_ptr && last_write_result[ITF_HID_CTAP] != WRITE_PENDING) {

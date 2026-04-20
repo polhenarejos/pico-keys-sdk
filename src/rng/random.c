@@ -17,12 +17,7 @@
 
 #define HWRNG_PRE_LOOP 32
 
-#include <stdlib.h>
-#if defined(PICO_PLATFORM)
-#include "pico/stdlib.h"
-#endif
-#include <string.h>
-
+#include "picokeys.h"
 #include "hwrng.h"
 #include "random.h"
 

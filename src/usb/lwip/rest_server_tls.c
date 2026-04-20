@@ -15,13 +15,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#define MBEDTLS_ALLOW_PRIVATE_ACCESS
+#include "picokeys.h"
 #include "rest_server_tls.h"
 
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <strings.h>
 
 extern void rest_close_conn(rest_conn_t *conn);

@@ -15,17 +15,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "pico_keys.h"
+#include "picokeys.h"
 #include "tusb.h"
-#include "usb_descriptors.h"
-#if defined(PICO_PLATFORM)
-#include "pico/unique_id.h"
-#endif
 #ifdef ESP_PLATFORM
 #include "tinyusb.h"
 #endif
-#include "pico_keys_version.h"
+#include "picokeys_version.h"
 #include "usb.h"
+#include "serial.h"
 
 #ifndef USB_VID
 #define USB_VID   0x2E8A
@@ -59,7 +56,7 @@ tusb_desc_device_t desc_device = {
 
     .idVendor           = (USB_VID),
     .idProduct          = (USB_PID),
-    .bcdDevice          = PICO_KEYS_SDK_VERSION,
+    .bcdDevice          = PICOKEYS_SDK_VERSION,
 
     .iManufacturer      = 1,
     .iProduct           = 2,

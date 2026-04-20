@@ -15,36 +15,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "picokeys.h"
-#include "led/led.h"
-#ifdef PICO_PLATFORM
-#include "hardware/gpio.h"
-#endif
+#ifndef __VERSION_H_
+#define __VERSION_H_
 
-#ifdef CYW43_WL_GPIO_LED_PIN
+#define PICOKEYS_SDK_VERSION 0x0806
 
-#include "pico/cyw43_arch.h"
-
-void led_driver_init_cyw43(void);
-void led_driver_color_cyw43(uint8_t color, uint32_t led_brightness, float progress);
-
-void led_driver_init_cyw43(void) {
-    cyw43_arch_init();
-}
-
-void led_driver_color_cyw43(uint8_t color, uint32_t led_brightness, float progress) {
-    (void)led_brightness;
-    (void)color;
-    uint8_t gpio = CYW43_WL_GPIO_LED_PIN;
-    if (phy_data.led_gpio_present) {
-        gpio = phy_data.led_gpio;
-    }
-    cyw43_arch_gpio_put(gpio, progress >= 0.5);
-}
-
-led_driver_t led_driver_cyw43 = {
-    .init = led_driver_init_cyw43,
-    .set_color = led_driver_color_cyw43,
-};
+#define PICOKEYS_SDK_VERSION_MAJOR ((PICOKEYS_SDK_VERSION >> 8) & 0xff)
+#define PICOKEYS_SDK_VERSION_MINOR (PICOKEYS_SDK_VERSION & 0xff)
 
 #endif

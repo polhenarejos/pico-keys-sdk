@@ -15,16 +15,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-
-#include "pico_keys.h"
-#include <string.h>
-#include "crypto_utils.h"
+#include "picokeys.h"
+#include "serial.h"
+ #include "crypto_utils.h"
 #ifdef PICO_PLATFORM
- #include "pico/stdlib.h"
  #include "hardware/flash.h"
  #include "hardware/sync.h"
  #include "pico/mutex.h"
@@ -34,7 +28,7 @@
  #include "boot/picobin.h"
 #else
  #ifdef ESP_PLATFORM
-  #include "esp_compat.h"
+  #include "compat/esp_compat.h"
   #include "esp_partition.h"
   const esp_partition_t *part0;
   #define save_and_disable_interrupts() 1
@@ -56,7 +50,7 @@
    #include <unistd.h>
    #include <sys/mman.h>
   #endif
-  #include "queue.h"
+  #include "compat/queue.h"
  #endif
  #ifdef ENABLE_EMULATION
     #define FLASH_SECTOR_SIZE       0x4000
@@ -103,7 +97,7 @@ bool flash_available = false;
 
 
 //this function has to be called from the core 0
-void do_flash(void) {
+void low_flash_task(void) {
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
         if (locked_out == true && flash_available == true && ready_pages > 0) {
             //printf(" DO_FLASH AVAILABLE\n");
@@ -284,24 +278,24 @@ int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
     page_flash_t *p = NULL;
 
     if (!data || len == 0) {
-        return PICOKEY_ERR_NULL_PARAM;
+        return PICOKEYS_ERR_NULL_PARAM;
     }
 
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
         printf("ERROR: ALL FLASH PAGES CACHED\n");
-        return PICOKEY_ERR_NO_MEMORY;
+        return PICOKEYS_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
         mutex_exit(&mtx_flash);
         printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
-        return PICOKEY_ERR_MEMORY_FATAL;
+        return PICOKEYS_ERR_MEMORY_FATAL;
     }
     memcpy(&p->page[addr & (FLASH_SECTOR_SIZE - 1)], data, len);
     //printf("Flash: modified page %X with data %x at [%x]\n",(uintptr_t)addr,(uintptr_t)data,addr&(FLASH_SECTOR_SIZE-1));
     mutex_exit(&mtx_flash);
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 int flash_program_halfword(uintptr_t addr, uint16_t data) {
@@ -365,19 +359,19 @@ int flash_erase_page(uintptr_t addr, size_t page_size) {
     if (ready_pages == TOTAL_FLASH_PAGES) {
         mutex_exit(&mtx_flash);
         printf("ERROR: ALL FLASH PAGES CACHED\n");
-        return PICOKEY_ERR_NO_MEMORY;
+        return PICOKEYS_ERR_NO_MEMORY;
     }
     if (!(p = find_free_page(addr))) {
         printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
         mutex_exit(&mtx_flash);
-        return PICOKEY_ERR_MEMORY_FATAL;
+        return PICOKEYS_ERR_MEMORY_FATAL;
     }
     p->erase = true;
     p->ready = false;
     p->page_size = page_size;
     mutex_exit(&mtx_flash);
 
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 bool flash_check_blank(const uint8_t *p_start, size_t size) {

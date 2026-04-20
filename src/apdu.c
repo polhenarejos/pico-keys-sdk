@@ -15,12 +15,13 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "picokeys.h"
 #include "apdu.h"
-#include "pico_keys.h"
+#include "led/led.h"
 #include "usb.h"
 #include <stdio.h>
 #ifdef ESP_PLATFORM
-#include "esp_compat.h"
+#include "compat/esp_compat.h"
 #endif
 #ifdef ENABLE_EMULATION
 #include "emulation.h"
@@ -32,6 +33,8 @@ extern uint32_t timeout;
 bool is_chaining = false;
 uint8_t chain_buf[2038];
 uint8_t *chain_ptr = NULL;
+
+struct apdu apdu;
 
 int process_apdu(void) {
     led_set_mode(MODE_PROCESSING);
@@ -58,7 +61,7 @@ int process_apdu(void) {
         }
     }
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
-        if (select_app(apdu.data, apdu.nc) == PICOKEY_OK) {
+        if (select_app(apdu.data, apdu.nc) == PICOKEYS_OK) {
             return SW_OK();
         }
         return SW_FILE_NOT_FOUND();
@@ -87,17 +90,17 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
     }
     else if (apdu.header[4] == 0x0 && buffer_size >= 7) {
         if (buffer_size == 7) {
-            apdu.ne = get_uint16_t_be(apdu.header + 5);
+            apdu.ne = get_uint16_be(apdu.header + 5);
             if (apdu.ne == 0) {
                 apdu.ne = 65536;
             }
         }
         else {
             apdu.ne = 0;
-            apdu.nc = get_uint16_t_be(apdu.header + 5);
+            apdu.nc = get_uint16_be(apdu.header + 5);
             apdu.data = apdu.header + 7;
             if (apdu.nc + 7 + 2 == buffer_size) {
-                apdu.ne = get_uint16_t_be(apdu.header + buffer_size - 2);
+                apdu.ne = get_uint16_be(apdu.header + buffer_size - 2);
                 if (apdu.ne == 0) {
                     apdu.ne = 65536;
                 }
@@ -178,11 +181,11 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
 }
 
 uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
-    apdu.sw = make_uint16_t_be(sw1, sw2);
+    apdu.sw = make_uint16_be(sw1, sw2);
     if (sw1 != 0x90) {
         res_APDU_size = 0;
     }
-    return make_uint16_t_be(sw1, sw2);
+    return make_uint16_be(sw1, sw2);
 }
 
 void *apdu_thread(void *arg) {
@@ -225,7 +228,7 @@ done:   ;
 }
 
 void apdu_finish(void) {
-    put_uint16_t_be(apdu.sw, apdu.rdata + apdu.rlen);
+    put_uint16_be(apdu.sw, apdu.rdata + apdu.rlen);
     // timeout_stop();
 #ifndef ENABLE_EMULATION
     /* It was fixed in the USB handling. Keep it just in case */
@@ -273,8 +276,8 @@ int bulk_cmd(int (*cmd)(void)) {
         *apdu.rdata++ = 0;
         apdu.rlen = 0;
         cmd();
-        put_uint16_t_be(apdu.rlen, apdu.rdata - 2);
-        put_uint16_t_be(apdu.sw, apdu.rdata + apdu.rlen);
+        put_uint16_be(apdu.rlen, apdu.rdata - 2);
+        put_uint16_be(apdu.sw, apdu.rdata + apdu.rlen);
         rapdu_size += 4 + apdu.rlen + 2;
         apdu.rdata += apdu.rlen + 2;
         p += 3 + apdu.nc;

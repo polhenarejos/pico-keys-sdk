@@ -18,14 +18,10 @@
 #ifndef _FILE_H_
 #define _FILE_H_
 
-#include <stdlib.h>
-#if defined(PICO_PLATFORM)
-#include "pico/stdlib.h"
-#else
-#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#endif
-#include "compat.h"
+#include <stdbool.h>
+#include "compat/compat.h"
 #include "phy.h"
 
 #define FILE_TYPE_NOT_KNOWN     0x00
@@ -167,7 +163,7 @@ extern uint8_t flash_read_uint8(uintptr_t addr);
 extern uint8_t *flash_read(uintptr_t addr);
 extern int flash_erase_page(uintptr_t addr, size_t page_size);
 extern bool flash_check_blank(const uint8_t *p_start, size_t size);
-extern void do_flash(void);
+extern void flash_task(void);
 extern void low_flash_init(void);
 
 #ifndef ENABLE_EMULATION

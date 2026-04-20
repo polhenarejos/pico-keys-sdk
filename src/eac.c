@@ -15,6 +15,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "picokeys.h"
 #include "eac.h"
 #include "crypto_utils.h"
 #include "random.h"
@@ -100,13 +101,13 @@ int sm_sign(uint8_t *in, size_t in_len, uint8_t out[16]) {
 int sm_unwrap(void) {
     uint8_t sm_indicator = (CLA(apdu) >> 2) & 0x3;
     if (sm_indicator == 0) {
-        return PICOKEY_OK;
+        return PICOKEYS_OK;
     }
     if (!sm_active || sm_blocksize == 0) {
-        return PICOKEY_EXEC_ERROR;
+        return PICOKEYS_EXEC_ERROR;
     }
     int r = sm_verify();
-    if (r != PICOKEY_OK) {
+    if (r != PICOKEYS_OK) {
         return r;
     }
     apdu.ne = sm_get_le();
@@ -131,26 +132,26 @@ int sm_unwrap(void) {
     }
     if (!body) {
         apdu.nc = 0;
-        return PICOKEY_OK;
+        return PICOKEYS_OK;
     }
     if (is87 && *body++ != 0x1) {
-        return PICOKEY_WRONG_PADDING;
+        return PICOKEYS_WRONG_PADDING;
     }
     sm_update_iv();
-    aes_decrypt(sm_kenc, sm_iv, 128, PICO_KEYS_AES_MODE_CBC, body, body_size);
+    aes_decrypt(sm_kenc, sm_iv, 128, PICOKEYS_AES_MODE_CBC, body, body_size);
     memmove(apdu.data, body, body_size);
     apdu.nc = sm_remove_padding(apdu.data, body_size);
     DEBUG_PAYLOAD(apdu.data, (int) apdu.nc);
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 int sm_wrap(void) {
     uint8_t sm_indicator = (CLA(apdu) >> 2) & 0x3;
     if (sm_indicator == 0) {
-        return PICOKEY_OK;
+        return PICOKEYS_OK;
     }
     if (!sm_active || sm_blocksize == 0) {
-        return PICOKEY_EXEC_ERROR;
+        return PICOKEYS_EXEC_ERROR;
     }
     uint8_t input[USB_BUFFER_SIZE];
     size_t input_len = 0;
@@ -161,7 +162,7 @@ int sm_wrap(void) {
     mbedtls_mpi_copy(&sm_mSSC, &ssc);
     int r = mbedtls_mpi_write_binary(&ssc, input, sm_blocksize);
     if (r != 0) {
-        return PICOKEY_EXEC_ERROR;
+        return PICOKEYS_EXEC_ERROR;
     }
     input_len += sm_blocksize;
     mbedtls_mpi_free(&ssc);
@@ -171,7 +172,7 @@ int sm_wrap(void) {
         res_APDU_size += (sm_blocksize - (res_APDU_size % sm_blocksize));
         DEBUG_PAYLOAD(res_APDU, res_APDU_size);
         sm_update_iv();
-        aes_encrypt(sm_kenc, sm_iv, 128, PICO_KEYS_AES_MODE_CBC, res_APDU, res_APDU_size);
+        aes_encrypt(sm_kenc, sm_iv, 128, PICOKEYS_AES_MODE_CBC, res_APDU, res_APDU_size);
         memmove(res_APDU + 1, res_APDU, res_APDU_size);
         res_APDU[0] = 0x1;
         res_APDU_size++;
@@ -189,14 +190,14 @@ int sm_wrap(void) {
         else {
             memmove(res_APDU + 4, res_APDU, res_APDU_size);
             res_APDU[1] = 0x82;
-            put_uint16_t_be(res_APDU_size, res_APDU + 2);
+            put_uint16_be(res_APDU_size, res_APDU + 2);
             res_APDU_size += 4;
         }
         res_APDU[0] = 0x87;
     }
     res_APDU[res_APDU_size++] = 0x99;
     res_APDU[res_APDU_size++] = 2;
-    put_uint16_t_be(apdu.sw, res_APDU + res_APDU_size);
+    put_uint16_be(apdu.sw, res_APDU + res_APDU_size);
     res_APDU_size += 2;
     memcpy(input + input_len, res_APDU, res_APDU_size);
     input_len += res_APDU_size;
@@ -210,7 +211,7 @@ int sm_wrap(void) {
         apdu.ne = res_APDU_size;
     }
     set_res_sw(0x90, 0x00);
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 uint16_t sm_get_le(void) {
@@ -235,7 +236,7 @@ void sm_update_iv(void) {
     uint8_t tmp_iv[16], sc_counter[16];
     memset(tmp_iv, 0, sizeof(tmp_iv)); //IV is always 0 for encryption of IV based on counter
     mbedtls_mpi_write_binary(&sm_mSSC, sc_counter, sizeof(sc_counter));
-    aes_encrypt(sm_kenc, tmp_iv, 128, PICO_KEYS_AES_MODE_CBC, sc_counter, sizeof(sc_counter));
+    aes_encrypt(sm_kenc, tmp_iv, 128, PICOKEYS_AES_MODE_CBC, sc_counter, sizeof(sc_counter));
     memcpy(sm_iv, sc_counter, sizeof(sc_counter));
 }
 
@@ -250,7 +251,7 @@ int sm_verify(void) {
         data_len += sm_blocksize;
     }
     if (data_len + (add_header ? sm_blocksize : 0) > sizeof(input)) {
-        return PICOKEY_WRONG_LENGTH;
+        return PICOKEYS_WRONG_LENGTH;
     }
     mbedtls_mpi ssc;
     mbedtls_mpi_init(&ssc);
@@ -260,7 +261,7 @@ int sm_verify(void) {
     input_len += sm_blocksize;
     mbedtls_mpi_free(&ssc);
     if (r != 0) {
-        return PICOKEY_EXEC_ERROR;
+        return PICOKEYS_EXEC_ERROR;
     }
     if (add_header) {
         input[input_len++] = CLA(apdu);
@@ -293,7 +294,7 @@ int sm_verify(void) {
         }
     }
     if (!mac || mac_len != 8) {
-        return PICOKEY_WRONG_DATA;
+        return PICOKEYS_WRONG_DATA;
     }
     if (some_added) {
         input[input_len++] = 0x80;
@@ -302,12 +303,12 @@ int sm_verify(void) {
     uint8_t signature[16];
     r = sm_sign(input, input_len, signature);
     if (r != 0) {
-        return PICOKEY_EXEC_ERROR;
+        return PICOKEYS_EXEC_ERROR;
     }
     if (memcmp(signature, mac, mac_len) == 0) {
-        return PICOKEY_OK;
+        return PICOKEYS_OK;
     }
-    return PICOKEY_VERIFICATION_FAILED;
+    return PICOKEYS_VERIFICATION_FAILED;
 }
 
 uint16_t sm_remove_padding(const uint8_t *data, uint16_t data_len) {

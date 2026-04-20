@@ -16,8 +16,8 @@
  */
 
 
-#ifndef PICO_KEYS_REST_SERVER_H
-#define PICO_KEYS_REST_SERVER_H
+#ifndef REST_SERVER_H
+#define REST_SERVER_H
 
 #ifdef ENABLE_EMULATION
 typedef int err_t;

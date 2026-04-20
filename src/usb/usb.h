@@ -18,18 +18,20 @@
 #ifndef _USB_H_
 #define _USB_H_
 
+#include "picokeys.h"
+
 #if defined(ENABLE_EMULATION)
 #include "emulation.h"
 #elif defined(ESP_PLATFORM)
-#include "esp_compat.h"
+#include "compat/esp_compat.h"
 #elif defined(PICO_PLATFORM)
 #include "pico/util/queue.h"
 #else
-#include "queue.h"
-#include "board.h"
+#include "compat/queue.h"
+#include "compat/board.h"
 #endif
 
-#include "compat.h"
+#include "compat/compat.h"
 
 /* USB thread */
 #define EV_CARD_CHANGE        1

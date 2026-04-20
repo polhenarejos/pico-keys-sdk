@@ -15,22 +15,22 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "pico_keys.h"
+#include "picokeys.h"
 #include "asn1.h"
 
 int asn1_ctx_init(uint8_t *data, uint16_t len, asn1_ctx_t *ctx) {
     if (!ctx) {
-        return PICOKEY_ERR_NULL_PARAM;
+        return PICOKEYS_ERR_NULL_PARAM;
     }
     ctx->data = data;
     ctx->len = len;
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 int asn1_ctx_clear(asn1_ctx_t *ctx) {
     ctx->data = NULL;
     ctx->len = 0;
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 uint16_t asn1_len(asn1_ctx_t *ctx) {
@@ -73,7 +73,7 @@ uint8_t format_tlv_len(uint16_t len, uint8_t *out) {
     }
     if (out) {
         *out++ = 0x82;
-        put_uint16_t_be(len, out);
+        put_uint16_be(len, out);
     }
     return 3;
 }

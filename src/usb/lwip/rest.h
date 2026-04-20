@@ -15,8 +15,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef REST_SERVER_H
-#define REST_SERVER_H
+#ifndef REST_H
+#define REST_H
 
 #include <string.h>
 #include <stdio.h>
@@ -25,7 +25,6 @@
 #include <stdint.h>
 #include <time.h>
 #include "cJSON.h"
-#include "pico_keys.h"
 
 #define REST_MAX_REQUEST_SIZE 1024
 #define REST_MAX_METHOD_SIZE 8

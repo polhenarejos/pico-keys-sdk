@@ -15,18 +15,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#define MBEDTLS_ALLOW_PRIVATE_ACCESS
+#include "picokeys.h"
 #include "rest_server.h"
 #include "rest_server_tls.h"
-#include "pico_keys.h"
 #include "usb.h"
 
-#include <stdbool.h>
 #include <ctype.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <strings.h>
 
 #ifdef ENABLE_EMULATION
@@ -127,7 +121,7 @@ void rest_task(void) {
         return;
     }
     status = card_status(ITF_LWIP);
-    if (status != PICOKEY_OK) {
+    if (status != PICOKEYS_OK) {
         return;
     }
 

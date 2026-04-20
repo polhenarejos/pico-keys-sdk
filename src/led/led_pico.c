@@ -15,8 +15,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "pico_keys.h"
+#include "picokeys.h"
+#include "led/led.h"
 
+#ifdef PICO_PLATFORM
+#include "hardware/gpio.h"
+#endif
 #ifdef PICO_DEFAULT_LED_PIN
 static uint8_t gpio = PICO_DEFAULT_LED_PIN;
 #else

@@ -18,13 +18,8 @@
 #ifndef _ASN1_H_
 #define _ASN1_H_
 
-#include <stdlib.h>
-#if defined(PICO_PLATFORM)
-#include "pico/stdlib.h"
-#else
 #include <stdint.h>
 #include <stdbool.h>
-#endif
 
 typedef struct asn1_ctx {
     uint8_t *data;

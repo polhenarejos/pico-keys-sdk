@@ -15,14 +15,13 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include "pico_keys.h"
+#include "picokeys.h"
+#include "led/led.h"
 #ifdef PICO_PLATFORM
 #include "bsp/board.h"
 #elif defined(ESP_PLATFORM)
 #include "driver/gpio.h"
-#include "esp_compat.h"
+#include "compat/esp_compat.h"
 #elif defined(ENABLE_EMULATION)
 #include "emulation.h"
 #endif

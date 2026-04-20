@@ -18,7 +18,9 @@
 #ifndef _EAC_H_
 #define _EAC_H_
 
-#include "pico_keys.h"
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 typedef enum MSE_protocol {
     MSE_AES = 0,

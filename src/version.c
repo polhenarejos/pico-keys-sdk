@@ -15,9 +15,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "pico_keys.h"
-#include "pico_keys_version.h"
+#include <stdint.h>
+#include "picokeys_version.h"
 
 const uint8_t PICO_PRODUCT = 0;
-const uint8_t PICO_VERSION_MAJOR = PICO_KEYS_SDK_VERSION_MAJOR;
-const uint8_t PICO_VERSION_MINOR = PICO_KEYS_SDK_VERSION_MINOR;
+const uint8_t PICO_VERSION_MAJOR = PICOKEYS_SDK_VERSION_MAJOR;
+const uint8_t PICO_VERSION_MINOR = PICOKEYS_SDK_VERSION_MINOR;

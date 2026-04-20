@@ -43,31 +43,31 @@ The smartphone may be artificially picky about which Ethernet MAC address to rec
 try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00 (clearing bit 1).
 */
 
+#if !defined(ESP_PLATFORM)
 #include "bsp/board_api.h"
-#include "tusb.h"
-
 #include "dhserver.h"
 #include "dnserver.h"
 #include "lwip/ethip6.h"
 #include "lwip/init.h"
 #include "lwip/timeouts.h"
+#endif
 #include "rest_server.h"
-#include "rest_server_tls.h"
+#include "tusb.h"
+
+/* shared between tud_network_recv_cb() and service_traffic() */
+static struct pbuf *received_frame;
+
+#if !defined(ESP_PLATFORM)
+/* this is used by this code, ./class/net/net_driver.c, and usb_descriptors.c */
+/* ideally speaking, this should be generated from the hardware's unique ID (if available) */
+/* it is suggested that the first byte is 0x02 to indicate a link-local address */
+uint8_t tud_network_mac_address[6] = {0x02, 0x02, 0x84, 0x6A, 0x96, 0x00};
 
 #define INIT_IP4(a, b, c, d) \
   { PP_HTONL(LWIP_MAKEU32(a, b, c, d)) }
 
 /* lwip context */
 static struct netif netif_data;
-
-/* shared between tud_network_recv_cb() and service_traffic() */
-static struct pbuf *received_frame;
-
-/* this is used by this code, ./class/net/net_driver.c, and usb_descriptors.c */
-/* ideally speaking, this should be generated from the hardware's unique ID (if available) */
-/* it is suggested that the first byte is 0x02 to indicate a link-local address */
-uint8_t tud_network_mac_address[6] = {0x02, 0x02, 0x84, 0x6A, 0x96, 0x00};
-
 /* network parameters of this MCU */
 static const ip4_addr_t ipaddr = INIT_IP4(192, 168, 7, 1);
 static const ip4_addr_t netmask = INIT_IP4(255, 255, 255, 0);
@@ -201,8 +201,9 @@ void service_traffic(void) {
     received_frame = NULL;
     tud_network_recv_renew();
   }
-
+#if !defined(ESP_PLATFORM)
   sys_check_timeouts();
+#endif
 }
 
 void tud_network_init_cb(void) {
@@ -213,11 +214,14 @@ void tud_network_init_cb(void) {
   }
 }
 
+#endif
 int lwip_itf_init(void) {
+#if !defined(ESP_PLATFORM)
   init_lwip();
   while (!netif_is_up(&netif_data));
   while (dhserv_init(&dhcp_config) != ERR_OK);
   while (dnserv_init(IP_ADDR_ANY, 53, dns_query_proc) != ERR_OK);
+#endif
   while (rest_server_init(REST_CONN_ALL) != ERR_OK);
 
   return 0;

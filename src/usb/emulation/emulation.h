@@ -20,8 +20,8 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "queue.h"
-#include "board.h"
+#include "compat/queue.h"
+#include "compat/board.h"
 #include <stdbool.h>
 
 #define USB_BUFFER_SIZE 4096

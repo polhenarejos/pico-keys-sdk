@@ -343,7 +343,7 @@ if(ENABLE_PQC)
     )
 endif()
 
-list(APPEND PICO_KEYS_SOURCES
+list(APPEND PICOKEYS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
@@ -358,17 +358,20 @@ list(APPEND PICO_KEYS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/asn1.c
     ${CMAKE_CURRENT_LIST_DIR}/src/apdu.c
     ${CMAKE_CURRENT_LIST_DIR}/src/rescue.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/serial.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/pico_time.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/button.c
     ${CMAKE_CURRENT_LIST_DIR}/src/led/led.c
 )
 
 if(ESP_PLATFORM)
-    list(APPEND PICO_KEYS_SOURCES
+    list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c
         ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
     )
 else()
     if(NOT ENABLE_EMULATION)
-        list(APPEND PICO_KEYS_SOURCES
+        list(APPEND PICOKEYS_SOURCES
             ${CMAKE_CURRENT_LIST_DIR}/src/led/led_cyw43.c
             ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pico.c
             ${CMAKE_CURRENT_LIST_DIR}/src/led/led_pimoroni.c
@@ -401,12 +404,14 @@ set(SYSTEM_INCLUDES
 )
 
 if(USB_ITF_LWIP)
-    add_compile_definitions(
-        MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
-        MBEDTLS_SSL_PROTO_TLS1_2
-        MBEDTLS_SSL_SRV_C
-        MBEDTLS_SSL_TLS_C
-    )
+    if (NOT ESP_PLATFORM)
+        add_compile_definitions(
+            MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
+            MBEDTLS_SSL_PROTO_TLS1_2
+            MBEDTLS_SSL_SRV_C
+            MBEDTLS_SSL_TLS_C
+        )
+    endif()
     list(APPEND MBEDTLS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pkparse.c
         ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library/pk_ecc.c
@@ -512,8 +517,8 @@ endfunction()
 
 # Apply strict warning flags to a caller-provided source list.
 # Usage:
-#   pico_keys_apply_strict_flags(SOURCES ${SOURCES} FILTER_REGEX "/src/fido/")
-function(pico_keys_apply_strict_flags)
+#   picokeys_apply_strict_flags(SOURCES ${SOURCES} FILTER_REGEX "/src/fido/")
+function(picokeys_apply_strict_flags)
     set(options)
     set(oneValueArgs FILTER_REGEX)
     set(multiValueArgs SOURCES)
@@ -523,7 +528,7 @@ function(pico_keys_apply_strict_flags)
         return()
     endif()
 
-    set(PICO_KEYS_STRICT_FLAGS
+    set(PICOKEYS_STRICT_FLAGS
         -Wextra
         -pipe
         -funsigned-char
@@ -560,12 +565,12 @@ function(pico_keys_apply_strict_flags)
                 continue()
             endif()
         endif()
-        set_property(SOURCE "${src}" APPEND PROPERTY COMPILE_OPTIONS ${PICO_KEYS_STRICT_FLAGS})
+        set_property(SOURCE "${src}" APPEND PROPERTY COMPILE_OPTIONS ${PICOKEYS_STRICT_FLAGS})
     endforeach()
 endfunction()
 
 if(USB_ITF_HID)
-    list(APPEND PICO_KEYS_SOURCES
+    list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
     )
     list(APPEND INCLUDES
@@ -574,7 +579,7 @@ if(USB_ITF_HID)
 endif()
 
 if(USB_ITF_CCID)
-    list(APPEND PICO_KEYS_SOURCES
+    list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid/ccid.c
     )
     list(APPEND INCLUDES
@@ -587,7 +592,7 @@ if(NOT MSVC)
     add_compile_options("-fmacro-prefix-map=${CMAKE_CURRENT_LIST_DIR}/=")
 endif()
 if(MSVC)
-    list(APPEND PICO_KEYS_SOURCES
+    list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/mman.c
     )
 endif()
@@ -596,11 +601,11 @@ if(ENABLE_EMULATION)
         add_definitions("-Wno-deprecated-declarations")
     endif()
     add_compile_definitions(ENABLE_EMULATION)
-    list(APPEND PICO_KEYS_SOURCES
+    list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/emulation.c
     )
     if(USE_OPENSSL_EMULATION_WRAPPER)
-        list(APPEND PICO_KEYS_SOURCES
+        list(APPEND PICOKEYS_SOURCES
             ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation/openssl.c
         )
     endif()
@@ -611,7 +616,7 @@ if(ENABLE_EMULATION)
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/emulation
     )
 else()
-    list(APPEND PICO_KEYS_SOURCES
+    list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb_descriptors.c
     )
 endif()
@@ -641,7 +646,7 @@ if(PICO_PLATFORM)
 endif()
 
 if(USB_ITF_LWIP)
-    list(APPEND PICO_KEYS_SOURCES
+    list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/rest.c
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/rest_server.c
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/rest_server_tls.c
@@ -650,17 +655,21 @@ if(USB_ITF_LWIP)
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip
     )
     if(NOT ENABLE_EMULATION)
-        list(APPEND PICO_KEYS_SOURCES
+        list(APPEND PICOKEYS_SOURCES
             ${CMAKE_CURRENT_LIST_DIR}/src/usb/lwip/lwip.c
-            ${PICO_TINYUSB_PATH}/lib/networking/dhserver.c
-            ${PICO_TINYUSB_PATH}/lib/networking/dnserver.c
         )
-        list(APPEND INCLUDES
-            ${PICO_TINYUSB_PATH}/lib/networking
-            ${PICO_LWIP_PATH}/src/include/lwip/apps
-        )
-        message(STATUS "TINYUSB_PATH:\t\t ${PICO_TINYUSB_PATH}")
-        message(STATUS "LWIP_PATH:\t\t ${PICO_LWIP_PATH}")
+        if ((NOT ESP_PLATFORM) AND (NOT IDF_TARGET))
+            list(APPEND PICOKEYS_SOURCES
+                ${PICO_TINYUSB_PATH}/lib/networking/dhserver.c
+                ${PICO_TINYUSB_PATH}/lib/networking/dnserver.c
+            )
+            list(APPEND INCLUDES
+                ${PICO_TINYUSB_PATH}/lib/networking
+                ${PICO_LWIP_PATH}/src/include/lwip/apps
+            )
+            message(STATUS "TINYUSB_PATH:\t\t ${PICO_TINYUSB_PATH}")
+            message(STATUS "LWIP_PATH:\t\t ${PICO_LWIP_PATH}")
+        endif()
     endif()
 endif()
 
@@ -686,24 +695,24 @@ if(PICO_RP2350)
         )
         target_link_libraries(mbedtls PRIVATE pico_sha256)
     endif()
-    list(APPEND PICO_KEYS_SOURCES
+    list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt/sha256_alt.c
     )
     add_compile_definitions(MBEDTLS_SHA256_ALT=1)
     list(APPEND LIBRARIES pico_sha256)
 endif()
-set(INTERNAL_SOURCES ${PICO_KEYS_SOURCES})
+set(INTERNAL_SOURCES ${PICOKEYS_SOURCES})
 
-if(NOT TARGET pico_keys_sdk)
+if(NOT TARGET picokeys_sdk)
     if(PICO_PLATFORM)
-        pico_add_library(pico_keys_sdk)
+        pico_add_library(picokeys_sdk)
 
         target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBRARIES})
     else()
-        add_impl_library(pico_keys_sdk)
+        add_impl_library(picokeys_sdk)
     endif()
-    target_sources(pico_keys_sdk INTERFACE ${PICO_KEYS_SOURCES})
-    target_include_directories(pico_keys_sdk INTERFACE ${INCLUDES})
-    target_include_directories(pico_keys_sdk SYSTEM INTERFACE ${SYSTEM_INCLUDES})
-    target_link_libraries(pico_keys_sdk INTERFACE ${LIBRARIES})
+    target_sources(picokeys_sdk INTERFACE ${PICOKEYS_SOURCES})
+    target_include_directories(picokeys_sdk INTERFACE ${INCLUDES})
+    target_include_directories(picokeys_sdk SYSTEM INTERFACE ${SYSTEM_INCLUDES})
+    target_link_libraries(picokeys_sdk INTERFACE ${LIBRARIES})
 endif()

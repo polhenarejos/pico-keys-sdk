@@ -15,8 +15,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef PICO_KEYS_REST_SERVER_TLS_H
-#define PICO_KEYS_REST_SERVER_TLS_H
+#ifndef REST_SERVER_TLS_H
+#define REST_SERVER_TLS_H
 
 #ifdef ENABLE_EMULATION
 typedef int err_t;
@@ -58,4 +58,4 @@ extern void tls_handle_client(int client_fd);
 extern struct tcp_pcb *tls_listener_pcb;
 #endif
 
-#endif
+#endif // REST_SERVER_TLS_H

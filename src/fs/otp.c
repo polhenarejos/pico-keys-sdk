@@ -15,9 +15,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "file.h"
-#include "pico_keys.h"
-#include <stdio.h>
+#include "picokeys.h"
 #include "otp.h"
 
 #ifdef PICO_RP2350
@@ -255,8 +253,8 @@ typedef esp_err_t otp_ret_t;
 #ifndef SECURE_BOOT_BOOTKEY_INDEX
 #define SECURE_BOOT_BOOTKEY_INDEX 0
 #endif
-#ifndef PICO_KEYS_REQUIRE_SECURE_BOOT_BEFORE_LOCK
-#define PICO_KEYS_REQUIRE_SECURE_BOOT_BEFORE_LOCK 1
+#ifndef PICOKEYS_REQUIRE_SECURE_BOOT_BEFORE_LOCK
+#define PICOKEYS_REQUIRE_SECURE_BOOT_BEFORE_LOCK 1
 #endif
 
 bool otp_is_secure_boot_enabled(uint8_t *bootkey) {
@@ -352,7 +350,7 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
 #ifdef PICO_RP2350
     alignas(2) uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
     if (is_empty_otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, 32)) {
-        PICOKEY_CHECK(otp_write_data(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, BOOTKEY, sizeof(BOOTKEY)));
+        PICOKEYS_CHECK(otp_write_data(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, BOOTKEY, sizeof(BOOTKEY)));
     }
 
     const uint8_t *boot_flags1 = otp_buffer_raw(OTP_DATA_BOOT_FLAGS1_ROW);
@@ -361,9 +359,9 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
         flagsb1[1] |= ((OTP_DATA_BOOT_FLAGS1_KEY_INVALID_BITS >> OTP_DATA_BOOT_FLAGS1_KEY_INVALID_LSB) & (~(1 << bootkey)));
     }
 
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_ROW, flagsb1, sizeof(flagsb1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R1_ROW, flagsb1, sizeof(flagsb1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R2_ROW, flagsb1, sizeof(flagsb1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_ROW, flagsb1, sizeof(flagsb1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R1_ROW, flagsb1, sizeof(flagsb1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R2_ROW, flagsb1, sizeof(flagsb1)));
 
     const uint8_t *crit1 = otp_buffer_raw(OTP_DATA_CRIT1_ROW);
     alignas(4) uint8_t flagsc1[] = { crit1[0] | (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB), crit1[1], crit1[2], 0x00 };
@@ -372,31 +370,31 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
         flagsc1[0] |= (1 << OTP_DATA_CRIT1_GLITCH_DETECTOR_ENABLE_LSB);
         flagsc1[0] |= (3 << OTP_DATA_CRIT1_GLITCH_DETECTOR_SENS_LSB);
     }
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R1_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R2_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R3_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R4_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R5_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R6_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R7_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R1_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R2_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R3_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R4_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R5_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R6_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R7_ROW, flagsc1, sizeof(flagsc1)));
 
     if (secure_lock) {
         const uint8_t *page1 = otp_buffer_raw(OTP_DATA_PAGE1_LOCK1_ROW);
         uint8_t page1v = page1[0] | (OTP_DATA_PAGE1_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE1_LOCK1_LOCK_BL_LSB);
         alignas(4) uint8_t flagsp1[] = { page1v, page1v, page1v, 0x00 };
-        PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_PAGE1_LOCK1_ROW, flagsp1, sizeof(flagsp1)));
+        PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_PAGE1_LOCK1_ROW, flagsp1, sizeof(flagsp1)));
         const uint8_t *page2 = otp_buffer_raw(OTP_DATA_PAGE2_LOCK1_ROW);
         uint8_t page2v = page2[0] | (OTP_DATA_PAGE2_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE2_LOCK1_LOCK_BL_LSB);
         alignas(4) uint8_t flagsp2[] = { page2v, page2v, page2v, 0x00 };
-        PICOKEY_CHECK(otp_write_data_raw(OTP_DATA_PAGE2_LOCK1_ROW, flagsp2, sizeof(flagsp2)));
+        PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_PAGE2_LOCK1_ROW, flagsp2, sizeof(flagsp2)));
     }
 #elif defined(ESP_PLATFORM)
     if (bootkey > 2) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (secure_lock && PICO_KEYS_REQUIRE_SECURE_BOOT_BEFORE_LOCK) {
+    if (secure_lock && PICOKEYS_REQUIRE_SECURE_BOOT_BEFORE_LOCK) {
         if (!esp_efuse_read_field_bit(ESP_EFUSE_SECURE_BOOT_EN)) {
             printf("Secure lock requires SECURE_BOOT_EN already set. Enable secure boot first.\n");
             return ESP_ERR_INVALID_STATE;
@@ -461,10 +459,10 @@ int otp_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
 #endif // PICO_RP2350
     goto err;
     err:
-    if (ret != PICOKEY_OK) {
+    if (ret != PICOKEYS_OK) {
         return ret;
     }
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 #ifdef PICO_RP2350

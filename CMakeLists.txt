@@ -45,16 +45,16 @@ set(USB_ITF_CCID 1)
 set(USB_ITF_WCID 1)
 include(cmake/version.cmake)
 include(cmake/options.cmake OPTIONAL)
-include(pico_keys_sdk_import.cmake)
+include(picokeys_sdk_import.cmake)
 if(NOT ESP_PLATFORM)
-    set(SOURCES ${PICO_KEYS_SOURCES})
+    set(SOURCES ${PICOKEYS_SOURCES})
 endif()
 list(APPEND SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/files.c
     ${CMAKE_CURRENT_LIST_DIR}/src/version.c
 )
 
-SET_VERSION(ver_major ver_minor "${CMAKE_CURRENT_LIST_DIR}/src/pico_keys_version.h")
+SET_VERSION(ver_major ver_minor "${CMAKE_CURRENT_LIST_DIR}/src/picokeys_version.h")
 
 if(ESP_PLATFORM)
     project(pico_rescue)

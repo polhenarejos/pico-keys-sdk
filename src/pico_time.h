@@ -15,36 +15,19 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "picokeys.h"
-#include "led/led.h"
+#ifndef TIME_H
+#define TIME_H
+
 #ifdef PICO_PLATFORM
-#include "hardware/gpio.h"
+#include "pico/aon_timer.h"
+#else
+#include <sys/time.h>
+#include <time.h>
 #endif
 
-#ifdef CYW43_WL_GPIO_LED_PIN
+extern bool has_set_rtc(void);
+extern time_t get_rtc_time(void);
+extern void set_rtc_time(time_t tv_sec);
+extern void init_rtc(void);
 
-#include "pico/cyw43_arch.h"
-
-void led_driver_init_cyw43(void);
-void led_driver_color_cyw43(uint8_t color, uint32_t led_brightness, float progress);
-
-void led_driver_init_cyw43(void) {
-    cyw43_arch_init();
-}
-
-void led_driver_color_cyw43(uint8_t color, uint32_t led_brightness, float progress) {
-    (void)led_brightness;
-    (void)color;
-    uint8_t gpio = CYW43_WL_GPIO_LED_PIN;
-    if (phy_data.led_gpio_present) {
-        gpio = phy_data.led_gpio;
-    }
-    cyw43_arch_gpio_put(gpio, progress >= 0.5);
-}
-
-led_driver_t led_driver_cyw43 = {
-    .init = led_driver_init_cyw43,
-    .set_color = led_driver_color_cyw43,
-};
-
-#endif
+#endif // TIME_H

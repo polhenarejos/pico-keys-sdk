@@ -15,7 +15,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "pico_keys.h"
+#include "picokeys.h"
+#include "led/led.h"
 
 #ifdef PICO_PLATFORM
 #include "hardware/pio.h"

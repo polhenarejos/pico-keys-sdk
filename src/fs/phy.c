@@ -15,8 +15,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "pico_keys.h"
-#include "file.h"
+#include "picokeys.h"
 #include "otp.h"
 
 #ifndef ENABLE_EMULATION
@@ -25,7 +24,7 @@ phy_data_t phy_data;
 
 int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     if (!phy || !data || !len) {
-        return PICOKEY_ERR_NULL_PARAM;
+        return PICOKEYS_ERR_NULL_PARAM;
     }
     uint8_t *p = data;
     if (phy->vidpid_present) {
@@ -48,7 +47,7 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     }
     *p++ = PHY_OPTS;
     *p++ = 2;
-    p += put_uint16_t_be(phy->opts, p);
+    p += put_uint16_be(phy->opts, p);
     if (phy->up_btn_present) {
         *p++ = PHY_UP_BTN;
         *p++ = 1;
@@ -64,7 +63,7 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     if (phy->enabled_curves_present) {
         *p++ = PHY_ENABLED_CURVES;
         *p++ = 4;
-        p += put_uint32_t_be(phy->enabled_curves, p);
+        p += put_uint32_be(phy->enabled_curves, p);
     }
     if (phy->enabled_usb_itf_present) {
         *p++ = PHY_ENABLED_USB_ITF;
@@ -78,12 +77,12 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     }
 
     *len = (uint8_t)(p - data);
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
     if (!phy || !data || !len) {
-        return PICOKEY_ERR_NULL_PARAM;
+        return PICOKEYS_ERR_NULL_PARAM;
     }
     const uint8_t *p = data;
     uint8_t tag, tlen;
@@ -115,7 +114,7 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
                 break;
             case PHY_OPTS:
                 if (tlen == 2) {
-                    phy->opts = get_uint16_t_be(p);
+                    phy->opts = get_uint16_be(p);
                     p += 2;
                 }
                 break;
@@ -135,7 +134,7 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
                 break;
             case PHY_ENABLED_CURVES:
                 if (tlen == 4) {
-                    phy->enabled_curves = get_uint32_t_be(p);
+                    phy->enabled_curves = get_uint32_be(p);
                     p += 4;
                     phy->enabled_curves_present = true;
                 }
@@ -162,7 +161,7 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
         phy_data.enabled_usb_itf = PHY_USB_ITF_ALL;
         phy_data.enabled_usb_itf_present = true;
     }
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 int phy_init(void) {
@@ -174,18 +173,18 @@ int phy_save(void) {
     uint8_t tmp[PHY_MAX_SIZE] = {0};
     uint16_t tmp_len = 0;
     int ret = phy_serialize_data(&phy_data, tmp, &tmp_len);
-    if (ret != PICOKEY_OK) {
+    if (ret != PICOKEYS_OK) {
         return ret;
     }
     file_put_data(ef_phy, tmp, tmp_len);
     low_flash_available();
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 
 int phy_load(void) {
     if (file_has_data(ef_phy)) {
         return phy_unserialize_data(file_get_data(ef_phy), file_get_size(ef_phy), &phy_data);
     }
-    return PICOKEY_OK;
+    return PICOKEYS_OK;
 }
 #endif

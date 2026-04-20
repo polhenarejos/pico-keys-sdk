@@ -1,6 +1,6 @@
 #
 # OpenSSL  wrapper configuration for Pico Keys SDK.
-# Keeps OpenSSL-specific build logic out of pico_keys_sdk_import.cmake.
+# Keeps OpenSSL-specific build logic out of picokeys_sdk_import.cmake.
 #
 
 if(NOT DEFINED USE_OPENSSL)

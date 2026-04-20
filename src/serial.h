@@ -15,12 +15,22 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __VERSION_H_
-#define __VERSION_H_
+#ifndef _SERIAL_H_
+#define _SERIAL_H_
 
-#define PICO_KEYS_SDK_VERSION 0x0806
+#include <stdint.h>
 
-#define PICO_KEYS_SDK_VERSION_MAJOR ((PICO_KEYS_SDK_VERSION >> 8) & 0xff)
-#define PICO_KEYS_SDK_VERSION_MINOR (PICO_KEYS_SDK_VERSION & 0xff)
-
+#if !defined (PICO_PLATFORM)
+#define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8
+typedef struct { uint8_t id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES]; } picokey_serial_t;
+#else
+#include "pico/unique_id.h"
+typedef pico_unique_board_id_t picokey_serial_t;
 #endif
+
+extern picokey_serial_t pico_serial;
+extern char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+extern uint8_t pico_serial_hash[32];
+extern void serial_init(void);
+
+#endif //_SERIAL_H_

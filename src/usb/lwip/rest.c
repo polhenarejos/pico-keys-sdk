@@ -17,6 +17,90 @@
 
 #include "rest.h"
 #include <strings.h>
+#include "random.h"
+
+#define REST_MAX_SESSIONS 4
+
+static rest_session_t rest_sessions[REST_MAX_SESSIONS] = {0};
+
+rest_session_t *rest_session_create(const rest_session_role_t role, rest_session_status_t status) {
+    for (int i = 0; i < REST_MAX_SESSIONS; i++) {
+        if (rest_sessions[i].status == REST_SESSION_UNKNOWN || rest_sessions[i].status == REST_SESSION_EXPIRED || rest_sessions[i].status == REST_SESSION_TERMINATED) {
+            memset(&rest_sessions[i], 0, sizeof(rest_session_t));
+            rest_sessions[i].status = status;
+            rest_sessions[i].role = role;
+            random_fill_buffer(rest_sessions[i].id, sizeof(rest_sessions[i].id));
+            rest_sessions[i].created_at = get_rtc_time();
+            rest_sessions[i].last_activity_timestamp = rest_sessions[i].created_at;
+            return &rest_sessions[i];
+        }
+    }
+    return NULL;
+}
+
+rest_session_t *rest_session_get(const uint8_t *id, size_t id_len) {
+    if (id == NULL || id_len != 16) {
+        return NULL;
+    }
+    for (int i = 0; i < REST_MAX_SESSIONS; i++) {
+        if (rest_sessions[i].status != REST_SESSION_UNKNOWN && rest_sessions[i].status != REST_SESSION_EXPIRED && rest_sessions[i].status != REST_SESSION_TERMINATED) {
+            if (memcmp(rest_sessions[i].id, id, sizeof(rest_sessions[i].id)) == 0) {
+                return &rest_sessions[i];
+            }
+        }
+    }
+    return NULL;
+}
+
+int rest_session_terminate(const uint8_t *id, size_t id_len) {
+    rest_session_t *session = rest_session_get(id, id_len);
+    if (session == NULL) {
+        return -1;
+    }
+    session->status = REST_SESSION_TERMINATED;
+    return 0;
+}
+
+int rest_session_update_activity(const uint8_t *id, size_t id_len) {
+    rest_session_t *session = rest_session_get(id, id_len);
+    if (session == NULL) {
+        return -1;
+    }
+    session->last_activity_timestamp = get_rtc_time();
+    return 0;
+}
+
+int rest_session_set_status(const uint8_t *id, size_t id_len, rest_session_status_t status) {
+    rest_session_t *session = rest_session_get(id, id_len);
+    if (session == NULL) {
+        return -1;
+    }
+    session->status = status;
+    return 0;
+}
+
+int rest_session_set_role(const uint8_t *id, size_t id_len, rest_session_role_t role) {
+    rest_session_t *session = rest_session_get(id, id_len);
+    if (session == NULL) {
+        return -1;
+    }
+    session->role = role;
+    return 0;
+}
+
+int rest_session_cleanup_expired(time_t expiration_time) {
+    int count = 0;
+    time_t now = get_rtc_time();
+    for (int i = 0; i < REST_MAX_SESSIONS; i++) {
+        if (rest_sessions[i].status != REST_SESSION_UNKNOWN && rest_sessions[i].status != REST_SESSION_EXPIRED && rest_sessions[i].status != REST_SESSION_TERMINATED) {
+            if (now - rest_sessions[i].last_activity_timestamp > expiration_time) {
+                rest_sessions[i].status = REST_SESSION_EXPIRED;
+                count++;
+            }
+        }
+    }
+    return count;
+}
 
 #ifdef DEBUG_APDU
 void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len) {

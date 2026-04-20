@@ -76,7 +76,7 @@ enum {
     REPORT_ID_COUNT
 };
 
-#if defined(ESP_PLATFORM) && defined(USB_ITF_HID) && defined(USB_ITF_CCID)
+#if defined(ESP_PLATFORM) && (defined(USB_ITF_HID) || defined(USB_ITF_LWIP))&& defined(USB_ITF_CCID)
 #define TUSB_SMARTCARD_CCID_EPS 2
 #else
 #define TUSB_SMARTCARD_CCID_EPS 3

@@ -200,7 +200,7 @@ void usb_desc_setup(void) {
 #ifdef USB_ITF_LWIP
     if (ITF_LWIP != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_CDC_NCM_DESC_LEN;
-        const uint8_t desc_lwip[] = { TUD_CDC_NCM_DESCRIPTOR(ITF_LWIP, ITF_LWIP + 6, 5, EPNUM_LWIP_NOTIF, 64, EPNUM_LWIP, EPNUM_LWIP | TUSB_DIR_IN_MASK, CFG_TUD_NET_ENDPOINT_SIZE, CFG_TUD_NET_MTU) };
+        const uint8_t desc_lwip[] = { TUD_CDC_NCM_DESCRIPTOR(ITF_LWIP, ITF_LWIP + 6, 5, EPNUM_LWIP_NOTIF | TUSB_DIR_IN_MASK, 64, EPNUM_LWIP, EPNUM_LWIP | TUSB_DIR_IN_MASK, CFG_TUD_NET_ENDPOINT_SIZE, CFG_TUD_NET_MTU) };
         memcpy(p, desc_lwip, sizeof(desc_lwip));
         p += sizeof(desc_lwip);
     }
@@ -344,7 +344,7 @@ uint8_t const *tud_descriptor_bos_cb(void) {
 //--------------------------------------------------------------------+
 
 // array of pointer to string descriptors
-char *string_desc_itf[4] = {0};
+char *string_desc_itf[5] = {0};
 char const *string_desc_arr [] = {
     (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
     "Pol Henarejos",                     // 1: Manufacturer
@@ -367,7 +367,7 @@ char const *string_desc_arr [] = {
 tinyusb_config_t tusb_cfg = {
     .device_descriptor = &desc_device,
     .string_descriptor = string_desc_arr,
-    .string_descriptor_count = (sizeof(string_desc_arr) / sizeof(string_desc_arr[0])) > 8 ? 8 : (sizeof(string_desc_arr) / sizeof(string_desc_arr[0])),
+    .string_descriptor_count = (sizeof(string_desc_arr) / sizeof(string_desc_arr[0])),
     .external_phy = false,
     .configuration_descriptor = desc_config,
 };

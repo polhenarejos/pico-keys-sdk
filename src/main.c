@@ -108,7 +108,7 @@ void execute_tasks(void) {
     tud_task(); // tinyusb device task
 #endif
 #ifdef USB_ITF_LWIP
-#if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
+#if !defined(ENABLE_EMULATION)
     service_traffic();
 #endif
     rest_task();
@@ -119,6 +119,11 @@ void execute_tasks(void) {
 
 static void core0_loop(void *arg) {
     (void)arg;
+#if defined(ESP_PLATFORM) && defined(USB_ITF_LWIP)
+    if (ITF_LWIP_TOTAL > 0) {
+        lwip_itf_init();
+    }
+#endif
     while (1) {
         execute_tasks();
         hwrng_task();
@@ -133,6 +138,8 @@ static void core0_loop(void *arg) {
 #ifdef ESP_PLATFORM
 extern tinyusb_config_t tusb_cfg;
 extern const uint8_t desc_config[];
+extern char *string_desc_arr[];
+extern char *string_desc_itf[];
 TaskHandle_t hcore0 = NULL, hcore1 = NULL;
 int app_main(void) {
 #else
@@ -178,13 +185,16 @@ int main(void) {
     if (phy_data.usb_product_present) {
         tusb_cfg.string_descriptor[2] = phy_data.usb_product;
     }
-    static char tmps[4][32];
-    for (int i = 4; i < tusb_cfg.string_descriptor_count; i++) {
-        strlcpy(tmps[i-4], tusb_cfg.string_descriptor[2], sizeof(tmps[0]));
-        strlcat(tmps[i-4], " ", sizeof(tmps[0]));
-        strlcat(tmps[i-4], tusb_cfg.string_descriptor[i], sizeof(tmps[0]));
-        tusb_cfg.string_descriptor[i] = tmps[i-4];
+    static char tmps[5][32];
+    const int max_desc_slots = 8 - 6;
+    const int itf_desc_count = ITF_TOTAL < max_desc_slots ? ITF_TOTAL : max_desc_slots;
+    for (int i = 0; i < itf_desc_count; i++) {
+        strlcpy(tmps[i], tusb_cfg.string_descriptor[2], sizeof(tmps[0]));
+        strlcat(tmps[i], " ", sizeof(tmps[0]));
+        strlcat(tmps[i], string_desc_itf[i], sizeof(tmps[0]));
+        tusb_cfg.string_descriptor[i+6] = tmps[i];
     }
+    tusb_cfg.string_descriptor_count = 6 + itf_desc_count;
     tusb_cfg.configuration_descriptor = desc_config;
 
     tinyusb_driver_install(&tusb_cfg);

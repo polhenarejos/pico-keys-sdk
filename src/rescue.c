@@ -114,7 +114,7 @@ static int load_internal_keydev(mbedtls_ecp_keypair *ecp, mbedtls_ecp_group_id e
         // Generate new key
         uint8_t pkey[MBEDTLS_ECP_MAX_BYTES] = {0};
         size_t olen = 0;
-        mbedtls_ecp_gen_key(ec_id, ecp, random_gen, NULL);
+        mbedtls_ecp_gen_key(ec_id, ecp, random_fill_iterator, NULL);
         mbedtls_ecp_write_key_ext(ecp, &olen, pkey, sizeof(pkey));
 
         aes_encrypt(kbase, pico_serial_hash, 32 * 8, PICO_KEYS_AES_MODE_CBC, pkey, 32);
@@ -153,7 +153,7 @@ static int cmd_keydev_sign(void) {
         mbedtls_mpi_init(&r);
         mbedtls_mpi_init(&s);
 
-        int ret = mbedtls_ecdsa_sign(&ecp.MBEDTLS_PRIVATE(grp), &r, &s, &ecp.MBEDTLS_PRIVATE(d), apdu.data, apdu.nc, random_gen, NULL);
+        int ret = mbedtls_ecdsa_sign(&ecp.MBEDTLS_PRIVATE(grp), &r, &s, &ecp.MBEDTLS_PRIVATE(d), apdu.data, apdu.nc, random_fill_iterator, NULL);
         if (ret != 0) {
             mbedtls_ecp_keypair_free(&ecp);
             mbedtls_mpi_free(&r);
@@ -189,7 +189,7 @@ static int cmd_keydev_sign(void) {
                 return SW_EXEC_ERROR();
             }
         }
-        int ret = mbedtls_ecp_mul(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), &ecp.MBEDTLS_PRIVATE(d), &ecp.MBEDTLS_PRIVATE(grp).G, random_gen, NULL);
+        int ret = mbedtls_ecp_mul(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), &ecp.MBEDTLS_PRIVATE(d), &ecp.MBEDTLS_PRIVATE(grp).G, random_fill_iterator, NULL);
         if (ret != 0) {
             mbedtls_ecp_keypair_free(&ecp);
             return SW_EXEC_ERROR();

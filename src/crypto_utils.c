@@ -97,7 +97,7 @@ int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
     uint8_t *ct    = out_buf + 12;
     uint8_t *tag   = out_buf + 12 + in_len;
 
-    random_gen(NULL, nonce, 12);
+    random_fill_buffer(nonce, 12);
 
     mbedtls_gcm_context gcm;
     mbedtls_gcm_init(&gcm);

@@ -40,7 +40,7 @@ void random_init(void) {
 /*
  * Free pointer to random 32-byte
  */
-void random_bytes_free(const uint8_t *p) {
+static void random_bytes_free(const uint8_t *p) {
     (void) p;
     memset(random_word, 0, RANDOM_BYTES_LENGTH);
     hwrng_flush();
@@ -66,7 +66,7 @@ const uint8_t *random_bytes_get(size_t len) {
 /*
  * Random byte iterator
  */
-int random_gen(void *arg, unsigned char *out, size_t out_len) {
+int random_fill_iterator(void *arg, unsigned char *out, size_t out_len) {
     uint8_t *index_p = (uint8_t *) arg;
     uint8_t index = index_p ? *index_p : 0;
     uint8_t n;
@@ -97,8 +97,6 @@ int random_gen(void *arg, unsigned char *out, size_t out_len) {
     return 0;
 }
 
-#ifdef ENABLE_PQC
-void randombytes(uint8_t *buf, size_t n) {
-    random_gen(NULL, buf, n);
+int random_fill_buffer(uint8_t *buf, size_t n) {
+    return random_fill_iterator(NULL, buf, n);
 }
-#endif

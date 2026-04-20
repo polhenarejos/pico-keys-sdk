@@ -22,16 +22,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-void random_init(void);
+extern void random_init(void);
 
-/* 32-byte random bytes */
-const uint8_t *random_bytes_get(size_t);
-void random_bytes_free(const uint8_t *p);
-
-/* iterator returning a byta at a time */
-extern int random_gen(void *arg, unsigned char *output, size_t output_len);
-#ifdef ENABLE_PQC
-extern void randombytes(uint8_t *buf, size_t n);
-#endif
+extern const uint8_t *random_bytes_get(size_t);
+extern int random_fill_iterator(void *arg, unsigned char *output, size_t output_len);
+extern int random_fill_buffer(uint8_t *buf, size_t n);
 
 #endif

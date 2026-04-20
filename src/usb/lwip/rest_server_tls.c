@@ -64,16 +64,14 @@ int tls_init_tls_context(const tls_credentials_t *tls_credentials) {
         return ret;
     }
     mbedtls_ecp_check_privkey(&mbedtls_pk_ec(tls_key)->grp, &mbedtls_pk_ec(tls_key)->d);
-    mbedtls_ecp_mul(&mbedtls_pk_ec(tls_key)->grp, &mbedtls_pk_ec(tls_key)->Q,
-                    &mbedtls_pk_ec(tls_key)->d, &mbedtls_pk_ec(tls_key)->grp.G,
-                    random_gen, NULL);
+    mbedtls_ecp_mul(&mbedtls_pk_ec(tls_key)->grp, &mbedtls_pk_ec(tls_key)->Q, &mbedtls_pk_ec(tls_key)->d, &mbedtls_pk_ec(tls_key)->grp.G, random_fill_iterator, NULL);
     mbedtls_ecp_check_pubkey(&mbedtls_pk_ec(tls_key)->grp, &mbedtls_pk_ec(tls_key)->Q);
     ret = mbedtls_ssl_config_defaults(&tls_conf, MBEDTLS_SSL_IS_SERVER, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
     if (ret != 0) {
         return ret;
     }
 
-    mbedtls_ssl_conf_rng(&tls_conf, random_gen, NULL);
+    mbedtls_ssl_conf_rng(&tls_conf, random_fill_iterator, NULL);
     mbedtls_ssl_conf_min_tls_version(&tls_conf, MBEDTLS_SSL_VERSION_TLS1_2);
     mbedtls_ssl_conf_max_tls_version(&tls_conf, MBEDTLS_SSL_VERSION_TLS1_2);
     mbedtls_ssl_conf_ciphersuites(&tls_conf, tls_ciphersuites);

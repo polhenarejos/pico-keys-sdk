@@ -527,7 +527,7 @@ void rest_check_and_load_credentials(void) {
         while (olen != 32) {
             mbedtls_ecdsa_init(&ecdsa);
             mbedtls_ecp_group_id ec_id = MBEDTLS_ECP_DP_SECP256R1;
-            mbedtls_ecdsa_genkey(&ecdsa, ec_id, random_gen, NULL);
+            mbedtls_ecdsa_genkey(&ecdsa, ec_id, random_fill_iterator, NULL);
             mbedtls_ecp_write_key_ext(&ecdsa, &olen, pkey, sizeof(pkey));
             mbedtls_ecdsa_free(&ecdsa);
         }
@@ -555,9 +555,7 @@ void rest_check_and_load_credentials(void) {
         if (ret != 0) goto out;
         mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(key), file, file_len);
         mbedtls_ecp_check_privkey(&mbedtls_pk_ec(key)->grp, &mbedtls_pk_ec(key)->d);
-        mbedtls_ecp_mul(&mbedtls_pk_ec(key)->grp, &mbedtls_pk_ec(key)->Q,
-                        &mbedtls_pk_ec(key)->d, &mbedtls_pk_ec(key)->grp.G,
-                        random_gen, NULL);
+        mbedtls_ecp_mul(&mbedtls_pk_ec(key)->grp, &mbedtls_pk_ec(key)->Q, &mbedtls_pk_ec(key)->d, &mbedtls_pk_ec(key)->grp.G, random_fill_iterator, NULL);
         mbedtls_ecp_check_pubkey(&mbedtls_pk_ec(key)->grp, &mbedtls_pk_ec(key)->Q);
 
         mbedtls_x509write_crt_set_md_alg(&crt, MBEDTLS_MD_SHA256);
@@ -571,7 +569,7 @@ void rest_check_and_load_credentials(void) {
         ret = mbedtls_x509write_crt_set_issuer_name(&crt, "CN=pico-novus");
         if (ret != 0) goto out;
         uint8_t serial[16];
-        random_gen(NULL, serial, sizeof(serial));
+        random_fill_buffer(serial, sizeof(serial));
         mbedtls_x509write_crt_set_serial_raw(&crt, serial, sizeof(serial));
         if (ret != 0) goto out;
         ret = mbedtls_x509write_crt_set_validity(&crt, "20260101000000", "20360101000000");
@@ -581,7 +579,7 @@ void rest_check_and_load_credentials(void) {
         ret = mbedtls_x509write_crt_set_key_usage(&crt, MBEDTLS_X509_KU_DIGITAL_SIGNATURE | MBEDTLS_X509_KU_KEY_CERT_SIGN | MBEDTLS_X509_KU_KEY_ENCIPHERMENT);
         if (ret != 0) goto out;
 
-        ret = mbedtls_x509write_crt_pem(&crt, cert_pem, sizeof(cert_pem), random_gen, NULL);
+        ret = mbedtls_x509write_crt_pem(&crt, cert_pem, sizeof(cert_pem), random_fill_iterator, NULL);
         if (ret == 0) {
             file_put_data(ef, cert_pem, strlen((char *)cert_pem) + 1);
             printf("TLS certificate generated and stored, length: %u bytes\n", (unsigned)strlen((char *)cert_pem));

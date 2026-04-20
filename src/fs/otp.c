@@ -530,7 +530,7 @@ void init_otp_files(void) {
     uint16_t write_otp[2] = {0xFFFF, 0xFFFF};
     if (OTP_EMTPY(OTP_KEY_1, 32)) {
         uint8_t mkek[32] = {0};
-        random_gen(NULL, mkek, sizeof(mkek));
+        random_fill_buffer(mkek, sizeof(mkek));
         ret = OTP_WRITE(OTP_KEY_1, mkek, sizeof(mkek));
         if (ret != 0) {
             printf("Error writing OTP key 1 [%d]\n", ret);
@@ -549,7 +549,7 @@ void init_otp_files(void) {
         while (olen != 32) {
             mbedtls_ecdsa_init(&ecdsa);
             mbedtls_ecp_group_id ec_id = MBEDTLS_ECP_DP_SECP256K1;
-            mbedtls_ecdsa_genkey(&ecdsa, ec_id, random_gen, NULL);
+            mbedtls_ecdsa_genkey(&ecdsa, ec_id, random_fill_iterator, NULL);
             mbedtls_ecp_write_key_ext(&ecdsa, &olen, pkey, sizeof(pkey));
             mbedtls_ecdsa_free(&ecdsa);
         }

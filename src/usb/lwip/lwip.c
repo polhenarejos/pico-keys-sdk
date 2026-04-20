@@ -43,35 +43,42 @@ The smartphone may be artificially picky about which Ethernet MAC address to rec
 try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00 (clearing bit 1).
 */
 
-#if !defined(ESP_PLATFORM)
-#include "bsp/board_api.h"
+#include "picokeys.h"
+#if defined(PICO_PLATFORM)
 #include "dhserver.h"
 #include "dnserver.h"
-#include "lwip/ethip6.h"
 #include "lwip/init.h"
 #include "lwip/timeouts.h"
+#elif defined(ESP_PLATFORM)
+#include "apps/dhcpserver/dhcpserver.h"
+#include "netif/ethernet.h"
+#include "lwip/etharp.h"
+#include "lwip/netif.h"
+#include "lwip/pbuf.h"
 #endif
 #include "rest_server.h"
 #include "tusb.h"
-
-/* shared between tud_network_recv_cb() and service_traffic() */
-static struct pbuf *received_frame;
-
-#if !defined(ESP_PLATFORM)
-/* this is used by this code, ./class/net/net_driver.c, and usb_descriptors.c */
-/* ideally speaking, this should be generated from the hardware's unique ID (if available) */
-/* it is suggested that the first byte is 0x02 to indicate a link-local address */
-uint8_t tud_network_mac_address[6] = {0x02, 0x02, 0x84, 0x6A, 0x96, 0x00};
 
 #define INIT_IP4(a, b, c, d) \
   { PP_HTONL(LWIP_MAKEU32(a, b, c, d)) }
 
 /* lwip context */
 static struct netif netif_data;
+
+/* shared between tud_network_recv_cb() and service_traffic() */
+static struct pbuf *received_frame;
+
+/* this is used by this code, ./class/net/net_driver.c, and usb_descriptors.c */
+/* ideally speaking, this should be generated from the hardware's unique ID (if available) */
+/* it is suggested that the first byte is 0x02 to indicate a link-local address */
+uint8_t tud_network_mac_address[6] = {0x02, 0x02, 0x84, 0x6A, 0x96, 0x00};
+
 /* network parameters of this MCU */
 static const ip4_addr_t ipaddr = INIT_IP4(192, 168, 7, 1);
 static const ip4_addr_t netmask = INIT_IP4(255, 255, 255, 0);
 static const ip4_addr_t gateway = INIT_IP4(0, 0, 0, 0);
+
+#if !defined(ESP_PLATFORM)
 
 /* database IP addresses that can be offered to the host; this must be in RAM to store assigned MAC addresses */
 static dhcp_entry_t entries[] = {
@@ -84,40 +91,56 @@ static dhcp_entry_t entries[] = {
 static const dhcp_config_t dhcp_config = {
     .router = INIT_IP4(0, 0, 0, 0),  /* router address (if any) */
     .port = 67,                      /* listen port */
-    .dns = INIT_IP4(192, 168, 7, 1), /* dns server (if any) */
+    .dns = ipaddr, /* dns server (if any) */
     "usb",                           /* dns suffix */
     TU_ARRAY_SIZE(entries),          /* num entry */
     entries                          /* entries */
 };
 
+/* handle any DNS requests from dns-server */
+bool dns_query_proc(const char *name, ip4_addr_t *addr) {
+  if (0 == strcmp(name, "tiny.usb")) {
+    *addr = ipaddr;
+    return true;
+  }
+  return false;
+}
+#endif
+
+#if defined(ESP_PLATFORM)
+static dhcps_t *dhcps = NULL;
+
+static void dhcps_lease_cb(void *cb_arg, u8_t client_ip[4], u8_t client_mac[6]) {
+  (void) cb_arg;
+  (void) client_ip;
+  (void) client_mac;
+}
+
+#endif
+
 static err_t linkoutput_fn(struct netif *netif, struct pbuf *p) {
   (void) netif;
 
   for (;;) {
-    /* if TinyUSB isn't ready, we must signal back to lwip that there is nothing we can do */
-    if (!tud_ready())
+    if (!tud_ready()) {
       return ERR_USE;
-
-    /* if the network driver can accept another packet, we make it happen */
-    if (tud_network_can_xmit(p->tot_len)) {
-      tud_network_xmit(p, 0 /* unused for this example */);
-      return ERR_OK;
     }
 
-    /* transfer execution to TinyUSB in the hopes that it will finish transmitting the prior packet */
+    if (tud_network_can_xmit(p->tot_len)) {
+      tud_network_xmit(p, 0);
+      return ERR_OK;
+    }
+#if defined(ESP_PLATFORM)
+    vTaskDelay(pdMS_TO_TICKS(1));
+#else
     tud_task();
+#endif
   }
 }
 
 static err_t ip4_output_fn(struct netif *netif, struct pbuf *p, const ip4_addr_t *addr) {
   return etharp_output(netif, p, addr);
 }
-
-#if LWIP_IPV6
-static err_t ip6_output_fn(struct netif *netif, struct pbuf *p, const ip6_addr_t *addr) {
-  return ethip6_output(netif, p, addr);
-}
-#endif
 
 static err_t netif_init_cb(struct netif *netif) {
   LWIP_ASSERT("netif != NULL", (netif != NULL));
@@ -128,36 +151,23 @@ static err_t netif_init_cb(struct netif *netif) {
   netif->name[1] = 'X';
   netif->linkoutput = linkoutput_fn;
   netif->output = ip4_output_fn;
-#if LWIP_IPV6
-  netif->output_ip6 = ip6_output_fn;
-#endif
   return ERR_OK;
 }
 
 static void init_lwip(void) {
   struct netif *netif = &netif_data;
 
-  lwip_init();
-
-  /* the lwip virtual MAC address must be different from the host's; to ensure this, we toggle the LSbit */
   netif->hwaddr_len = sizeof(tud_network_mac_address);
   memcpy(netif->hwaddr, tud_network_mac_address, sizeof(tud_network_mac_address));
   netif->hwaddr[5] ^= 0x01;
 
-  netif = netif_add(netif, &ipaddr, &netmask, &gateway, NULL, netif_init_cb, ip_input);
-#if LWIP_IPV6
-  netif_create_ip6_linklocal_address(netif, 1);
+#ifdef PICO_PLATFORM
+  lwip_init();
 #endif
+  netif = netif_add(netif, &ipaddr, &netmask, &gateway, NULL, netif_init_cb, ethernet_input);
+  netif_set_link_up(netif);
+  netif_set_up(netif);
   netif_set_default(netif);
-}
-
-/* handle any DNS requests from dns-server */
-bool dns_query_proc(const char *name, ip4_addr_t *addr) {
-  if (0 == strcmp(name, "tiny.usb")) {
-    *addr = ipaddr;
-    return true;
-  }
-  return false;
 }
 
 bool tud_network_recv_cb(const uint8_t *src, uint16_t size) {
@@ -169,8 +179,10 @@ bool tud_network_recv_cb(const uint8_t *src, uint16_t size) {
     struct pbuf *p = pbuf_alloc(PBUF_RAW, size, PBUF_POOL);
 
     if (p) {
-      /* pbuf_alloc() has already initialized struct; all we need to do is copy the data */
-      memcpy(p->payload, src, size);
+      if (pbuf_take(p, src, size) != ERR_OK) {
+        pbuf_free(p);
+        return false;
+      }
 
       /* store away the pointer for service_traffic() to later handle */
       received_frame = p;
@@ -212,15 +224,27 @@ void tud_network_init_cb(void) {
     pbuf_free(received_frame);
     received_frame = NULL;
   }
+  /* Arm first receive buffer, otherwise host traffic (DHCP included) never enters lwIP. */
+  tud_network_recv_renew();
 }
 
-#endif
 int lwip_itf_init(void) {
-#if !defined(ESP_PLATFORM)
   init_lwip();
   while (!netif_is_up(&netif_data));
+#if !defined(ESP_PLATFORM)
   while (dhserv_init(&dhcp_config) != ERR_OK);
   while (dnserv_init(IP_ADDR_ANY, 53, dns_query_proc) != ERR_OK);
+#else
+  if (dhcps == NULL) {
+    dhcps = dhcps_new();
+  }
+  if (dhcps) {
+    (void) dhcps_set_new_lease_cb(dhcps, dhcps_lease_cb, NULL);
+    ip_addr_t dns_server;
+    ip_addr_copy_from_ip4(dns_server, ipaddr);
+    (void) dhcps_dns_setserver(dhcps, &dns_server);
+    while (dhcps_start(dhcps, &netif_data, ipaddr) != ERR_OK);
+  }
 #endif
   while (rest_server_init(REST_CONN_ALL) != ERR_OK);
 

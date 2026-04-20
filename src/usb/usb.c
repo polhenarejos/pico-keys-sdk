@@ -77,7 +77,7 @@ queue_t card_to_usb_q = {0};
 
 #ifndef ENABLE_EMULATION
 extern tusb_desc_device_t desc_device;
-extern char *string_desc_itf[4], *string_desc_arr[];
+extern char *string_desc_itf[5], *string_desc_arr[];
 #endif
 void usb_init(void)
 {
@@ -170,7 +170,9 @@ void usb_init(void)
 #endif
 #ifdef USB_ITF_LWIP
     if (ITF_LWIP_TOTAL > 0) {
+#ifndef ESP_PLATFORM
         lwip_itf_init();
+#endif
     }
 #endif
 #ifdef ESP_PLATFORM

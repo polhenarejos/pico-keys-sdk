@@ -78,7 +78,7 @@ static int rest_start_core1_job(rest_conn_t *conn, const rest_request_t *request
     rest_core1_job.handler = handler;
     rest_core1_job.request = *request;
 
-    card_start(ITF_LWIP, rest_core1_thread);
+    card_start(ITF_LWIP_NET, rest_core1_thread);
     usb_send_event(EV_CMD_AVAILABLE);
     return 0;
 }
@@ -120,7 +120,7 @@ void rest_task(void) {
     if (!rest_core1_job.pending) {
         return;
     }
-    status = card_status(ITF_LWIP);
+    status = card_status(ITF_LWIP_NET);
     if (status != PICOKEYS_OK) {
         return;
     }

@@ -245,7 +245,7 @@ void low_flash_init_core1(void) {
     mutex_exit(&mtx_flash);
 }
 
-void low_flash_available(void) {
+void low_flash_commit(void) {
     mutex_enter_blocking(&mtx_flash);
     flash_available = true;
     mutex_exit(&mtx_flash);

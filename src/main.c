@@ -37,12 +37,11 @@
 #include "apdu.h"
 #include "usb.h"
 #include "flash.h"
+#include "otp.h"
 #include "led/led.h"
 #include "pico_time.h"
 #include "serial.h"
 #include "mbedtls/sha256.h"
-
-extern void init_otp_files(void);
 
 app_t apps[16];
 uint8_t num_apps = 0;
@@ -159,11 +158,11 @@ int main(void) {
 
     random_init();
 
-    init_otp_files();
+    otp_init_files();
 
     low_flash_init();
 
-    scan_flash();
+    file_scan_flash();
 
     init_rtc();
 

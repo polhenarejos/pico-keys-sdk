@@ -177,7 +177,7 @@ int phy_save(void) {
         return ret;
     }
     file_put_data(ef_phy, tmp, tmp_len);
-    low_flash_available();
+    flash_commit();
     return PICOKEYS_OK;
 }
 

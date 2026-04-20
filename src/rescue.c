@@ -76,7 +76,7 @@ static int rescue_select(app_t *a, uint8_t force) {
     res_APDU_size += sizeof(pico_serial.id);
     apdu.ne = res_APDU_size;
     if (force) {
-        scan_flash();
+        file_scan_flash();
     }
     return PICOKEYS_OK;
 }
@@ -128,7 +128,7 @@ static int load_internal_keydev(mbedtls_ecp_keypair *ecp, mbedtls_ecp_group_id e
         aes_encrypt(kbase, pico_serial_hash, 32 * 8, PICOKEYS_AES_MODE_CBC, pkey, 32);
         file_put_data(ef_devcert_key, pkey, (uint16_t)olen);
         mbedtls_platform_zeroize(pkey, sizeof(pkey));
-        low_flash_available();
+        flash_commit();
     }
     return PICOKEYS_OK;
 }
@@ -222,7 +222,7 @@ static int cmd_keydev_sign(void) {
         }
         file_put_data(ef_devcert, apdu.data, (uint16_t)apdu.nc);
         res_APDU_size = 0;
-        low_flash_available();
+        flash_commit();
     }
     else {
         return SW_INCORRECT_P1P2();

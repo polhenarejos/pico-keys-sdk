@@ -21,6 +21,10 @@
 #include "apdu.h"
 #include <stdio.h>
 
+#define MAX_DEPTH 4
+
+#define MAX_DYNAMIC_FILES 256
+
 extern const uintptr_t end_data_pool;
 extern const uintptr_t start_data_pool;
 extern const uintptr_t end_rom_pool;
@@ -129,7 +133,7 @@ file_t *search_by_name(uint8_t *name, uint16_t namelen) {
     return NULL;
 }
 
-file_t *search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp) {
+file_t *file_search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp) {
 #ifndef ENABLE_EMULATION
     if (fid == EF_PHY) {
         return ef_phy;
@@ -149,8 +153,17 @@ file_t *search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp
     return NULL;
 }
 
-file_t *search_file(const uint16_t fid) {
-    file_t *ef = search_by_fid(fid, NULL, SPECIFY_EF);
+static file_t *search_dynamic_file(uint16_t fid) {
+    for (int i = 0; i < dynamic_files; i++) {
+        if (dynamic_file[i].fid == fid) {
+            return &dynamic_file[i];
+        }
+    }
+    return NULL;
+}
+
+file_t *file_search(const uint16_t fid) {
+    file_t *ef = file_search_by_fid(fid, NULL, SPECIFY_EF);
     if (ef) {
         return ef;
     }
@@ -218,11 +231,11 @@ bool authenticate_action(const file_t *ef, uint8_t op) {
     return false;
 }
 
-void initialize_flash(bool hard) {
+void file_initialize_flash(bool hard) {
     if (hard) {
         const uint8_t empty[8] = { 0 };
         flash_program_block(end_data_pool, empty, sizeof(empty));
-        low_flash_available();
+        flash_commit();
     }
     for (file_t *f = file_entries; f != file_last; f++) {
         if ((f->type & FILE_DATA_FLASH) == FILE_DATA_FLASH) {
@@ -234,8 +247,7 @@ void initialize_flash(bool hard) {
 
 extern uintptr_t last_base;
 extern uint32_t num_files;
-static void scan_region(bool persistent)
-{
+static void scan_region(bool persistent) {
     uintptr_t endp = end_data_pool, startp = start_data_pool;
     if (persistent) {
         endp = end_rom_pool;
@@ -252,7 +264,7 @@ static void scan_region(bool persistent)
 
         uint16_t fid = flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t));
         printf("[%x] scan fid %x, len %d\n", (unsigned int) base, fid, flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t)));
-        file_t *file = (file_t *) search_by_fid(fid, NULL, SPECIFY_EF);
+        file_t *file = (file_t *) file_search_by_fid(fid, NULL, SPECIFY_EF);
         if (!file) {
             file = file_new(fid);
         }
@@ -270,8 +282,8 @@ static void scan_region(bool persistent)
         }
     }
 }
-void scan_flash(void) {
-    initialize_flash(false); //soft initialization
+void file_scan_flash(void) {
+    file_initialize_flash(false); //soft initialization
     uint32_t r1 = (uint32_t)flash_read_uintptr(end_rom_pool);
     uint32_t r2 = (uint32_t)flash_read_uintptr(end_rom_pool + sizeof(uintptr_t));
     if ((r1 == 0xffffffff || r1 == 0xefefefef) && (r2 == 0xffffffff || r2 == 0xefefefef)) {
@@ -280,7 +292,7 @@ void scan_flash(void) {
         memset(empty, 0, sizeof(empty));
         flash_program_block(end_data_pool, empty, sizeof(empty));
         flash_program_block(end_rom_pool, empty, sizeof(empty));
-        //low_flash_available();
+        //flash_commit();
     }
     printf("SCAN\n");
     scan_region(true);
@@ -318,16 +330,7 @@ int file_put_data(file_t *file, const uint8_t *data, uint16_t len) {
     return flash_write_data_to_file(file, data, len);
 }
 
-file_t *search_dynamic_file(uint16_t fid) {
-    for (int i = 0; i < dynamic_files; i++) {
-        if (dynamic_file[i].fid == fid) {
-            return &dynamic_file[i];
-        }
-    }
-    return NULL;
-}
-
-int delete_dynamic_file(file_t *f) {
+static int delete_dynamic_file(file_t *f) {
     if (f == NULL) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
@@ -345,7 +348,7 @@ int delete_dynamic_file(file_t *f) {
 
 file_t *file_new(uint16_t fid) {
     file_t *f;
-    if ((f = search_file(fid))) {
+    if ((f = file_search(fid))) {
         return f;
     }
     if (dynamic_files == MAX_DYNAMIC_FILES) {
@@ -367,7 +370,7 @@ file_t *file_new(uint16_t fid) {
     return f;
 }
 uint16_t meta_find(uint16_t fid, uint8_t **out) {
-    file_t *ef = search_file(EF_META);
+    file_t *ef = file_search(EF_META);
     if (!ef) {
         return 0;
     }
@@ -391,7 +394,7 @@ uint16_t meta_find(uint16_t fid, uint8_t **out) {
     return 0;
 }
 int meta_delete(uint16_t fid) {
-    file_t *ef = search_file(EF_META);
+    file_t *ef = file_search(EF_META);
     if (!ef) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
@@ -426,7 +429,7 @@ int meta_delete(uint16_t fid) {
                     return PICOKEYS_EXEC_ERROR;
                 }
             }
-            low_flash_available();
+            flash_commit();
             break;
         }
     }
@@ -434,7 +437,7 @@ int meta_delete(uint16_t fid) {
 }
 int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     int r;
-    file_t *ef = search_file(EF_META);
+    file_t *ef = file_search(EF_META);
     if (!ef) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
@@ -520,6 +523,27 @@ int delete_file(file_t *ef) {
     if (delete_dynamic_file(ef) != PICOKEYS_OK) {
         return PICOKEYS_EXEC_ERROR;
     }
-    low_flash_available();
+    flash_commit();
+    return PICOKEYS_OK;
+}
+
+int flash_clear_file(file_t *file) {
+    if (file == NULL || file->data == NULL) {
+        return PICOKEYS_OK;
+    }
+    uintptr_t base_addr = (uintptr_t)(file->data - sizeof(uintptr_t) - sizeof(uint16_t) - sizeof(uintptr_t));
+    uintptr_t prev_addr = flash_read_uintptr(base_addr + sizeof(uintptr_t));
+    uintptr_t next_addr = flash_read_uintptr(base_addr);
+    //printf("nc %lx->%lx   %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);
+    flash_program_uintptr(prev_addr, next_addr);
+    flash_program_halfword((uintptr_t) file->data, 0);
+    if (next_addr > 0) {
+        flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);
+    }
+    flash_program_uintptr(base_addr, 0);
+    flash_program_uintptr(base_addr + sizeof(uintptr_t), 0);
+    file->data = NULL;
+    num_files--;
+    //printf("na %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr));
     return PICOKEYS_OK;
 }

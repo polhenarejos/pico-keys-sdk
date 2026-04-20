@@ -30,6 +30,7 @@
 #include <string.h>
 
 #include "file.h"
+#include "flash.h"
 #include "debug.h"
 
 #if !defined(MIN)
@@ -141,9 +142,6 @@ static inline uint32_t put_uint64_le(uint64_t n, uint8_t *b) {
     *b = (n >> 56) & 0xff;
     return 8;
 }
-
-extern void low_flash_available(void);
-extern int flash_clear_file(file_t *file);
 
 extern int (*button_pressed_cb)(uint8_t);
 

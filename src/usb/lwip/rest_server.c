@@ -538,7 +538,7 @@ void rest_check_and_load_credentials(void) {
         mbedtls_pk_context key;
         unsigned char cert_pem[2048] = {0};
         int ret = 0;
-        file_t *ef_key = search_file(EF_TLS_KEY);
+        file_t *ef_key = file_search(EF_TLS_KEY);
         const uint8_t *file = file_get_data(ef_key);
         size_t file_len = file_get_size(ef_key);
 
@@ -585,7 +585,7 @@ out:
     tls_credentials.tls_cert_pem = (char *)file_get_data(ef);
     tls_credentials.tls_cert_pem_len = file_get_size(ef);
     printf("TLS certificate loaded, length: %u bytes\n", (unsigned)tls_credentials.tls_cert_pem_len);
-    low_flash_available();
+    flash_commit();
 }
 
 #ifndef ENABLE_EMULATION

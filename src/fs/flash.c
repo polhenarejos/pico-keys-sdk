@@ -36,6 +36,7 @@ uint32_t FLASH_SIZE_BYTES = (2 * 1024 * 1024);
 #include "file.h"
 
 extern void low_flash_task(void);
+extern void low_flash_commit(void);
 
 /*
  * ------------------------------------------------------
@@ -109,27 +110,6 @@ static uintptr_t allocate_free_addr(uint16_t size, bool persistent) {
         }
     }
     return 0x0; //probably never reached
-}
-
-int flash_clear_file(file_t *file) {
-    if (file == NULL || file->data == NULL) {
-        return PICOKEYS_OK;
-    }
-    uintptr_t base_addr = (uintptr_t)(file->data - sizeof(uintptr_t) - sizeof(uint16_t) - sizeof(uintptr_t));
-    uintptr_t prev_addr = flash_read_uintptr(base_addr + sizeof(uintptr_t));
-    uintptr_t next_addr = flash_read_uintptr(base_addr);
-    //printf("nc %lx->%lx   %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);
-    flash_program_uintptr(prev_addr, next_addr);
-    flash_program_halfword((uintptr_t) file->data, 0);
-    if (next_addr > 0) {
-        flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);
-    }
-    flash_program_uintptr(base_addr, 0);
-    flash_program_uintptr(base_addr + sizeof(uintptr_t), 0);
-    file->data = NULL;
-    num_files--;
-    //printf("na %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr));
-    return PICOKEYS_OK;
 }
 
 static int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t len, uint16_t offset) {
@@ -208,4 +188,8 @@ uint32_t flash_size(void) {
 
 void flash_task(void) {
     low_flash_task();
+}
+
+void flash_commit(void) {
+    low_flash_commit();
 }

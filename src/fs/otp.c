@@ -517,7 +517,7 @@ static void otp_migrate_chaff(void) {
 }
 #endif
 
-void init_otp_files(void) {
+void otp_init_files(void) {
 
 #ifdef PICO_RP2350
     otp_migrate_chaff();

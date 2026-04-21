@@ -18,6 +18,7 @@
 #ifndef _BOARD_H_
 #define _BOARD_H_
 
+#include <stdint.h>
 #ifdef _MSC_VER
 #include <windows.h>
 struct timezone;

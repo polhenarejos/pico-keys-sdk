@@ -19,11 +19,11 @@
 #include "usb.h"
 #include "led/led.h"
 #include "button.h"
+#include "pico_time.h"
 #if defined(PICO_PLATFORM)
 #include "pico/bootrom.h"
 #include "pico/multicore.h"
 #include "hardware/sync.h"
-#include "bsp/board.h"
 #define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
 #endif
 #include "apdu.h"

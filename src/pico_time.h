@@ -18,11 +18,15 @@
 #ifndef TIME_H
 #define TIME_H
 
-#ifdef PICO_PLATFORM
+#if defined(PICO_PLATFORM)
 #include "pico/aon_timer.h"
+#include "bsp/board.h"
+#elif defined(ESP_PLATFORM)
+#include "compat/esp_compat.h"
 #else
 #include <sys/time.h>
 #include <time.h>
+#include "compat/board.h"
 #endif
 
 extern bool has_set_rtc(void);

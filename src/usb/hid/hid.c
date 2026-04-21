@@ -17,11 +17,10 @@
 
 #include "picokeys.h"
 #include "serial.h"
+#include "pico_time.h"
 #ifndef ENABLE_EMULATION
 #include "tusb.h"
-#if defined(PICO_PLATFORM)
-#include "bsp/board.h"
-#elif defined(ESP_PLATFORM)
+#if defined(ESP_PLATFORM)
 static portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 #endif
 #else

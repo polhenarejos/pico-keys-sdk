@@ -17,11 +17,9 @@
 
 #include "picokeys.h"
 #include "led/led.h"
-#ifdef PICO_PLATFORM
-#include "bsp/board.h"
-#elif defined(ESP_PLATFORM)
+#include "pico_time.h"
+#if defined(ESP_PLATFORM)
 #include "driver/gpio.h"
-#include "compat/esp_compat.h"
 #elif defined(ENABLE_EMULATION)
 #include "emulation.h"
 #endif

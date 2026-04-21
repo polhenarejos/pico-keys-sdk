@@ -18,8 +18,8 @@
 #include "picokeys.h"
 #include "button.h"
 #include "led/led.h"
+#include "pico_time.h"
 #if defined(PICO_PLATFORM)
-#include "bsp/board.h"
 #include "hardware/sync.h"
 #include "hardware/structs/ioqspi.h"
 #include "hardware/gpio.h"

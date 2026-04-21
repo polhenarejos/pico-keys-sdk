@@ -17,17 +17,13 @@
 
 #include "picokeys.h"
 #include "hwrng.h"
+#include "pico_time.h"
 
 #if defined(PICO_PLATFORM)
-#include "bsp/board.h"
 #include "pico/rand.h"
 #elif defined(ESP_PLATFORM)
 #include "bootloader_random.h"
 #include "esp_random.h"
-#include "compat/esp_compat.h"
-#else
-#include <time.h>
-#include "compat/board.h"
 #endif
 
 static void hwrng_start(void) {

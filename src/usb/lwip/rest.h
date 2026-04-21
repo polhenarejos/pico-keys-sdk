@@ -38,12 +38,26 @@ typedef enum {
     REST_HTTP_DELETE
 } rest_http_method_t;
 
+typedef enum {
+    REST_HEADER_USER_AGENT = 0,
+    REST_HEADER_AUTHORIZATION,
+    REST_HEADER_CONTENT_TYPE,
+    REST_HEADER_CONTENT_LENGTH,
+    REST_HEADER_HOST,
+    REST_HEADER_ACCEPT,
+    REST_HEADER_X_SESSION_ID,
+    REST_HEADER_X_SEQ,
+    REST_HEADER_X_SIGNATURE,
+    REST_HEADER_TOTAL_COUNT
+} rest_header_id_t;
+
 typedef struct {
     rest_http_method_t method;
     char path[REST_MAX_PATH_SIZE];
     const char *body;
     size_t body_len;
     const char *content_type;
+    char *headers[REST_HEADER_TOTAL_COUNT];
 } rest_request_t;
 
 typedef struct {
@@ -52,13 +66,15 @@ typedef struct {
     char *body; // heap !
     size_t body_len;
     cJSON *json;
+    char *headers[REST_HEADER_TOTAL_COUNT];
 } rest_response_t;
 
 typedef int (*rest_route_handler_t)(const rest_request_t *request, rest_response_t *response);
 
 typedef enum {
-    REST_ROUTE_NONE = 0x0,
-    REST_ROUTE_AUTH = 0x1,
+    REST_ROUTE_NONE         = 0x0,
+    REST_ROUTE_REQUIRE_AUTH = 0x1,
+    REST_ROUTE_REQUIRE_TLS  = 0x2,
 } rest_route_flags_t;
 
 typedef struct {

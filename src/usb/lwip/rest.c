@@ -32,7 +32,7 @@ rest_session_t *rest_session_create(const rest_session_role_t role, rest_session
             rest_sessions[i].status = status;
             rest_sessions[i].role = role;
             random_fill_buffer(rest_sessions[i].id, sizeof(rest_sessions[i].id));
-            rest_sessions[i].created_at = get_rtc_time();
+            rest_sessions[i].created_at = board_millis();
             rest_sessions[i].last_activity_timestamp = rest_sessions[i].created_at;
             return &rest_sessions[i];
         }
@@ -68,7 +68,7 @@ int rest_session_update_activity(const uint8_t *id, size_t id_len) {
     if (session == NULL) {
         return -1;
     }
-    session->last_activity_timestamp = get_rtc_time();
+    session->last_activity_timestamp = board_millis();
     return 0;
 }
 
@@ -92,7 +92,7 @@ int rest_session_set_role(const uint8_t *id, size_t id_len, rest_session_role_t 
 
 int rest_session_cleanup_expired(time_t expiration_time) {
     int count = 0;
-    time_t now = get_rtc_time();
+    time_t now = board_millis();
     for (int i = 0; i < REST_MAX_SESSIONS; i++) {
         if (rest_sessions[i].status != REST_SESSION_UNKNOWN && rest_sessions[i].status != REST_SESSION_EXPIRED && rest_sessions[i].status != REST_SESSION_TERMINATED) {
             if (now - rest_sessions[i].last_activity_timestamp > expiration_time) {

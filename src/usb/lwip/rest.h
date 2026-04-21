@@ -102,6 +102,7 @@ typedef enum {
 } rest_session_status_t;
 
 typedef struct {
+    uint8_t public_key[32];
     uint8_t id[16];
     uint8_t id_str[25];
     time_t last_activity_timestamp;
@@ -120,7 +121,7 @@ bool rest_content_type_is_json(const char *content_type);
 
 const rest_route_t *rest_get_routes(size_t *count);
 
-extern rest_session_t *rest_session_create(const rest_session_role_t role, rest_session_status_t status);
+extern rest_session_t *rest_session_create(const rest_session_role_t role, rest_session_status_t status, const uint8_t public_key[32]);
 extern rest_session_t *rest_session_get(const uint8_t *id, size_t id_len);
 extern rest_session_t *rest_session_get_by_id_str(const char *id_str);
 extern int rest_session_terminate(const uint8_t *id, size_t id_len);
@@ -128,6 +129,7 @@ extern int rest_session_update_activity(const uint8_t *id, size_t id_len);
 extern int rest_session_set_status(const uint8_t *id, size_t id_len, rest_session_status_t status);
 extern int rest_session_set_role(const uint8_t *id, size_t id_len, rest_session_role_t role);
 extern int rest_session_cleanup_expired(time_t expiration_time);
+extern int rest_session_derive_key(const rest_session_t *session, uint8_t derived_key[32]);
 
 #ifdef DEBUG_APDU
 extern void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len);

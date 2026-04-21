@@ -21,17 +21,29 @@
 #include <strings.h>
 #include "random.h"
 #include "crypto_utils.h"
+#include "serial.h"
+
+#include "mbedtls/ecdh.h"
+#include "mbedtls/ecp.h"
+#include "mbedtls/hkdf.h"
+#include "mbedtls/platform_util.h"
 
 #define REST_MAX_SESSIONS 4
 
 static rest_session_t rest_sessions[REST_MAX_SESSIONS] = {0};
+static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], const uint8_t *salt, size_t salt_len, const uint8_t *info, size_t info_len, uint8_t out_key[32]);
 
-rest_session_t *rest_session_create(const rest_session_role_t role, rest_session_status_t status) {
+rest_session_t *rest_session_create(const rest_session_role_t role, rest_session_status_t status, const uint8_t public_key[32]) {
     for (int i = 0; i < REST_MAX_SESSIONS; i++) {
         if (rest_sessions[i].status == REST_SESSION_UNKNOWN || rest_sessions[i].status == REST_SESSION_EXPIRED || rest_sessions[i].status == REST_SESSION_TERMINATED) {
             memset(&rest_sessions[i], 0, sizeof(rest_session_t));
             rest_sessions[i].status = status;
             rest_sessions[i].role = role;
+            if (public_key != NULL) {
+                memcpy(rest_sessions[i].public_key, public_key, sizeof(rest_sessions[i].public_key));
+            } else {
+                memset(rest_sessions[i].public_key, 0, sizeof(rest_sessions[i].public_key));
+            }
             random_fill_buffer(rest_sessions[i].id, sizeof(rest_sessions[i].id));
             rest_sessions[i].created_at = board_millis();
             rest_sessions[i].last_activity_timestamp = rest_sessions[i].created_at;
@@ -267,4 +279,66 @@ __attribute__((weak)) const rest_route_t *rest_get_routes(size_t *count) {
         *count = 0;
     }
     return NULL;
+}
+
+
+static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], const uint8_t *salt, size_t salt_len, const uint8_t *info, size_t info_len, uint8_t out_key[32]) {
+    int ret = -1;
+    size_t shared_len = 0;
+    uint8_t shared[32] = {0};
+
+    mbedtls_ecdh_context ecdh;
+    mbedtls_ecp_keypair ours, theirs;
+    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+
+    mbedtls_ecdh_init(&ecdh);
+    mbedtls_ecp_keypair_init(&ours);
+    mbedtls_ecp_keypair_init(&theirs);
+
+    if (md == NULL) {
+        ret = MBEDTLS_ERR_MD_BAD_INPUT_DATA;
+        goto cleanup;
+    }
+
+    MBEDTLS_MPI_CHK(mbedtls_ecp_group_load(&ours.grp, MBEDTLS_ECP_DP_CURVE25519));
+    MBEDTLS_MPI_CHK(mbedtls_ecp_group_load(&theirs.grp, MBEDTLS_ECP_DP_CURVE25519));
+
+    MBEDTLS_MPI_CHK(mbedtls_ecp_read_key(MBEDTLS_ECP_DP_CURVE25519, &ours, sk, 32));
+
+    // Carrega pública remota (32 bytes)
+    MBEDTLS_MPI_CHK(mbedtls_ecp_point_read_binary(&theirs.grp, &theirs.Q, pk, 32));
+
+    MBEDTLS_MPI_CHK(mbedtls_ecdh_setup(&ecdh, MBEDTLS_ECP_DP_CURVE25519));
+    MBEDTLS_MPI_CHK(mbedtls_ecdh_get_params(&ecdh, &ours, MBEDTLS_ECDH_OURS));
+    MBEDTLS_MPI_CHK(mbedtls_ecdh_get_params(&ecdh, &theirs, MBEDTLS_ECDH_THEIRS));
+
+    MBEDTLS_MPI_CHK(mbedtls_ecdh_calc_secret(&ecdh, &shared_len, shared, sizeof(shared), random_fill_iterator, NULL));
+
+    if (shared_len != 32) {
+        ret = MBEDTLS_ERR_ECP_BAD_INPUT_DATA;
+        goto cleanup;
+    }
+
+    ret = mbedtls_hkdf(md, salt, salt_len, shared, shared_len, info, info_len, out_key, 32);
+
+cleanup:
+    mbedtls_platform_zeroize(shared, sizeof(shared));
+    mbedtls_ecdh_free(&ecdh);
+    mbedtls_ecp_keypair_free(&ours);
+    mbedtls_ecp_keypair_free(&theirs);
+    return ret;
+}
+
+int rest_session_derive_key(const rest_session_t *session, uint8_t derived_key[32]) {
+    uint8_t kver[32], sk[32];
+    const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    derive_kver(session->id, sizeof(session->id), kver);
+    mbedtls_hkdf(md_info, pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"REST/SESSION", 12, derived_key, 32);
+    mbedtls_platform_zeroize(kver, sizeof(kver));
+    int ret = x25519_hkdf_derive_key32(sk, session->public_key, session->id, sizeof(session->id), (const uint8_t *)"REST/SESSION/DERIVE", 20, derived_key);
+    mbedtls_platform_zeroize(sk, sizeof(sk));
+    if (ret != 0) {
+        return -1;
+    }
+    return PICOKEYS_OK;
 }

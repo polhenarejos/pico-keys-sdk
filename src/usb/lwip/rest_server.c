@@ -597,13 +597,11 @@ static int parse_request(rest_conn_t *conn, rest_request_t *request) {
     return 1;
 }
 
-static int rest_session_derive_key(const uint8_t *session_id, size_t session_id_len, uint8_t derived_key[32]) {
-    uint8_t kver[32];
-    const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    derive_kver(session_id, session_id_len, kver);
-    mbedtls_hkdf(md_info, pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"REST/SESSION", 12, derived_key, 32);
-    mbedtls_platform_zeroize(kver, sizeof(kver));
-    return PICOKEYS_OK;
+static uint32_t rest_request_get_seq(const rest_request_t *request) {
+    if (request == NULL || request->headers[REST_HEADER_X_SEQ] == NULL) {
+        return 0;
+    }
+    return (uint32_t)strtoul(request->headers[REST_HEADER_X_SEQ], NULL, 10);
 }
 
 static int rest_verify_request_signature(const rest_request_t *request, const rest_session_t *session) {
@@ -625,25 +623,28 @@ static int rest_verify_request_signature(const rest_request_t *request, const re
     const char *body_empty = "{}";
     const char *body = request->body_len > 0 ? request->body : body_empty;
     const char *method_str = rest_method_to_string(request->method);
-    char seq[16];
     size_t body_len = request->body_len > 0 ? request->body_len : strlen((const char *)body_empty);
-    snprintf(seq, sizeof(seq), "%s", request->headers[REST_HEADER_X_SEQ] ? request->headers[REST_HEADER_X_SEQ] : "0");
     uint8_t derived_key[32];
-    if (rest_session_derive_key(session->id, sizeof(session->id), derived_key) != 0) {
+    if (rest_session_derive_key(session, derived_key) != 0) {
         mbedtls_md_free(&ctx);
         return PICOKEYS_EXEC_ERROR;
     }
 
+    uint32_t seq = htonl(rest_request_get_seq(request));
     if (mbedtls_md_hmac_starts(&ctx, (const unsigned char *)derived_key, sizeof(derived_key)) != 0 ||
         mbedtls_md_hmac_starts(&ctx, (const unsigned char *)session->id, sizeof(session->id)) != 0 ||
         mbedtls_md_hmac_update(&ctx, (const unsigned char *)method_str, strlen(method_str)) != 0 ||
         mbedtls_md_hmac_update(&ctx, (const unsigned char *)request->path, strlen(request->path)) != 0 ||
-        mbedtls_md_hmac_update(&ctx, (const unsigned char *)seq, strlen(seq)) != 0 ||
-        mbedtls_md_hmac_update(&ctx, (const unsigned char *)body, body_len) != 0) {
+        mbedtls_md_hmac_update(&ctx, (const unsigned char *)&seq, sizeof(uint32_t)) != 0 ||
+        mbedtls_md_hmac_update(&ctx, (const unsigned char *)body, body_len) != 0)
+    {
+        mbedtls_platform_zeroize(derived_key, sizeof(derived_key));
         mbedtls_md_free(&ctx);
         return PICOKEYS_EXEC_ERROR;
     }
+    mbedtls_platform_zeroize(derived_key, sizeof(derived_key));
     if (mbedtls_md_hmac_finish(&ctx, hmac) != 0) {
+        mbedtls_platform_zeroize(derived_key, sizeof(derived_key));
         mbedtls_md_free(&ctx);
         return PICOKEYS_EXEC_ERROR;
     }
@@ -718,6 +719,10 @@ void rest_handle_request(rest_conn_t *conn) {
             if (session->last_activity_timestamp + REST_SESSION_TIMEOUT_INACTIVITY_MS < board_millis() || session->created_at + REST_SESSION_TIMEOUT_TOTAL_MS < board_millis()) {
                 session->status = REST_SESSION_EXPIRED;
                 send_json_error(conn, 401, "session_expired");
+                return;
+            }
+            if (rest_request_get_seq(request) < session->last_seq) {
+                send_json_error(conn, 401, "invalid_seq");
                 return;
             }
             if (rest_verify_request_signature(request, session) != PICOKEYS_OK) {

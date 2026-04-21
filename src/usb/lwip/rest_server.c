@@ -401,18 +401,149 @@ static const rest_header_descriptor_t rest_http_headers[REST_HEADER_TOTAL_COUNT]
     { REST_HEADER_X_SIGNATURE, "X-Signature" }
 };
 
+static void trim_ascii_ws_bounds(const char **start, const char **end) {
+    while (*start < *end && isspace((unsigned char)**start)) {
+        (*start)++;
+    }
+    while (*end > *start && isspace((unsigned char)*((*end) - 1))) {
+        (*end)--;
+    }
+}
+
+static bool split_header_line_span(const char *line, const char *line_end,
+                                   const char **name_start, const char **name_end,
+                                   const char **value_start, const char **value_end) {
+    const char *colon;
+    if (line == NULL || line_end == NULL || name_start == NULL || name_end == NULL || value_start == NULL || value_end == NULL || line >= line_end) {
+        return false;
+    }
+    colon = memchr(line, ':', (size_t)(line_end - line));
+    if (colon == NULL) {
+        return false;
+    }
+
+    *name_start = line;
+    *name_end = colon;
+    *value_start = colon + 1;
+    *value_end = line_end;
+    trim_ascii_ws_bounds(name_start, name_end);
+    trim_ascii_ws_bounds(value_start, value_end);
+    return true;
+}
+
+static void trim_ascii_ws_cstr(char **s) {
+    char *end;
+    if (s == NULL || *s == NULL) {
+        return;
+    }
+    while (**s != '\0' && isspace((unsigned char)**s)) {
+        (*s)++;
+    }
+    end = *s + strlen(*s);
+    while (end > *s && isspace((unsigned char)*(end - 1))) {
+        *(--end) = '\0';
+    }
+}
+
+static bool split_header_line(char *line, char **name, char **value) {
+    char *colon;
+    if (line == NULL || name == NULL || value == NULL) {
+        return false;
+    }
+    colon = strchr(line, ':');
+    if (colon == NULL) {
+        return false;
+    }
+    *colon = '\0';
+    *name = line;
+    *value = colon + 1;
+    trim_ascii_ws_cstr(name);
+    trim_ascii_ws_cstr(value);
+    return true;
+}
+
+static int parse_content_length(const char *request, const char *header_end, unsigned long *content_length) {
+    const char *scan;
+    const char *first_line_end;
+    if (request == NULL || header_end == NULL || content_length == NULL) {
+        return -1;
+    }
+
+    *content_length = 0;
+    first_line_end = strstr(request, "\r\n");
+    if (first_line_end == NULL || first_line_end > header_end) {
+        return -1;
+    }
+
+    scan = first_line_end + 2;
+    while (scan < header_end) {
+        const char *next = strstr(scan, "\r\n");
+        if (next == NULL || next > header_end) {
+            return -1;
+        }
+        if (next == scan) {
+            break;
+        }
+
+        const char *name_start, *name_end, *value_start, *value_end;
+        char value_buf[32];
+        size_t value_len;
+        char *endptr;
+
+        if (!split_header_line_span(scan, next, &name_start, &name_end, &value_start, &value_end)) {
+            scan = next + 2;
+            continue;
+        }
+
+        if ((size_t)(name_end - name_start) == strlen("Content-Length") &&
+            strncasecmp(name_start, "Content-Length", strlen("Content-Length")) == 0) {
+            value_len = (size_t)(value_end - value_start);
+            if (value_len == 0 || value_len >= sizeof(value_buf)) {
+                return -1;
+            }
+            memcpy(value_buf, value_start, value_len);
+            value_buf[value_len] = '\0';
+            *content_length = strtoul(value_buf, &endptr, 10);
+            if (endptr == value_buf || *endptr != '\0' || *content_length > REST_MAX_REQUEST_SIZE) {
+                return -1;
+            }
+        }
+        scan = next + 2;
+    }
+
+    return 0;
+}
+
 static int parse_request(rest_conn_t *conn, rest_request_t *request) {
     char *header_end, *line_end, *cursor;
     size_t headers_size;
-    unsigned long content_length = 0;
+    unsigned long content_length;
     char method_str[REST_MAX_METHOD_SIZE] = {0};
     memset(request, 0, sizeof(rest_request_t));
     conn->request[conn->request_len] = '\0';
-    header_end = strstr(conn->request, "\r\n\r\n");
-    if (header_end == NULL) {
+
+    if (!conn->request_headers_parsed) {
+        header_end = strstr(conn->request, "\r\n\r\n");
+        if (header_end == NULL) {
+            return 0;
+        }
+        headers_size = (size_t)(header_end - conn->request) + 4;
+        if (parse_content_length(conn->request, header_end, &content_length) != 0) {
+            return -1;
+        }
+        conn->request_headers_size = headers_size;
+        conn->request_content_length = (size_t)content_length;
+        conn->request_headers_parsed = true;
+    }
+
+    if (conn->request_len < conn->request_headers_size + conn->request_content_length) {
         return 0;
     }
-    headers_size = (size_t)(header_end - conn->request) + 4;
+
+    headers_size = conn->request_headers_size;
+    content_length = conn->request_content_length;
+    header_end = conn->request + headers_size - 4;
+
     line_end = strstr(conn->request, "\r\n");
     if (line_end == NULL || line_end > header_end) {
         return -1;
@@ -439,7 +570,7 @@ static int parse_request(rest_conn_t *conn, rest_request_t *request) {
 
     cursor = line_end + 2;
     while (cursor < header_end) {
-        char *next = strstr(cursor, "\r\n"), *colon, *name, *value, *endptr;
+        char *next = strstr(cursor, "\r\n"), *name, *value;
         if (next == NULL || next > header_end) {
             return -1;
         }
@@ -447,32 +578,8 @@ static int parse_request(rest_conn_t *conn, rest_request_t *request) {
             break;
         }
         *next = '\0';
-        colon = strchr(cursor, ':');
-        if (colon != NULL) {
-            *colon = '\0';
-            name = cursor;
-            value = colon + 1;
-
-            while (*name != '\0' && isspace((unsigned char)*name)) {
-                name++;
-            }
-            while (*value != '\0' && isspace((unsigned char)*value)) {
-                value++;
-            }
-            while (*name != '\0' && isspace((unsigned char)name[strlen(name) - 1])) {
-                name[strlen(name) - 1] = '\0';
-            }
-            while (*value != '\0' && isspace((unsigned char)value[strlen(value) - 1])) {
-                value[strlen(value) - 1] = '\0';
-            }
-
-            if (strcasecmp(name, "Content-Length") == 0) {
-                content_length = strtoul(value, &endptr, 10);
-                if ((endptr == value) || (*endptr != '\0') || (content_length > REST_MAX_REQUEST_SIZE)) {
-                    return -1;
-                }
-            }
-            else if (strcasecmp(name, "Content-Type") == 0) {
+        if (split_header_line(cursor, &name, &value)) {
+            if (strcasecmp(name, "Content-Type") == 0) {
                 request->content_type = value;
             }
             else {
@@ -485,9 +592,6 @@ static int parse_request(rest_conn_t *conn, rest_request_t *request) {
             }
         }
         cursor = next + 2;
-    }
-    if (conn->request_len < headers_size + content_length) {
-        return 0;
     }
     request->body = conn->request + headers_size;
     request->body_len = (size_t)content_length;

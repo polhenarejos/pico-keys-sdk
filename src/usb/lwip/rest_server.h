@@ -66,6 +66,9 @@ typedef struct {
     bool handshake_done;
     bool request_complete;
     bool request_dispatched;
+    bool request_headers_parsed;
+    size_t request_headers_size;
+    size_t request_content_length;
 } rest_conn_t;
 
 err_t rest_server_init(rest_conn_type_t conn_type);

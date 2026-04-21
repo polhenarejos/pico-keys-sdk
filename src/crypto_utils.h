@@ -66,6 +66,8 @@ extern int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *d
 extern int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len);
 extern mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t prime_len);
 extern uint32_t crc32c(const uint8_t *buf, size_t len);
+extern int base64url_encode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen);
+extern int base64url_decode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen);
 
 #define PIN_KDF_SIZE(x)  (12 + (x) + 16)
 

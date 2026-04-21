@@ -20,6 +20,7 @@
 #include "rest.h"
 #include <strings.h>
 #include "random.h"
+#include "crypto_utils.h"
 
 #define REST_MAX_SESSIONS 4
 
@@ -34,6 +35,11 @@ rest_session_t *rest_session_create(const rest_session_role_t role, rest_session
             random_fill_buffer(rest_sessions[i].id, sizeof(rest_sessions[i].id));
             rest_sessions[i].created_at = board_millis();
             rest_sessions[i].last_activity_timestamp = rest_sessions[i].created_at;
+            size_t olen = 0;
+            if (base64url_encode(rest_sessions[i].id_str, sizeof(rest_sessions[i].id_str), &olen, (const unsigned char *)rest_sessions[i].id, sizeof(rest_sessions[i].id)) != 0) {
+                memset(&rest_sessions[i], 0, sizeof(rest_session_t));
+                return NULL;
+            }
             return &rest_sessions[i];
         }
     }
@@ -47,6 +53,20 @@ rest_session_t *rest_session_get(const uint8_t *id, size_t id_len) {
     for (int i = 0; i < REST_MAX_SESSIONS; i++) {
         if (rest_sessions[i].status != REST_SESSION_UNKNOWN && rest_sessions[i].status != REST_SESSION_EXPIRED && rest_sessions[i].status != REST_SESSION_TERMINATED) {
             if (memcmp(rest_sessions[i].id, id, sizeof(rest_sessions[i].id)) == 0) {
+                return &rest_sessions[i];
+            }
+        }
+    }
+    return NULL;
+}
+
+rest_session_t *rest_session_get_by_id_str(const char *id_str) {
+    if (id_str == NULL || strlen(id_str) != 22) {
+        return NULL;
+    }
+    for (int i = 0; i < REST_MAX_SESSIONS; i++) {
+        if (rest_sessions[i].status != REST_SESSION_UNKNOWN && rest_sessions[i].status != REST_SESSION_EXPIRED && rest_sessions[i].status != REST_SESSION_TERMINATED) {
+            if (strcmp((const char *)rest_sessions[i].id_str, id_str) == 0) {
                 return &rest_sessions[i];
             }
         }

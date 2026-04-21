@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <time.h>
 #include "cJSON.h"
+#include "mbedtls/base64.h"
 
 #define REST_MAX_REQUEST_SIZE 1024
 #define REST_MAX_METHOD_SIZE 8
@@ -85,9 +86,9 @@ typedef struct {
 } rest_route_t;
 
 typedef enum {
-    REST_SESSION_NONE = 0,
-    REST_SESSION_USER = 0x1,
-    REST_SESSION_ADMIN = 0x2
+    REST_SESSION_ROLE_NONE = 0,
+    REST_SESSION_ROLE_USER = 0x1,
+    REST_SESSION_ROLE_ADMIN = 0x2
 } rest_session_role_t;
 
 typedef enum {
@@ -102,6 +103,7 @@ typedef enum {
 
 typedef struct {
     uint8_t id[16];
+    uint8_t id_str[25];
     time_t last_activity_timestamp;
     time_t created_at;
     uint32_t last_seq;
@@ -120,6 +122,7 @@ const rest_route_t *rest_get_routes(size_t *count);
 
 extern rest_session_t *rest_session_create(const rest_session_role_t role, rest_session_status_t status);
 extern rest_session_t *rest_session_get(const uint8_t *id, size_t id_len);
+extern rest_session_t *rest_session_get_by_id_str(const char *id_str);
 extern int rest_session_terminate(const uint8_t *id, size_t id_len);
 extern int rest_session_update_activity(const uint8_t *id, size_t id_len);
 extern int rest_session_set_status(const uint8_t *id, size_t id_len, rest_session_status_t status);

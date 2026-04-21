@@ -22,6 +22,7 @@
 #include "mbedtls/aes.h"
 #include "mbedtls/hkdf.h"
 #include "mbedtls/gcm.h"
+#include "mbedtls/base64.h"
 #include "crypto_utils.h"
 #include "otp.h"
 #include "random.h"
@@ -307,4 +308,53 @@ uint32_t crc32c(const uint8_t *buf, size_t len) {
         }
     }
     return ~crc;
+}
+
+int base64url_encode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen) {
+    int rc = mbedtls_base64_encode(dst, dlen, olen, src, slen);
+    if (rc != 0) {
+        return rc;
+    }
+    for (size_t i = 0; i < *olen; i++) {
+        if (dst[i] == '+') {
+            dst[i] = '-';
+        }
+        else if (dst[i] == '/') {
+            dst[i] = '_';
+        }
+    }
+    uint8_t *p = dst + *olen - 1;
+    while (*p == '=') {
+        *p-- = '\0';
+        (*olen)--;
+    }
+    return 0;
+}
+
+int base64url_decode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen) {
+    // First convert from base64url to standard base64
+    unsigned char *b64_src = (unsigned char *)malloc(slen + 2); // +2 for padding if needed
+    if (b64_src == NULL) {
+        return PICOKEYS_ERR_MEMORY_FATAL;
+    }
+    for (size_t i = 0; i < slen; i++) {
+        if (src[i] == '-') {
+            b64_src[i] = '+';
+        }
+        else if (src[i] == '_') {
+            b64_src[i] = '/';
+        }
+        else {
+            b64_src[i] = src[i];
+        }
+    }
+    size_t padding = (4 - (slen % 4)) % 4;
+    for (size_t i = 0; i < padding; i++) {
+        b64_src[slen + i] = '=';
+    }
+    size_t b64_len = slen + padding;
+
+    int rc = mbedtls_base64_decode(dst, dlen, olen, b64_src, b64_len);
+    free(b64_src);
+    return rc;
 }

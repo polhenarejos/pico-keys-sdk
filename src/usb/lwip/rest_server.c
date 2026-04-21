@@ -24,7 +24,6 @@
 
 #include <ctype.h>
 #include <strings.h>
-#include "mbedtls/base64.h"
 #include "mbedtls/md.h"
 #include "mbedtls/hkdf.h"
 #include "crypto_utils.h"
@@ -615,7 +614,7 @@ static int rest_verify_request_signature(const rest_request_t *request, const re
     if (md_info == NULL) {
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
-    if (mbedtls_base64_decode(hmac_x, sizeof(hmac_x), &olen, (const unsigned char *)request->headers[REST_HEADER_X_SIGNATURE], strlen(request->headers[REST_HEADER_X_SIGNATURE])) != 0) {
+    if (base64url_decode(hmac_x, sizeof(hmac_x), &olen, (const unsigned char *)request->headers[REST_HEADER_X_SIGNATURE], strlen(request->headers[REST_HEADER_X_SIGNATURE])) != 0) {
         return PICOKEYS_EXEC_ERROR;
     }
     mbedtls_md_init(&ctx);
@@ -707,7 +706,7 @@ void rest_handle_request(rest_conn_t *conn) {
                 send_json_error(conn, 401, "authentication_required");
                 return;
             }
-            rest_session_t *session = rest_session_get((const uint8_t *)request->headers[REST_HEADER_X_SESSION_ID], strlen(request->headers[REST_HEADER_X_SESSION_ID]));
+            rest_session_t *session = rest_session_get_by_id_str(request->headers[REST_HEADER_X_SESSION_ID]);
             if (!session) {
                 send_json_error(conn, 401, "authentication_required");
                 return;

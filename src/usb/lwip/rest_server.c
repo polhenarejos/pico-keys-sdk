@@ -695,7 +695,13 @@ void rest_handle_request(rest_conn_t *conn) {
         if (routes[i].path == NULL || routes[i].handler == NULL) {
             continue;
         }
-        if (strcmp(routes[i].path, request->path) != 0) {
+        if (routes[i].param_parser != NULL) {
+            int result = routes[i].param_parser(request->path, routes[i].path, request->params);
+            if (result < 0) {
+                continue;
+            }
+        }
+        else if (strcmp(routes[i].path, request->path) != 0) {
             continue;
         }
         if (!(routes[i].method & request->method)) {
@@ -714,6 +720,10 @@ void rest_handle_request(rest_conn_t *conn) {
             }
             if (session->status != REST_SESSION_AUTHENTICATED) {
                 send_json_error(conn, 401, "authentication_required");
+                return;
+            }
+            if (session->role < routes[i].role) {
+                send_json_error(conn, 403, "insufficient_privileges");
                 return;
             }
             if (session->last_activity_timestamp + REST_SESSION_TIMEOUT_INACTIVITY_MS < board_millis() || session->created_at + REST_SESSION_TIMEOUT_TOTAL_MS < board_millis()) {

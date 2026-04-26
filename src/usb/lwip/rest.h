@@ -31,6 +31,7 @@
 #define REST_MAX_METHOD_SIZE 8
 #define REST_MAX_CONTENT_TYPE_SIZE 64
 #define REST_MAX_PATH_SIZE 192
+#define REST_MAX_REQUEST_PARAMS 4
 
 typedef enum {
     REST_HTTP_UNKNOWN = 0x0,
@@ -64,13 +65,29 @@ typedef enum {
     REST_HEADER_TOTAL_COUNT
 } rest_header_id_t;
 
+typedef enum {
+    REST_PARAM_UNKNOWN = 0,
+    REST_PARAM_INTEGER,
+    REST_PARAM_STRING
+} rest_param_type_t;
+
 typedef struct {
+    union {
+        uint32_t int_param;
+        char *str_param;
+    } param;
+    rest_param_type_t type;
+} rest_param_t;
+
+typedef struct
+{
     rest_http_method_t method;
     char path[REST_MAX_PATH_SIZE];
     const char *body;
     size_t body_len;
     const char *content_type;
     char *headers[REST_HEADER_TOTAL_COUNT];
+    rest_param_t params[REST_MAX_REQUEST_PARAMS];
 } rest_request_t;
 
 typedef struct {
@@ -90,18 +107,23 @@ typedef enum {
     REST_ROUTE_REQUIRE_TLS  = 0x2,
 } rest_route_flags_t;
 
-typedef struct {
-    rest_http_method_t method;
-    const char *path;
-    rest_route_handler_t handler;
-    rest_route_flags_t flags;
-} rest_route_t;
+typedef int (*rest_route_param_parser_t)(const char *str, const char *param_str, rest_param_t params_out[REST_MAX_REQUEST_PARAMS]);
 
 typedef enum {
     REST_SESSION_ROLE_NONE = 0,
     REST_SESSION_ROLE_USER = 0x1,
     REST_SESSION_ROLE_ADMIN = 0x2
 } rest_session_role_t;
+
+typedef struct {
+    rest_http_method_t method;
+    const char *path;
+    rest_route_handler_t handler;
+    rest_route_flags_t flags;
+    rest_route_param_parser_t param_parser;
+    rest_session_role_t role; // Minimum required role to access this route (only relevant if REST_ROUTE_REQUIRE_AUTH flag is set)
+} rest_route_t;
+
 
 typedef enum {
     REST_SESSION_UNKNOWN = 0,

@@ -136,6 +136,10 @@ int rest_session_cleanup_expired(time_t expiration_time) {
     return count;
 }
 
+void rest_session_clear_all(void) {
+    memset(rest_sessions, 0, sizeof(rest_sessions));
+}
+
 #ifdef DEBUG_APDU
 void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len) {
     size_t i;

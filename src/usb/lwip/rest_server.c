@@ -698,7 +698,7 @@ void rest_handle_request(rest_conn_t *conn) {
         if (strcmp(routes[i].path, request->path) != 0) {
             continue;
         }
-        if (routes[i].method != request->method) {
+        if (!(routes[i].method & request->method)) {
             path_exists_for_other_method = true;
             continue;
         }

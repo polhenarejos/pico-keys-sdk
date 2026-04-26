@@ -33,10 +33,22 @@
 #define REST_MAX_PATH_SIZE 192
 
 typedef enum {
-    REST_HTTP_GET = 0,
-    REST_HTTP_POST,
-    REST_HTTP_PUT,
-    REST_HTTP_DELETE
+    REST_HTTP_UNKNOWN = 0x0,
+    REST_HTTP_GET = 0x1,
+    REST_HTTP_POST = 0x2,
+    REST_HTTP_PUT = 0x4,
+    REST_HTTP_DELETE = 0x8,
+    REST_HTTP_GET_POST = REST_HTTP_GET | REST_HTTP_POST,
+    REST_HTTP_GET_PUT = REST_HTTP_GET | REST_HTTP_PUT,
+    REST_HTTP_GET_DELETE = REST_HTTP_GET | REST_HTTP_DELETE,
+    REST_HTTP_POST_PUT = REST_HTTP_POST | REST_HTTP_PUT,
+    REST_HTTP_POST_DELETE = REST_HTTP_POST | REST_HTTP_DELETE,
+    REST_HTTP_PUT_DELETE = REST_HTTP_PUT | REST_HTTP_DELETE,
+    REST_HTTP_GET_POST_PUT = REST_HTTP_GET | REST_HTTP_POST | REST_HTTP_PUT,
+    REST_HTTP_GET_POST_DELETE = REST_HTTP_GET | REST_HTTP_POST | REST_HTTP_DELETE,
+    REST_HTTP_GET_PUT_DELETE = REST_HTTP_GET | REST_HTTP_PUT | REST_HTTP_DELETE,
+    REST_HTTP_POST_PUT_DELETE = REST_HTTP_POST | REST_HTTP_PUT | REST_HTTP_DELETE,
+    REST_HTTP_GET_POST_PUT_DELETE = REST_HTTP_GET | REST_HTTP_POST | REST_HTTP_PUT | REST_HTTP_DELETE
 } rest_http_method_t;
 
 typedef enum {
@@ -129,6 +141,7 @@ extern int rest_session_update_activity(const uint8_t *id, size_t id_len);
 extern int rest_session_set_status(const uint8_t *id, size_t id_len, rest_session_status_t status);
 extern int rest_session_set_role(const uint8_t *id, size_t id_len, rest_session_role_t role);
 extern int rest_session_cleanup_expired(time_t expiration_time);
+extern void rest_session_clear_all(void);
 extern int rest_session_derive_key(const rest_session_t *session, uint8_t derived_key[32]);
 
 #ifdef DEBUG_APDU

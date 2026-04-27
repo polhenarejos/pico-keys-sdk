@@ -17,6 +17,9 @@
 
 #include "picokeys.h"
 #include "pico_time.h"
+#ifdef ESP_PLATFORM
+#include <sys/time.h>
+#endif
 
 #ifdef _MSC_VER
 #include <windows.h>

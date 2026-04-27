@@ -23,6 +23,7 @@
 #include "bsp/board.h"
 #elif defined(ESP_PLATFORM)
 #include "compat/esp_compat.h"
+#include <time.h>
 #else
 #include <sys/time.h>
 #include <time.h>

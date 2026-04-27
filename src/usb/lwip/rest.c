@@ -214,6 +214,10 @@ int rest_execute_route_handler(const rest_request_t *request, rest_route_handler
         }
         response->body = body;
     }
+    if (response->json != NULL) {
+        cJSON_Delete(response->json);
+        response->json = NULL;
+    }
 
     response->status_code = (response->status_code == 0) ? 200 : response->status_code;
     response->body_len = (response->body_len == 0) ? strlen(response->body) : response->body_len;

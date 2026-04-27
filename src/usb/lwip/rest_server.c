@@ -885,6 +885,7 @@ void rest_check_and_load_credentials(void) {
 out:
         mbedtls_x509write_crt_free(&crt);
         mbedtls_platform_zeroize(cert_pem, sizeof(cert_pem));
+        mbedtls_pk_free(&key);
     }
     tls_credentials.tls_cert_pem = (char *)file_get_data(ef);
     tls_credentials.tls_cert_pem_len = file_get_size(ef);

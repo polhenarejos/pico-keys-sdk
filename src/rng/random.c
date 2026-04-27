@@ -20,11 +20,22 @@
 #include "picokeys.h"
 #include "hwrng.h"
 #include "random.h"
+#if defined(PICO_PLATFORM)
+#include "pico/mutex.h"
+#elif defined(ESP_PLATFORM)
+#include "compat/esp_compat.h"
+#else
+#include "compat/queue.h"
+#endif
 
 #define RANDOM_BYTES_LENGTH 32
 static uint32_t random_word[RANDOM_BYTES_LENGTH / sizeof(uint32_t)];
+static mutex_t random_mutex;
+static bool random_mutex_initialized = false;
 
 void random_init(void) {
+    mutex_init(&random_mutex);
+    random_mutex_initialized = true;
     hwrng_init(random_word, RANDOM_BYTES_LENGTH / sizeof(uint32_t));
 
     for (int i = 0; i < HWRNG_PRE_LOOP; i++) {
@@ -50,10 +61,16 @@ const uint8_t *random_bytes_get(size_t len) {
         return NULL;
     }
     static uint32_t return_word[MAX_RANDOM_BUFFER / sizeof(uint32_t)];
+    if (random_mutex_initialized) {
+        mutex_enter_blocking(&random_mutex);
+    }
     for (size_t ix = 0; ix < len; ix += RANDOM_BYTES_LENGTH) {
         hwrng_wait_full();
         memcpy(return_word + ix / sizeof(uint32_t), random_word, RANDOM_BYTES_LENGTH);
         random_bytes_free((const uint8_t *) random_word);
+    }
+    if (random_mutex_initialized) {
+        mutex_exit(&random_mutex);
     }
     return (const uint8_t *) return_word;
 }
@@ -66,6 +83,9 @@ int random_fill_iterator(void *arg, unsigned char *out, size_t out_len) {
     uint8_t index = index_p ? *index_p : 0;
     uint8_t n;
 
+    if (random_mutex_initialized) {
+        mutex_enter_blocking(&random_mutex);
+    }
     while (out_len) {
         hwrng_wait_full();
 
@@ -87,6 +107,9 @@ int random_fill_iterator(void *arg, unsigned char *out, size_t out_len) {
 
     if (index_p) {
         *index_p = index;
+    }
+    if (random_mutex_initialized) {
+        mutex_exit(&random_mutex);
     }
 
     return 0;

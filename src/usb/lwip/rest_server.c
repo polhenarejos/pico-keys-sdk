@@ -103,7 +103,7 @@ static int rest_start_core1_job(rest_conn_t *conn, const rest_request_t *request
     rest_core1_job.conn = conn;
     rest_core1_job.handler = handler;
 
-    card_start(ITF_LWIP_NET, rest_core1_thread);
+    card_start(ITF_LWIP, rest_core1_thread);
     usb_send_event(EV_CMD_AVAILABLE);
     return 0;
 }
@@ -159,7 +159,7 @@ void rest_task(void) {
     if (!rest_core1_job.pending) {
         return;
     }
-    status = card_status(ITF_LWIP_NET);
+    status = card_status(ITF_LWIP);
     if (status != PICOKEYS_OK) {
         return;
     }
@@ -398,7 +398,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
         sent_total += (size_t)n;
     }
 #else
-    err = tcp_write(conn->pcb, headers, (uint16_t)header_len, TCP_WRITE_FLAG_COPY);
+    err = tcp_write(conn->pcb, headers_buf, (uint16_t)header_len, TCP_WRITE_FLAG_COPY);
     if (err != ERR_OK) {
         rest_close_conn(conn);
         return;

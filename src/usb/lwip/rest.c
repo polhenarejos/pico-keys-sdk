@@ -320,7 +320,6 @@ static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], 
 
     MBEDTLS_MPI_CHK(mbedtls_ecp_read_key(MBEDTLS_ECP_DP_CURVE25519, &ours, sk, 32));
 
-    // Carrega pública remota (32 bytes)
     MBEDTLS_MPI_CHK(mbedtls_ecp_point_read_binary(&theirs.grp, &theirs.Q, pk, 32));
 
     MBEDTLS_MPI_CHK(mbedtls_ecdh_setup(&ecdh, MBEDTLS_ECP_DP_CURVE25519));
@@ -344,13 +343,19 @@ cleanup:
     return ret;
 }
 
-int rest_session_derive_key(const rest_session_t *session, uint8_t derived_key[32]) {
-    uint8_t kver[32], sk[32];
+int rest_session_derive_key(const rest_session_t *session, uint8_t sk[32]) {
+    uint8_t kver[32];
     const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     derive_kver(session->id, sizeof(session->id), kver);
-    mbedtls_hkdf(md_info, pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"REST/SESSION", 12, derived_key, 32);
+    mbedtls_hkdf(md_info, pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"REST/SESSION", 12, sk, 32);
     mbedtls_platform_zeroize(kver, sizeof(kver));
-    int ret = x25519_hkdf_derive_key32(sk, session->public_key, session->id, sizeof(session->id), (const uint8_t *)"REST/SESSION/DERIVE", 20, derived_key);
+    return PICOKEYS_OK;
+}
+
+int rest_session_derive_shared(const rest_session_t *session, uint8_t derived_key[32]) {
+    uint8_t sk[32];
+    rest_session_derive_key(session, sk);
+    int ret = x25519_hkdf_derive_key32(sk, session->public_key, session->id, sizeof(session->id), (const uint8_t *)"REST/SESSION/DERIVE", 19, derived_key);
     mbedtls_platform_zeroize(sk, sizeof(sk));
     if (ret != 0) {
         return -1;

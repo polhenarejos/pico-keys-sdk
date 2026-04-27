@@ -686,14 +686,13 @@ static int rest_verify_request_signature(const rest_request_t *request, const re
     const char *method_str = rest_method_to_string(request->method);
     size_t body_len = request->body_len > 0 ? request->body_len : strlen((const char *)body_empty);
     uint8_t derived_key[32];
-    if (rest_session_derive_key(session, derived_key) != 0) {
+    if (rest_session_derive_shared(session, derived_key) != 0) {
         mbedtls_md_free(&ctx);
         return PICOKEYS_EXEC_ERROR;
     }
-
     uint32_t seq = htonl(rest_request_get_seq(request));
     if (mbedtls_md_hmac_starts(&ctx, (const unsigned char *)derived_key, sizeof(derived_key)) != 0 ||
-        mbedtls_md_hmac_starts(&ctx, (const unsigned char *)session->id, sizeof(session->id)) != 0 ||
+        mbedtls_md_hmac_update(&ctx, (const unsigned char *)session->id, sizeof(session->id)) != 0 ||
         mbedtls_md_hmac_update(&ctx, (const unsigned char *)method_str, strlen(method_str)) != 0 ||
         mbedtls_md_hmac_update(&ctx, (const unsigned char *)request->path, strlen(request->path)) != 0 ||
         mbedtls_md_hmac_update(&ctx, (const unsigned char *)&seq, sizeof(uint32_t)) != 0 ||

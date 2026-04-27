@@ -171,7 +171,8 @@ extern int rest_session_set_status(const uint8_t *id, size_t id_len, rest_sessio
 extern int rest_session_set_role(const uint8_t *id, size_t id_len, rest_session_role_t role);
 extern int rest_session_cleanup_expired(time_t expiration_time);
 extern void rest_session_clear_all(void);
-extern int rest_session_derive_key(const rest_session_t *session, uint8_t derived_key[32]);
+extern int rest_session_derive_key(const rest_session_t *session, uint8_t sk[32]);
+extern int rest_session_derive_shared(const rest_session_t *session, uint8_t derived_key[32]);
 
 #ifdef DEBUG_APDU
 extern void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len);

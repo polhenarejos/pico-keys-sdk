@@ -250,15 +250,19 @@ void rest_close_conn(rest_conn_t *conn) {
         clear_conn(conn);
         return;
     }
+    err = tcp_close(conn->pcb);
+    if (err == ERR_MEM) {
+        (void)tcp_output(conn->pcb);
+        return;
+    }
+    if (err != ERR_OK) {
+        tcp_abort(conn->pcb);
+    }
     tcp_arg(conn->pcb, NULL);
     tcp_recv(conn->pcb, NULL);
     tcp_sent(conn->pcb, NULL);
     tcp_poll(conn->pcb, NULL, 0);
     tcp_err(conn->pcb, NULL);
-    err = tcp_close(conn->pcb);
-    if (err != ERR_OK) {
-        tcp_abort(conn->pcb);
-    }
     if (conn->conn_type == REST_CONN_TLS) {
         mbedtls_ssl_free(&conn->ssl);
     }
@@ -398,25 +402,60 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
         sent_total += (size_t)n;
     }
 #else
-    err = tcp_write(conn->pcb, headers_buf, (uint16_t)header_len, TCP_WRITE_FLAG_COPY);
-    if (err != ERR_OK) {
-        rest_close_conn(conn);
-        return;
-    }
+    /* lwIP guidance: check sndbuf for each tcp_write() call. */
     retries = 0;
-    while (body_len > 0) {
-        err = tcp_write(conn->pcb, body, (uint16_t)body_len, TCP_WRITE_FLAG_COPY);
-        if (err == ERR_OK) {
-            break;
-        }
-        if (err != ERR_MEM || retries >= 4) {
+    while (tcp_sndbuf(conn->pcb) < (u16_t)header_len) {
+        if (retries >= 16) {
             rest_close_conn(conn);
             return;
         }
         (void)tcp_output(conn->pcb);
         retries++;
     }
+    retries = 0;
+    while (true) {
+        err = tcp_write(conn->pcb, headers_buf, (uint16_t)header_len, TCP_WRITE_FLAG_COPY | (body_len > 0 ? TCP_WRITE_FLAG_MORE : 0));
+        if (err == ERR_OK) {
+            break;
+        }
+        if (err != ERR_MEM || retries >= 16) {
+            rest_close_conn(conn);
+            return;
+        }
+        (void)tcp_output(conn->pcb);
+        retries++;
+    }
+
+    if (body_len > 0) {
+        retries = 0;
+        while (tcp_sndbuf(conn->pcb) < (u16_t)body_len) {
+            if (retries >= 16) {
+                rest_close_conn(conn);
+                return;
+            }
+            (void)tcp_output(conn->pcb);
+            retries++;
+        }
+        retries = 0;
+        while (true) {
+            err = tcp_write(conn->pcb, body, (uint16_t)body_len, TCP_WRITE_FLAG_COPY);
+            if (err == ERR_OK) {
+                break;
+            }
+            if (err != ERR_MEM || retries >= 16) {
+                rest_close_conn(conn);
+                return;
+            }
+            (void)tcp_output(conn->pcb);
+            retries++;
+        }
+    }
     (void)tcp_output(conn->pcb);
+#endif
+#ifndef ENABLE_EMULATION
+    if (conn->conn_type == REST_CONN_PLAIN) {
+        return;
+    }
 #endif
     rest_close_conn(conn);
 }
@@ -914,7 +953,14 @@ static err_t rest_poll(void *arg, struct tcp_pcb *pcb) {
     if (conn->conn_type == REST_CONN_TLS) {
         return tls_progress_conn(conn);
     }
-    rest_close_conn(conn);
+    if (conn->request_len > 0) {
+        if (!conn->request_headers_parsed) {
+            return ERR_OK;
+        }
+        if (conn->request_len < conn->request_headers_size + conn->request_content_length) {
+            return ERR_OK;
+        }
+    }
     return ERR_OK;
 }
 

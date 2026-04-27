@@ -154,6 +154,15 @@ typedef struct {
     rest_session_role_t role; // Minimum required role to access this route (only relevant if REST_ROUTE_REQUIRE_AUTH flag is set)
 } rest_route_t;
 
+typedef struct {
+    rest_route_handler_t handler;
+} rest_background_job_t;
+
+#define REST_MAX_BACKGROUND_JOBS 4
+
+extern int rest_background_job_push(rest_route_handler_t handler);
+extern rest_route_handler_t rest_background_job_pop(void);
+
 extern int rest_execute_route_handler(const rest_request_t *request, rest_route_handler_t handler, rest_response_t *response);
 extern int rest_response_set_error(rest_response_t *response, int status_code, const char *message);
 const char *rest_status_text_from_code(uint16_t code);

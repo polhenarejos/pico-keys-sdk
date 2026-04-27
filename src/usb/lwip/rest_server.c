@@ -92,8 +92,8 @@ static void *rest_core1_thread(void *arg);
 static void send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const char *body, size_t body_len, char *headers[REST_HEADER_TOTAL_COUNT]);
 void rest_close_conn(rest_conn_t *conn);
 
-static int rest_start_core1_job(rest_conn_t *conn, const rest_request_t *request, rest_route_handler_t handler) {
-    if (request == NULL || handler == NULL || rest_core1_job.pending) {
+static int rest_start_core1_job(rest_conn_t *conn, rest_route_handler_t handler) {
+    if (handler == NULL || rest_core1_job.pending) {
         return -1;
     }
 
@@ -154,20 +154,25 @@ static void send_json_error(rest_conn_t *conn, int status_code, const char *erro
 }
 
 void rest_task(void) {
-    int status;
-    rest_conn_t *conn;
     if (!rest_core1_job.pending) {
+        rest_route_handler_t handler = rest_background_job_pop();
+        if (handler != NULL) {
+            if (rest_start_core1_job(NULL, handler) != 0) {
+                // Failed to start background job, push it back to the queue
+                rest_background_job_push(handler);
+            }
+        }
         return;
     }
-    status = card_status(ITF_LWIP);
+    int status = card_status(ITF_LWIP);
     if (status != PICOKEYS_OK) {
         return;
     }
 
-    conn = rest_core1_job.conn;
-    if (conn == NULL) {
-        return;
-    }
+    rest_conn_t *conn = rest_core1_job.conn;
+    //if (conn == NULL) {
+    //    return;
+    //}
     rest_response_t *response = &rest_core1_result.response;
     if (response == NULL) {
         return;
@@ -801,7 +806,7 @@ void rest_handle_request(rest_conn_t *conn) {
             }
             request->session = session;
         }
-        if (rest_start_core1_job(conn, request, routes[i].handler) != 0) {
+        if (rest_start_core1_job(conn, routes[i].handler) != 0) {
             send_json_error(conn, 500, "internal_error");
         }
         return;

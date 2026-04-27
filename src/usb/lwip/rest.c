@@ -30,6 +30,8 @@
 
 #define REST_MAX_SESSIONS 4
 
+rest_background_job_t background_jobs[REST_MAX_BACKGROUND_JOBS] = {0};
+
 static rest_session_t rest_sessions[REST_MAX_SESSIONS] = {0};
 static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], const uint8_t *salt, size_t salt_len, const uint8_t *info, size_t info_len, uint8_t out_key[32]);
 
@@ -361,4 +363,28 @@ int rest_session_derive_shared(const rest_session_t *session, uint8_t derived_ke
         return -1;
     }
     return PICOKEYS_OK;
+}
+
+int rest_background_job_push(rest_route_handler_t handler) {
+    if (handler == NULL) {
+        return -1;
+    }
+    for (int i = 0; i < REST_MAX_BACKGROUND_JOBS; i++) {
+        if (background_jobs[i].handler == NULL) {
+            background_jobs[i].handler = handler;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+rest_route_handler_t rest_background_job_pop(void) {
+    for (int i = 0; i < REST_MAX_BACKGROUND_JOBS; i++) {
+        if (background_jobs[i].handler != NULL) {
+            rest_route_handler_t handler = background_jobs[i].handler;
+            background_jobs[i].handler = NULL;
+            return handler;
+        }
+    }
+    return NULL;
 }

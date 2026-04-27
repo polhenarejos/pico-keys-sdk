@@ -70,8 +70,26 @@ typedef struct {
 static rest_core1_job_t rest_core1_job = {0};
 static rest_core1_result_t rest_core1_result = {0};
 
+typedef struct {
+    rest_header_id_t id;
+    const char *name;
+} rest_header_descriptor_t;
+
+static const rest_header_descriptor_t rest_http_headers[REST_HEADER_TOTAL_COUNT] = {
+    { REST_HEADER_USER_AGENT, "User-Agent" },
+    { REST_HEADER_AUTHORIZATION, "Authorization" },
+    { REST_HEADER_CONTENT_TYPE, "Content-Type" },
+    { REST_HEADER_CONTENT_LENGTH, "Content-Length" },
+    { REST_HEADER_HOST, "Host" },
+    { REST_HEADER_LOCATION, "Location" },
+    { REST_HEADER_ACCEPT, "Accept" },
+    { REST_HEADER_X_SESSION_ID, "X-Session-ID" },
+    { REST_HEADER_X_SEQ, "X-Seq" },
+    { REST_HEADER_X_SIGNATURE, "X-Signature" }
+};
+
 static void *rest_core1_thread(void *arg);
-static void send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const char *body, size_t body_len);
+static void send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const char *body, size_t body_len, char *headers[REST_HEADER_TOTAL_COUNT]);
 void rest_close_conn(rest_conn_t *conn);
 
 static int rest_start_core1_job(rest_conn_t *conn, const rest_request_t *request, rest_route_handler_t handler) {
@@ -122,7 +140,7 @@ static void *rest_core1_thread(void *arg) {
 }
 
 static void send_json(rest_conn_t *conn, int status_code, const char *status_text, const char *json_body) {
-    send_response(conn, status_code, status_text, "application/json", json_body, strlen(json_body));
+    send_response(conn, status_code, status_text, "application/json", json_body, strlen(json_body), NULL);
 }
 
 static void send_json_error(rest_conn_t *conn, int status_code, const char *error_message) {
@@ -157,7 +175,7 @@ void rest_task(void) {
     if (conn != NULL) {
         if (rest_core1_result.ready && response->body != NULL && response->content_type != NULL) {
             uint16_t code = response->status_code == 0 ? 200 : response->status_code;
-            send_response(conn, code, rest_status_text_from_code(code), response->content_type, response->body, response->body_len);
+            send_response(conn, code, rest_status_text_from_code(code), response->content_type, response->body, response->body_len, response->headers);
         }
         else {
             send_json_error(conn, 500, "internal_error");
@@ -248,8 +266,8 @@ void rest_close_conn(rest_conn_t *conn) {
 #endif
 }
 
-static void send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const char *body, size_t body_len) {
-    char headers[256];
+static void send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const char *body, size_t body_len, char *headers[REST_HEADER_TOTAL_COUNT]) {
+    char headers_buf[256];
     int header_len;
 #ifdef ENABLE_EMULATION
     size_t sent_total = 0;
@@ -277,14 +295,34 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     );
     rest_debug_dump_payload("response-body", body, body_len);
 
-    header_len = snprintf(headers, sizeof(headers),
+    char *p = headers_buf;
+    header_len = snprintf(p, sizeof(headers_buf),
                           "HTTP/1.0 %d %s\r\n"
                           "Content-Type: %s\r\n"
                           "Content-Length: %lu\r\n"
-                          "Connection: close\r\n"
-                          "\r\n",
+                          "Connection: close\r\n",
                           status_code, status_text, content_type, (unsigned long)body_len);
-    if (header_len <= 0 || (size_t)header_len >= sizeof(headers)) {
+    if (headers) {
+        for (int i = 0; i < REST_HEADER_TOTAL_COUNT; i++) {
+            if (headers[i] != NULL) {
+                int n = snprintf(p + header_len, sizeof(headers_buf) - (size_t)header_len, "%s: %s\r\n", rest_http_headers[i].name, headers[i]);
+                free(headers[i]);
+                headers[i] = NULL;
+                if (n <= 0 || header_len + n >= (int)sizeof(headers_buf)) {
+                    rest_close_conn(conn);
+                    return;
+                }
+                header_len += n;
+            }
+        }
+    }
+    if (header_len + 2 >= (int)sizeof(headers_buf)) {
+        rest_close_conn(conn);
+        return;
+    }
+    memcpy(p + header_len, "\r\n", 2);
+    header_len += 2;
+    if (header_len <= 0 || (size_t)header_len >= sizeof(headers_buf)) {
         rest_close_conn(conn);
         return;
     }
@@ -295,7 +333,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
         int want_retries = 0;
 
         while (written < (size_t)header_len) {
-            ret = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)headers + written, (size_t)header_len - written);
+            ret = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)headers_buf + written, (size_t)header_len - written);
             if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
                 if (++want_retries > 2048) {
                     rest_close_conn(conn);
@@ -336,7 +374,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
 #ifdef ENABLE_EMULATION
     while (sent_total < (size_t)header_len) {
 #ifndef _MSC_VER
-        ssize_t n = send(conn->sock, headers + sent_total, (size_t)header_len - sent_total, 0);
+        ssize_t n = send(conn->sock, headers_buf + sent_total, (size_t)header_len - sent_total, 0);
 #else
         int n = -1;
 #endif
@@ -382,23 +420,6 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
 #endif
     rest_close_conn(conn);
 }
-
-typedef struct {
-    rest_header_id_t id;
-    const char *name;
-} rest_header_descriptor_t;
-
-static const rest_header_descriptor_t rest_http_headers[REST_HEADER_TOTAL_COUNT] = {
-    { REST_HEADER_USER_AGENT, "User-Agent" },
-    { REST_HEADER_AUTHORIZATION, "Authorization" },
-    { REST_HEADER_CONTENT_TYPE, "Content-Type" },
-    { REST_HEADER_CONTENT_LENGTH, "Content-Length" },
-    { REST_HEADER_HOST, "Host" },
-    { REST_HEADER_ACCEPT, "Accept" },
-    { REST_HEADER_X_SESSION_ID, "X-Session-ID" },
-    { REST_HEADER_X_SEQ, "X-Seq" },
-    { REST_HEADER_X_SIGNATURE, "X-Signature" }
-};
 
 static void trim_ascii_ws_bounds(const char **start, const char **end) {
     while (*start < *end && isspace((unsigned char)**start)) {
@@ -594,6 +615,7 @@ static int parse_request(rest_conn_t *conn, rest_request_t *request) {
     }
     request->body = conn->request + headers_size;
     request->body_len = (size_t)content_length;
+    request->conn_type = (rest_request_conn_type_t)conn->conn_type;
     return 1;
 }
 
@@ -739,6 +761,7 @@ void rest_handle_request(rest_conn_t *conn) {
                 send_json_error(conn, 401, "invalid_signature");
                 return;
             }
+            request->session = session;
         }
         if (rest_start_core1_job(conn, request, routes[i].handler) != 0) {
             send_json_error(conn, 500, "internal_error");

@@ -198,12 +198,19 @@ int rest_execute_route_handler(const rest_request_t *request, rest_route_handler
         response->json = NULL;
         return -1;
     }
-    if (response->status_code == 0 || response->status_code == 200) {
+    if (response->status_code == 0 || response->status_code == 200 || response->status_code == 201 || response->status_code == 204) {
         char *body = cJSON_PrintUnformatted(response->json);
         cJSON_Delete(response->json);
         response->json = NULL;
         if (body == NULL) {
             return -1;
+        }
+        if (memcmp(body, "{}", 2) == 0) {
+            free(body);
+            body = strdup("");
+            if (body == NULL) {
+                return -1;
+            }
         }
         response->body = body;
     }

@@ -58,6 +58,7 @@ typedef enum {
     REST_HEADER_CONTENT_TYPE,
     REST_HEADER_CONTENT_LENGTH,
     REST_HEADER_HOST,
+    REST_HEADER_LOCATION,
     REST_HEADER_ACCEPT,
     REST_HEADER_X_SESSION_ID,
     REST_HEADER_X_SEQ,
@@ -73,33 +74,11 @@ typedef enum {
 
 typedef struct {
     union {
-        uint32_t int_param;
+        int32_t int_param;
         char *str_param;
     } param;
     rest_param_type_t type;
 } rest_param_t;
-
-typedef struct
-{
-    rest_http_method_t method;
-    char path[REST_MAX_PATH_SIZE];
-    const char *body;
-    size_t body_len;
-    const char *content_type;
-    char *headers[REST_HEADER_TOTAL_COUNT];
-    rest_param_t params[REST_MAX_REQUEST_PARAMS];
-} rest_request_t;
-
-typedef struct {
-    uint16_t status_code;
-    const char *content_type;
-    char *body; // heap !
-    size_t body_len;
-    cJSON *json;
-    char *headers[REST_HEADER_TOTAL_COUNT];
-} rest_response_t;
-
-typedef int (*rest_route_handler_t)(const rest_request_t *request, rest_response_t *response);
 
 typedef enum {
     REST_ROUTE_NONE         = 0x0,
@@ -115,15 +94,10 @@ typedef enum {
     REST_SESSION_ROLE_ADMIN = 0x2
 } rest_session_role_t;
 
-typedef struct {
-    rest_http_method_t method;
-    const char *path;
-    rest_route_handler_t handler;
-    rest_route_flags_t flags;
-    rest_route_param_parser_t param_parser;
-    rest_session_role_t role; // Minimum required role to access this route (only relevant if REST_ROUTE_REQUIRE_AUTH flag is set)
-} rest_route_t;
-
+typedef enum {
+    REST_REQUEST_CONN_TYPE_PLAIN = 0,
+    REST_REQUEST_CONN_TYPE_TLS = 1
+} rest_request_conn_type_t;
 
 typedef enum {
     REST_SESSION_UNKNOWN = 0,
@@ -144,8 +118,41 @@ typedef struct {
     uint32_t last_seq;
     rest_session_role_t role;
     rest_session_status_t status;
+    uint8_t token[32];
+    uint8_t user_id;
 } rest_session_t;
 
+typedef struct {
+    rest_http_method_t method;
+    char path[REST_MAX_PATH_SIZE];
+    const char *body;
+    size_t body_len;
+    const char *content_type;
+    char *headers[REST_HEADER_TOTAL_COUNT];
+    rest_param_t params[REST_MAX_REQUEST_PARAMS];
+    rest_session_t *session;
+    rest_request_conn_type_t conn_type;
+} rest_request_t;
+
+typedef struct {
+    uint16_t status_code;
+    const char *content_type;
+    char *body; // heap !
+    size_t body_len;
+    cJSON *json;
+    char *headers[REST_HEADER_TOTAL_COUNT];
+} rest_response_t;
+
+typedef int (*rest_route_handler_t)(const rest_request_t *request, rest_response_t *response);
+
+typedef struct {
+    rest_http_method_t method;
+    const char *path;
+    rest_route_handler_t handler;
+    rest_route_flags_t flags;
+    rest_route_param_parser_t param_parser;
+    rest_session_role_t role; // Minimum required role to access this route (only relevant if REST_ROUTE_REQUIRE_AUTH flag is set)
+} rest_route_t;
 
 extern int rest_execute_route_handler(const rest_request_t *request, rest_route_handler_t handler, rest_response_t *response);
 extern int rest_response_set_error(rest_response_t *response, int status_code, const char *message);
@@ -172,6 +179,14 @@ extern void rest_debug_dump_payload(const char *tag, const char *buffer, size_t 
 #else
 #define rest_debug_dump_payload(tag, buffer, len) do { (void)(tag); (void)(buffer); (void)(len); } while (0)
 #define REST_DEBUG_LOG(...) do {} while (0)
+#endif
+
+#ifdef ENABLE_EMULATION
+#define REST_ABSOLUTE_HTTP_URI "http://127.0.0.1"
+#define REST_ABSOLUTE_HTTPS_URI "https://127.0.0.1"
+#else
+#define REST_ABSOLUTE_HTTP_URI "http://192.168.7.1"
+#define REST_ABSOLUTE_HTTPS_URI "https://192.168.7.2"
 #endif
 
 #endif

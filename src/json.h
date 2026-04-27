@@ -27,8 +27,16 @@
     } \
 } while(0)
 
+#define CJSON_ADD_GENERIC_ITEM(hdl, ptr, item, value) do { \
+    if (hdl(ptr, item, value) == false) { \
+        response->status_code = 500; \
+        return 1; \
+    } \
+} while(0)
+
 #define CJSON_ADD_STRING(ptr, item, value) CJSON_ADD_GENERIC(cJSON_AddStringToObject, (ptr)->json, item, value)
 #define CJSON_ADD_NUMBER(ptr, item, value) CJSON_ADD_GENERIC(cJSON_AddNumberToObject, (ptr)->json, item, value)
 #define CJSON_ADD_BOOL(ptr, item, value)   CJSON_ADD_GENERIC(cJSON_AddBoolToObject, (ptr)->json, item, value)
+#define CJSON_ADD_ITEM(ptr, item, value)   CJSON_ADD_GENERIC_ITEM(cJSON_AddItemToObject, (ptr)->json, item, value)
 
 #endif // _JSON_H_

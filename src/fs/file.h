@@ -115,6 +115,7 @@ extern uint16_t file_get_size(const file_t *tf);
 extern int file_put_data(file_t *file, const uint8_t *data, uint16_t len);
 extern file_t *file_new(uint16_t);
 extern int flash_clear_file(file_t *file);
+extern int file_delete(file_t *ef);
 file_t *get_parent(file_t *f);
 
 extern bool isUserAuthenticated;
@@ -122,7 +123,6 @@ extern bool isUserAuthenticated;
 extern uint16_t meta_find(uint16_t, uint8_t **out);
 extern int meta_delete(uint16_t fid);
 extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
-extern int delete_file(file_t *ef);
 
 #ifndef ENABLE_EMULATION
 extern file_t *ef_phy;

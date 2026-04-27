@@ -512,7 +512,7 @@ bool file_has_data(const file_t *f) {
     return f != NULL && f->data != NULL && file_get_size(f) > 0;
 }
 
-int delete_file(file_t *ef) {
+int file_delete(file_t *ef) {
     if (ef == NULL) {
         return PICOKEYS_OK;
     }

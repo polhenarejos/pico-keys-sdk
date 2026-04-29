@@ -52,7 +52,7 @@ static inline uint32_t tud_vendor_n_read(uint8_t itf, uint8_t *buffer, uint32_t 
 }
 extern void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes);
 extern uint32_t tud_vendor_n_write(uint8_t itf, const uint8_t *buffer, uint32_t n);
-static inline uint32_t tud_vendor_n_flush(uint8_t itf) {
+static inline uint32_t tud_vendor_n_write_flush(uint8_t itf) {
     (void) itf;
     return emul_tx_size;
 }

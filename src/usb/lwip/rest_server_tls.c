@@ -18,7 +18,13 @@
 #include "picokeys.h"
 #include "rest_server_tls.h"
 
+#ifdef _MSC_VER
+#include <string.h>
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#else
 #include <strings.h>
+#endif
 
 extern void rest_close_conn(rest_conn_t *conn);
 extern void rest_handle_request(rest_conn_t *conn);
@@ -37,12 +43,12 @@ mbedtls_x509_crt tls_cert;
 mbedtls_pk_context tls_key;
 tls_credentials_t tls_credentials = {0};
 
-int tls_init_tls_context(const tls_credentials_t *tls_credentials) {
+int tls_init_tls_context(const tls_credentials_t *tls_creds) {
     int ret;
     if (tls_ctx_ready) {
         return 0;
     }
-    if (tls_credentials == NULL || tls_credentials->tls_key_pem == NULL || tls_credentials->tls_cert_pem == NULL) {
+    if (tls_creds == NULL || tls_creds->tls_key_pem == NULL || tls_creds->tls_cert_pem == NULL) {
         return -1;
     }
 
@@ -51,11 +57,11 @@ int tls_init_tls_context(const tls_credentials_t *tls_credentials) {
     mbedtls_pk_init(&tls_key);
     mbedtls_pk_setup(&tls_key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
 
-    ret = mbedtls_x509_crt_parse(&tls_cert, (const unsigned char *)tls_credentials->tls_cert_pem, tls_credentials->tls_cert_pem_len);
+    ret = mbedtls_x509_crt_parse(&tls_cert, (const unsigned char *)tls_creds->tls_cert_pem, tls_creds->tls_cert_pem_len);
     if (ret != 0) {
         return ret;
     }
-    ret = mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(tls_key), (const unsigned char *)tls_credentials->tls_key_pem, tls_credentials->tls_key_pem_len);
+    ret = mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(tls_key), (const unsigned char *)tls_creds->tls_key_pem, tls_creds->tls_key_pem_len);
     if (ret != 0) {
         return ret;
     }
@@ -147,15 +153,26 @@ static int request_is_complete(const char *request, size_t request_len, size_t *
 
 #ifdef ENABLE_EMULATION
 
-#ifndef _MSC_VER
+#ifdef _MSC_VER
+#include "compat/pthread_win32.h"
+typedef SOCKET socket_t;
+typedef int socklen_t;
+#define close closesocket
+#include <string.h>
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#else
+#include <strings.h>
+typedef int socket_t;
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif
 
-int tls_listener_sock = -1;
+socket_t tls_listener_sock = -1;
 
 int emulation_rest_tls_port(void) {
     const char *port_env = getenv("PICO_REST_TLS_PORT");
@@ -172,32 +189,49 @@ int emulation_rest_tls_port(void) {
 }
 
 int tls_send_cb(void *ctx, const unsigned char *buf, size_t len) {
-    const int fd = *(const int *)ctx;
-    ssize_t r = send(fd, buf, len, 0);
+    const socket_t fd = (socket_t)(*(const intptr_t *)ctx);
+    int r = send(fd, (const char *)buf, (int)len, 0);
     if (r >= 0) {
-        return (int)r;
+        return r;
     }
+#ifdef _MSC_VER
+    {
+        int e = WSAGetLastError();
+        if (e == WSAEWOULDBLOCK || e == WSAEINTR) {
+            return MBEDTLS_ERR_SSL_WANT_WRITE;
+        }
+    }
+#else
     if (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) {
         return MBEDTLS_ERR_SSL_WANT_WRITE;
     }
+#endif
     return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
 }
 
 int tls_recv_cb(void *ctx, unsigned char *buf, size_t len) {
-    const int fd = *(const int *)ctx;
-    ssize_t r = recv(fd, buf, len, 0);
+    const socket_t fd = (socket_t)(*(const intptr_t *)ctx);
+    int r = recv(fd, (char *)buf, (int)len, 0);
     if (r > 0) {
-        return (int)r;
+        return r;
     }
     if (r == 0) {
         return MBEDTLS_ERR_SSL_CONN_EOF;
     }
+#ifdef _MSC_VER
+    {
+        int e = WSAGetLastError();
+        if (e == WSAEWOULDBLOCK || e == WSAEINTR) {
+            return MBEDTLS_ERR_SSL_WANT_READ;
+        }
+    }
+#else
     if (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) {
         return MBEDTLS_ERR_SSL_WANT_READ;
     }
+#endif
     return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
 }
-#endif
 
 #else
 

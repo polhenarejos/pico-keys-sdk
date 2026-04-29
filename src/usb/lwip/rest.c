@@ -18,7 +18,14 @@
 #include "picokeys.h"
 #include "pico_time.h"
 #include "rest.h"
+#ifdef _WIN32
+#include <string.h>
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#define strdup _strdup
+#else
 #include <strings.h>
+#endif
 #include "random.h"
 #include "crypto_utils.h"
 #include "serial.h"
@@ -142,7 +149,7 @@ void rest_session_clear_all(void) {
     memset(rest_sessions, 0, sizeof(rest_sessions));
 }
 
-#ifdef DEBUG_APDU
+#if DEBUG_APDU
 void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len) {
     size_t i;
     if (buffer == NULL) {
@@ -291,13 +298,14 @@ bool rest_content_type_is_json(const char *content_type) {
     return strncasecmp(content_type, "application/json", 16) == 0;
 }
 
-__attribute__((weak)) const rest_route_t *rest_get_routes(size_t *count) {
+#ifndef _MSC_VER
+WEAK const rest_route_t *rest_get_routes(size_t *count) {
     if (count != NULL) {
         *count = 0;
     }
     return NULL;
 }
-
+#endif
 
 static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], const uint8_t *salt, size_t salt_len, const uint8_t *info, size_t info_len, uint8_t out_key[32]) {
     int ret = -1;

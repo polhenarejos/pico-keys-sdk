@@ -98,7 +98,7 @@ int select_app(const uint8_t *aid, size_t aid_len) {
 }
 
 
-__attribute__((weak)) int picokey_init(void) {
+WEAK int picokey_init(void) {
     return 0;
 }
 

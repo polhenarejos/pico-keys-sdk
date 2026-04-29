@@ -49,6 +49,19 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
     tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
     return 0;
 }
+int settimeofday(const struct timeval* tp, const struct timezone* tzp)
+{
+    (void)tzp;
+    SYSTEMTIME st;
+    FILETIME ft;
+    uint64_t time;
+
+    time = ((uint64_t)tp->tv_sec * 10000000L) + ((uint64_t)tp->tv_usec * 10) + ((uint64_t)116444736000000000ULL);
+    ft.dwLowDateTime = (uint32_t)(time & 0xFFFFFFFF);
+    ft.dwHighDateTime = (uint32_t)(time >> 32);
+    FileTimeToSystemTime(&ft, &st);
+    return SetSystemTime(&st);
+}
 #endif
 
 

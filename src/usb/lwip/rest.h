@@ -183,7 +183,7 @@ extern void rest_session_clear_all(void);
 extern int rest_session_derive_key(const rest_session_t *session, uint8_t sk[32]);
 extern int rest_session_derive_shared(const rest_session_t *session, uint8_t derived_key[32]);
 
-#ifdef DEBUG_APDU
+#if DEBUG_APDU
 extern void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len);
 #define REST_DEBUG_LOG(...) printf(__VA_ARGS__)
 #else

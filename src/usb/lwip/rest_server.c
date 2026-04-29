@@ -23,7 +23,19 @@
 #include "serial.h"
 
 #include <ctype.h>
+#ifdef _WIN32
+#include "compat/pthread_win32.h"
+typedef SOCKET socket_t;
+typedef int socklen_t;
+#define close closesocket
+#include <string.h>
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#else
 #include <strings.h>
+typedef int socket_t;
+#define INVALID_SOCKET (-1)
+#endif
 #include "mbedtls/md.h"
 #include "mbedtls/hkdf.h"
 #include "crypto_utils.h"
@@ -48,10 +60,9 @@
 #ifndef ENABLE_EMULATION
 static struct tcp_pcb *listener_pcb = NULL;
 #else
-static int listener_sock = -1;
-#ifndef _MSC_VER
+extern socket_t tls_listener_sock;
+static socket_t listener_sock = -1;
 static pthread_t rest_thread;
-#endif
 #endif
 static rest_conn_t conns[REST_MAX_CONNS];
 
@@ -196,7 +207,7 @@ void rest_task(void) {
 
 static rest_conn_t *alloc_conn(
 #ifdef ENABLE_EMULATION
-    int sock
+    socket_t sock
 #else
     struct tcp_pcb *pcb
 #endif
@@ -244,9 +255,10 @@ void rest_close_conn(rest_conn_t *conn) {
         mbedtls_ssl_free(&conn->ssl);
     }
     if (conn->sock >= 0) {
-#ifndef _MSC_VER
-        (void)close(conn->sock);
+#ifdef _MSC_VER
+        shutdown((SOCKET)conn->sock, 1);
 #endif
+        (void)close(conn->sock);
     }
     clear_conn(conn);
 #else
@@ -382,11 +394,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     }
 #ifdef ENABLE_EMULATION
     while (sent_total < (size_t)header_len) {
-#ifndef _MSC_VER
-        ssize_t n = send(conn->sock, headers_buf + sent_total, (size_t)header_len - sent_total, 0);
-#else
-        int n = -1;
-#endif
+        int n = send((socket_t)conn->sock, headers_buf + sent_total, (size_t)header_len - sent_total, 0);
         if (n <= 0) {
             rest_close_conn(conn);
             return;
@@ -395,11 +403,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     }
     sent_total = 0;
     while (sent_total < body_len) {
-#ifndef _MSC_VER
-        ssize_t n = send(conn->sock, body + sent_total, body_len - sent_total, 0);
-#else
-        int n = -1;
-#endif
+        int n = send((socket_t)conn->sock, body + sent_total, body_len - sent_total, 0);
         if (n <= 0) {
             rest_close_conn(conn);
             return;
@@ -833,7 +837,7 @@ void rest_check_and_load_credentials(void) {
             mbedtls_ecp_write_key_ext(&ecdsa, &olen, pkey, sizeof(pkey));
             mbedtls_ecdsa_free(&ecdsa);
         }
-        file_put_data(ef, pkey, olen);
+        file_put_data(ef, pkey, (uint16_t)olen);
         mbedtls_platform_zeroize(pkey, sizeof(pkey));
         printf("TLS key generated and stored, length: %u bytes\n", (unsigned)olen);
     }
@@ -883,7 +887,7 @@ void rest_check_and_load_credentials(void) {
 
         ret = mbedtls_x509write_crt_pem(&crt, cert_pem, sizeof(cert_pem), random_fill_iterator, NULL);
         if (ret == 0) {
-            file_put_data(ef, cert_pem, strlen((char *)cert_pem) + 1);
+            file_put_data(ef, cert_pem, (uint16_t)strlen((char *)cert_pem) + 1);
             printf("TLS certificate generated and stored, length: %u bytes\n", (unsigned)strlen((char *)cert_pem));
         }
 out:
@@ -1070,7 +1074,6 @@ err_t rest_server_init(rest_conn_type_t conn_type) {
 }
 #else
 static int emulation_rest_port(void) {
-#ifndef _MSC_VER
     const char *port_env = getenv("PICO_REST_PORT");
     long v;
     if (port_env == NULL || *port_env == '\0') {
@@ -1082,21 +1085,17 @@ static int emulation_rest_port(void) {
         return REST_PORT;
     }
     return (int)v;
-#else
-    return REST_PORT;
-#endif
 }
 
-#ifndef _MSC_VER
 static void *rest_emulation_thread(void *arg) {
     struct sockaddr_in peer;
-    int listen_fd = (int)(intptr_t)arg;
+    socket_t listen_fd = (socket_t)(uintptr_t)arg;
 
     while (true) {
         socklen_t peer_len = sizeof(peer);
-        int accepted = accept(listen_fd, (struct sockaddr *)&peer, &peer_len);
+        socket_t accepted = accept(listen_fd, (struct sockaddr *)&peer, &peer_len);
         rest_conn_t *conn;
-        if (accepted < 0) {
+        if (accepted == INVALID_SOCKET) {
             continue;
         }
         conn = alloc_conn(accepted);
@@ -1121,7 +1120,7 @@ static void *rest_emulation_thread(void *arg) {
                 }
             }
             else {
-                ssize_t n = recv(conn->sock, conn->request + conn->request_len, REST_MAX_REQUEST_SIZE - conn->request_len, 0);
+                int n = recv((socket_t)conn->sock, conn->request + conn->request_len, (int)(REST_MAX_REQUEST_SIZE - conn->request_len), 0);
                 if (n <= 0) {
                     rest_close_conn(conn);
                     break;
@@ -1137,61 +1136,70 @@ static void *rest_emulation_thread(void *arg) {
     }
     return NULL;
 }
+
+static err_t rest_server_init_conn(socket_t *list_sock, int port, rest_conn_type_t conn_type, const tls_credentials_t *tls_creds) {
+    struct sockaddr_in addr;
+#ifdef _MSC_VER
+    char one = 1;
+#else
+    int one = 1;
 #endif
 
-static err_t rest_server_init_conn(int *listener_sock, int port, rest_conn_type_t conn_type, const tls_credentials_t *tls_credentials) {
-#ifndef _MSC_VER
-    struct sockaddr_in addr;
-    int one = 1;
-
-    if (*listener_sock >= 0) {
+    if (*list_sock != INVALID_SOCKET) {
+        printf("Listener socket for port %d already initialized\n", port);
         return ERR_OK;
     }
     if (conn_type & REST_CONN_TLS) {
-        if (tls_credentials == NULL || tls_credentials->tls_key_pem == NULL || tls_credentials->tls_cert_pem == NULL) {
+        if (tls_creds == NULL || tls_creds->tls_key_pem == NULL || tls_creds->tls_cert_pem == NULL) {
             return ERR_VAL;
         }
-        if (tls_init_tls_context(tls_credentials) != 0) {
+        if (tls_init_tls_context(tls_creds) != 0) {
             return ERR_VAL;
         }
     }
-    *listener_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (*listener_sock < 0) {
+    *list_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (*list_sock == INVALID_SOCKET) {
+        printf("Failed to create listener socket for port %d\n", port);
         return -1;
     }
-    if (setsockopt(*listener_sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) != 0) {
-        (void)close(*listener_sock);
-        *listener_sock = -1;
+    if (setsockopt(*list_sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) != 0) {
+        printf("Failed to set SO_REUSEADDR on listener socket for port %d\n", port);
+        (void)close(*list_sock);
+        *list_sock = INVALID_SOCKET;
         return -1;
     }
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons((uint16_t)port);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(*listener_sock, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
-        (void)close(*listener_sock);
-        *listener_sock = -1;
+    if (bind(*list_sock, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+        printf("Failed bind %d\n", errno);
+        (void)close(*list_sock);
+        *list_sock = INVALID_SOCKET;
         return -1;
     }
-    if (listen(*listener_sock, REST_MAX_CONNS) != 0) {
-        (void)close(*listener_sock);
-        *listener_sock = -1;
+    if (listen(*list_sock, REST_MAX_CONNS) != 0) {
+        printf("Failed listen %d\n", errno);
+        (void)close(*list_sock);
+        *list_sock = INVALID_SOCKET;
         return -1;
     }
-    if (pthread_create(&rest_thread, NULL, rest_emulation_thread, (void *)(intptr_t)(*listener_sock)) != 0) {
-        (void)close(*listener_sock);
-        *listener_sock = -1;
+    if (pthread_create(&rest_thread, NULL, rest_emulation_thread, (void *)(uintptr_t)(*list_sock)) != 0) {
+        (void)close(*list_sock);
+        *list_sock = INVALID_SOCKET;
         return -1;
     }
     (void)pthread_detach(rest_thread);
     return ERR_OK;
-#else
-    return -1;
-#endif
 }
 
 err_t rest_server_init(rest_conn_type_t conn_type) {
-
+#ifdef _MSC_VER
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        printf("winsock initialization failure\n");
+    }
+#endif
     if (conn_type & REST_CONN_PLAIN) {
         if (rest_server_init_conn(&listener_sock, emulation_rest_port(), REST_CONN_PLAIN, NULL) != ERR_OK) {
             return -1;

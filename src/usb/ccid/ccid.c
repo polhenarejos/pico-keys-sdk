@@ -182,7 +182,7 @@ static int driver_write_ccid(uint8_t itf, const uint8_t *tx_buffer, uint16_t buf
     }
     uint32_t written = tud_vendor_n_write(itf, tx_buffer, buffer_size);
     if (written > 0) {
-        tud_vendor_n_flush(itf);
+        tud_vendor_n_write_flush(itf);
 
         ccid_tx[itf].r_ptr += (uint16_t)written;
         if (ccid_tx[itf].r_ptr >= ccid_tx[itf].w_ptr) {
@@ -365,12 +365,12 @@ void ccid_init(void) {
     ccid_init_buffers();
 }
 
-#ifndef ENABLE_EMULATION
-
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes) {
     (void) sent_bytes;
     tud_vendor_n_write_flush(itf);
 }
+
+#ifndef ENABLE_EMULATION
 
 static void ccid_init_cb(void) {
     vendord_init();

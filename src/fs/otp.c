@@ -25,7 +25,9 @@
 #endif
 #include "random.h"
 #include "mbedtls/ecdsa.h"
+#ifndef _MSC_VER
 #include <stdalign.h>
+#endif
 
 #ifdef PICO_RP2350
 

@@ -53,7 +53,7 @@ typedef enum {
 typedef struct {
     bool in_use;
 #ifdef ENABLE_EMULATION
-    int sock;
+    intptr_t sock;
 #else
     struct tcp_pcb *pcb;
 #endif

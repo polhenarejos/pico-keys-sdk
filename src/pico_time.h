@@ -25,7 +25,9 @@
 #include "compat/esp_compat.h"
 #include <time.h>
 #else
+#ifndef _MSC_VER
 #include <sys/time.h>
+#endif
 #include <time.h>
 #include "compat/board.h"
 #endif

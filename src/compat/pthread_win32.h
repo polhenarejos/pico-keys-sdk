@@ -21,6 +21,7 @@
 #define _PTHREAD_H_
 #include <windows.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef HANDLE pthread_t;
 typedef CRITICAL_SECTION pthread_mutex_t;
@@ -48,6 +49,11 @@ static inline int pthread_mutex_unlock(pthread_mutex_t *m) {
 
 static inline int pthread_mutex_destroy(pthread_mutex_t *m) {
     DeleteCriticalSection(m);
+    return 0;
+}
+
+static inline int pthread_detach(pthread_t t) {
+    CloseHandle(t);
     return 0;
 }
 

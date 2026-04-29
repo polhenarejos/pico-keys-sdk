@@ -52,7 +52,6 @@ extern int tls_init_tls_context(const tls_credentials_t *tls_credentials);
 
 #ifdef ENABLE_EMULATION
 extern int emulation_rest_tls_port(void);
-extern int tls_listener_sock;
 extern void tls_handle_client(int client_fd);
 #else
 extern struct tcp_pcb *tls_listener_pcb;

@@ -54,6 +54,12 @@
 #endif
 #endif
 
+#ifdef _MSC_VER
+#define WEAK
+#else
+#define WEAK __attribute__((weak))
+#endif
+
 extern int picokey_init(void);
 
 extern void low_flash_init_core1(void);
@@ -93,14 +99,14 @@ static inline uint32_t get_uint32_be(const uint8_t *b) {
 static inline uint32_t get_uint32_le(const uint8_t *b) {
     return make_uint32_le(b[0], b[1], b[2], b[3]);
 }
-static inline uint32_t put_uint32_be(uint32_t n, uint8_t *b) {
+static inline uint8_t put_uint32_be(uint32_t n, uint8_t *b) {
     *b++ = (n >> 24) & 0xff;
     *b++ = (n >> 16) & 0xff;
     *b++ = (n >> 8) & 0xff;
     *b = n & 0xff;
     return 4;
 }
-static inline uint32_t put_uint32_le(uint32_t n, uint8_t *b) {
+static inline uint8_t put_uint32_le(uint32_t n, uint8_t *b) {
     *b++ = n & 0xff;
     *b++ = (n >> 8) & 0xff;
     *b++ = (n >> 16) & 0xff;

@@ -14,7 +14,14 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-
+#ifdef _MSC_VER
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#endif
 #include "emulation.h"
 #include <stdio.h>
 #ifndef _MSC_VER
@@ -29,7 +36,6 @@ typedef int socket_t;
 #define INVALID_SOCKET (-1)
 #define SOCKET_ERROR (-1)
 #else
-#include <ws2tcpip.h>
 #define O_NONBLOCK _O_NONBLOCK
 #define close closesocket
 typedef SOCKET socket_t;
@@ -57,6 +63,16 @@ uint8_t emul_rx[USB_BUFFER_SIZE], emul_tx[USB_BUFFER_SIZE];
 uint16_t emul_rx_size = 0, emul_tx_size = 0;
 extern int cbor_parse(uint8_t cmd, const uint8_t *data, size_t len);
 pthread_t hcore0, hcore1;
+
+#ifdef _MSC_VER
+static void log_sock_error(const char *ctx) {
+    fprintf(stderr, "%s failed (WSAGetLastError=%d)\n", ctx, WSAGetLastError());
+}
+#else
+static void log_sock_error(const char *ctx) {
+    fprintf(stderr, "%s failed (errno=%d)\n", ctx, errno);
+}
+#endif
 
 #ifndef _MSC_VER
 static int msleep(long msec) {
@@ -89,7 +105,7 @@ int emul_init(const char *host, uint16_t port) {
     }
 #endif
     if ((ccid_sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-        perror("socket");
+        log_sock_error("socket(ccid)");
         return -1;
     }
 
@@ -99,13 +115,13 @@ int emul_init(const char *host, uint16_t port) {
     // Convert IPv4 and IPv6 addresses from text to binary
     // form
     if (inet_pton(AF_INET, host, &serv_addr.sin_addr) <= 0) {
-        perror("inet_pton");
+        log_sock_error("inet_pton(ccid)");
         close(ccid_sock);
         return -1;
     }
 
     if (connect(ccid_sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        perror("connect");
+        log_sock_error("connect(ccid)");
         close(ccid_sock);
         return -1;
     }
@@ -128,12 +144,12 @@ int emul_init(const char *host, uint16_t port) {
     struct sockaddr_in server_sockaddr;
 
     if ((hid_server_sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-        perror("socket");
+        log_sock_error("socket(hid_server)");
         return -1;
     }
 
     if (setsockopt(hid_server_sock, SOL_SOCKET, SO_REUSEADDR, (void *) &yes, sizeof yes) != 0) {
-        perror("setsockopt");
+        log_sock_error("setsockopt(SO_REUSEADDR)");
         close(hid_server_sock);
         return 1;
     }
@@ -153,16 +169,17 @@ int emul_init(const char *host, uint16_t port) {
 
     if (bind(hid_server_sock, (struct sockaddr *) &server_sockaddr,
              sizeof server_sockaddr) != 0) {
-        perror("bind");
+        log_sock_error("bind(hid_server)");
         close(hid_server_sock);
         return 1;
     }
 
-    if (listen(hid_server_sock, 0) != 0) {
-        perror("listen");
+    if (listen(hid_server_sock, SOMAXCONN) != 0) {
+        log_sock_error("listen(hid_server)");
         close(hid_server_sock);
         return 1;
     }
+    fprintf(stderr, "HID server listening on 0.0.0.0:%u\n", hid_port);
     return 0;
 }
 

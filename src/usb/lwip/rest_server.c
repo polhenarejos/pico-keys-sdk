@@ -731,17 +731,18 @@ void rest_handle_request(rest_conn_t *conn) {
     bool path_exists_for_other_method = false;
     int parsed;
 
-    if (rest_core1_job.pending) {
-        send_json_error(conn, 503, "busy");
-        return;
-    }
-
-    memset(&rest_core1_job, 0, sizeof(rest_core1_job));
+    memset(request, 0, sizeof(*request));
     parsed = parse_request(conn, request);
     if (parsed <= 0) {
         if (parsed < 0) {
             send_json_error(conn, 400, "bad_request");
         }
+        return;
+    }
+
+    if (rest_core1_job.pending
+        && !(request->method == REST_HTTP_POST && strcmp(request->path, "/device/jobs/cancel") == 0)) {
+        send_json_error(conn, 503, "busy");
         return;
     }
 
@@ -809,6 +810,27 @@ void rest_handle_request(rest_conn_t *conn) {
                 return;
             }
             request->session = session;
+        }
+        if (request->method == REST_HTTP_POST && strcmp(request->path, "/device/jobs/cancel") == 0) {
+            rest_response_t response = {0};
+            if (routes[i].handler(request, &response) != 0) {
+                send_json_error(conn, 500, "internal_error");
+                return;
+            }
+            uint16_t code = response.status_code == 0 ? 200 : response.status_code;
+            if (code == 204) {
+                send_response(conn, code, rest_status_text_from_code(code), "application/json", "", 0, response.headers);
+            }
+            else if (response.body != NULL && response.content_type != NULL) {
+                send_response(conn, code, rest_status_text_from_code(code), response.content_type, response.body, response.body_len, response.headers);
+            }
+            else {
+                send_json_error(conn, 500, "internal_error");
+            }
+            if (response.body != NULL) {
+                free(response.body);
+            }
+            return;
         }
         if (rest_start_core1_job(conn, routes[i].handler) != 0) {
             send_json_error(conn, 500, "internal_error");

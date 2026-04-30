@@ -22,7 +22,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-extern void random_init(void);
+typedef struct {
+    uint32_t index;
+    volatile bool cancel;
+} random_fill_iterator_ctx_t;
+
+extern void
+random_init(void);
 
 extern const uint8_t *random_bytes_get(size_t);
 extern int random_fill_iterator(void *arg, unsigned char *output, size_t output_len);

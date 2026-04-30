@@ -79,14 +79,19 @@ const uint8_t *random_bytes_get(size_t len) {
  * Random byte iterator
  */
 int random_fill_iterator(void *arg, unsigned char *out, size_t out_len) {
-    uint8_t *index_p = (uint8_t *) arg;
-    uint8_t index = index_p ? *index_p : 0;
+    random_fill_iterator_ctx_t *ctx = (random_fill_iterator_ctx_t *) arg;
+    uint32_t index = ctx ? ctx->index : 0;
     uint8_t n;
+    int ret = 0;
 
     if (random_mutex_initialized) {
         mutex_enter_blocking(&random_mutex);
     }
     while (out_len) {
+        if (ctx && ctx->cancel) {
+            ret = -1;
+            break;
+        }
         hwrng_wait_full();
 
         n = RANDOM_BYTES_LENGTH - index;
@@ -105,14 +110,14 @@ int random_fill_iterator(void *arg, unsigned char *out, size_t out_len) {
         }
     }
 
-    if (index_p) {
-        *index_p = index;
+    if (ctx) {
+        ctx->index = index;
     }
     if (random_mutex_initialized) {
         mutex_exit(&random_mutex);
     }
 
-    return 0;
+    return ret;
 }
 
 int random_fill_buffer(uint8_t *buf, size_t n) {

@@ -35,7 +35,7 @@ file_t *ef_phy = &sef_phy;
 #endif
 
 //puts FCI in the RAPDU
-void process_fci(const file_t *pe, int fmd) {
+void file_process_fci(const file_t *pe, int fmd) {
     res_APDU_size = 0;
     if (fmd) {
         res_APDU[res_APDU_size++] = 0x6f;
@@ -124,7 +124,7 @@ file_t *get_parent(file_t *f) {
     return &file_entries[f->parent];
 }
 
-file_t *search_by_name(uint8_t *name, uint16_t namelen) {
+file_t *file_search_by_name(uint8_t *name, uint16_t namelen) {
     for (file_t *p = file_entries; p != file_last; p++) {
         if (p->name && *p->name == apdu.nc && memcmp(p->name + 1, name, namelen) == 0) {
             return p;
@@ -192,7 +192,7 @@ static uint8_t make_path(const file_t *pe, const file_t *top, uint8_t *path) {
     return depth;
 }
 
-file_t *search_by_path(const uint8_t *pe_path, uint8_t pathlen, const file_t *parent) {
+file_t *file_search_by_path(const uint8_t *pe_path, uint8_t pathlen, const file_t *parent) {
     uint8_t path[MAX_DEPTH * 2];
     if (pathlen > sizeof(path)) {
         return NULL;
@@ -211,7 +211,7 @@ file_t *currentDF = NULL;
 const file_t *selected_applet = NULL;
 bool isUserAuthenticated = false;
 
-bool authenticate_action(const file_t *ef, uint8_t op) {
+bool file_authenticate_action(const file_t *ef, uint8_t op) {
     uint8_t acl = ef->acl[op];
     if (acl == 0x0) {
         return true;

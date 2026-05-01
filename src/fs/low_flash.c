@@ -98,7 +98,10 @@ bool flash_available = false;
 
 
 //this function has to be called from the core 0
-void low_flash_task(void) {
+void low_flash_task(void);
+void low_flash_commit(void);
+
+void low_flash_task(void){
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
         if (locked_out == true && flash_available == true && ready_pages > 0) {
             //printf(" DO_FLASH AVAILABLE\n");

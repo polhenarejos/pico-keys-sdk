@@ -21,6 +21,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct {
     uint32_t index;

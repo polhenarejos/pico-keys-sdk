@@ -102,6 +102,7 @@ WEAK int picokey_init(void) {
     return 0;
 }
 
+void execute_tasks(void);
 void execute_tasks(void) {
 #if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
     tud_task(); // tinyusb device task

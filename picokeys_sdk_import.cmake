@@ -289,9 +289,17 @@ list(APPEND INCLUDES
 set(SYSTEM_INCLUDES
     ${SYSTEM_INCLUDES}
     ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
-    ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src
-    ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson
 )
+if(USB_ITF_HID)
+    list(APPEND SYSTEM_INCLUDES
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src
+    )
+endif()
+if(USB_ITF_LWIP)
+    list(APPEND SYSTEM_INCLUDES
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson
+    )
+endif()
 
 if(USB_ITF_LWIP)
     if (NOT ESP_PLATFORM)

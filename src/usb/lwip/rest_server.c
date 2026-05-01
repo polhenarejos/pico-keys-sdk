@@ -740,8 +740,7 @@ void rest_handle_request(rest_conn_t *conn) {
         return;
     }
 
-    if (rest_core1_job.pending
-        && !(request->method == REST_HTTP_POST && strcmp(request->path, "/device/jobs/cancel") == 0)) {
+    if (rest_core1_job.pending && !(request->method == REST_HTTP_POST && strcmp(request->path, "/device/jobs/cancel") == 0)) {
         send_json_error(conn, 503, "busy");
         return;
     }
@@ -883,7 +882,7 @@ void rest_check_and_load_credentials(void) {
         if (ret != 0) goto out;
         mbedtls_ecp_read_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(key), file, file_len);
         mbedtls_ecp_check_privkey(&mbedtls_pk_ec(key)->grp, &mbedtls_pk_ec(key)->d);
-        mbedtls_ecp_keypair_calc_public(&mbedtls_pk_ec(key), random_fill_iterator, NULL);
+        mbedtls_ecp_keypair_calc_public(mbedtls_pk_ec(key), random_fill_iterator, NULL);
         mbedtls_ecp_check_pubkey(&mbedtls_pk_ec(key)->grp, &mbedtls_pk_ec(key)->Q);
 
         mbedtls_x509write_crt_set_md_alg(&crt, MBEDTLS_MD_SHA256);

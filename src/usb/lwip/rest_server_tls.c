@@ -66,7 +66,7 @@ int tls_init_tls_context(const tls_credentials_t *tls_creds) {
         return ret;
     }
     mbedtls_ecp_check_privkey(&mbedtls_pk_ec(tls_key)->grp, &mbedtls_pk_ec(tls_key)->d);
-    mbedtls_ecp_keypair_calc_public(&mbedtls_pk_ec(tls_key), random_fill_iterator, NULL);
+    mbedtls_ecp_keypair_calc_public(mbedtls_pk_ec(tls_key), random_fill_iterator, NULL);
     mbedtls_ecp_check_pubkey(&mbedtls_pk_ec(tls_key)->grp, &mbedtls_pk_ec(tls_key)->Q);
     ret = mbedtls_ssl_config_defaults(&tls_conf, MBEDTLS_SSL_IS_SERVER, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
     if (ret != 0) {

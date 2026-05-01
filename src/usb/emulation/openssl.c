@@ -1888,9 +1888,7 @@ int openssl_mbedtls_ecp_gen_key(mbedtls_ecp_group_id grp_id,
     if (rc != 0) {
         goto out;
     }
-    rc = mbedtls_ecp_mul(&key->MBEDTLS_PRIVATE(grp), &key->MBEDTLS_PRIVATE(Q),
-                         &key->MBEDTLS_PRIVATE(d), &key->MBEDTLS_PRIVATE(grp).G,
-                         f_rng, p_rng);
+    rc = mbedtls_ecp_keypair_calc_public(key, f_rng, p_rng);
 out:
     BN_free(bn_d);
     EVP_PKEY_free(pkey);

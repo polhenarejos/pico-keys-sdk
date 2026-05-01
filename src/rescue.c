@@ -197,7 +197,7 @@ static int cmd_keydev_sign(void) {
                 return SW_EXEC_ERROR();
             }
         }
-        int ret = mbedtls_ecp_mul(&ecp.MBEDTLS_PRIVATE(grp), &ecp.MBEDTLS_PRIVATE(Q), &ecp.MBEDTLS_PRIVATE(d), &ecp.MBEDTLS_PRIVATE(grp).G, random_fill_iterator, NULL);
+        int ret = mbedtls_ecp_keypair_calc_public(&ecp, random_fill_iterator, NULL);
         if (ret != 0) {
             mbedtls_ecp_keypair_free(&ecp);
             return SW_EXEC_ERROR();

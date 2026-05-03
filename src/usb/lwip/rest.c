@@ -207,7 +207,8 @@ int rest_execute_route_handler(const rest_request_t *request, rest_route_handler
         response->json = NULL;
         return -1;
     }
-    if (response->status_code == 0 || response->status_code == 200 || response->status_code == 201 || response->status_code == 204) {
+    bool is_json_response = (response->content_type != NULL && strcmp(response->content_type, "application/json") == 0);
+    if (is_json_response && (response->status_code == 0 || response->status_code == 200 || response->status_code == 201 || response->status_code == 204)) {
         char *body = cJSON_PrintUnformatted(response->json);
         cJSON_Delete(response->json);
         response->json = NULL;
@@ -222,6 +223,7 @@ int rest_execute_route_handler(const rest_request_t *request, rest_route_handler
             }
         }
         response->body = body;
+        response->body_len = 0;
     }
     if (response->json != NULL) {
         cJSON_Delete(response->json);

@@ -754,8 +754,8 @@ void rest_handle_request(rest_conn_t *conn) {
     rest_debug_dump_payload("request-body", request->body, request->body_len);
 
     if (request->method == REST_HTTP_POST || request->method == REST_HTTP_PUT) {
-        if (!rest_content_type_is_json(request->content_type) && strncasecmp(request->content_type, "application/x-pem-file", 22) != 0) {
-            send_json_error(conn, 415, "content_type_must_be_application_json");
+        if (!rest_supported_content_type(request->content_type)) {
+            send_json_error(conn, 415, "content_type_not_supported");
             return;
         }
     }

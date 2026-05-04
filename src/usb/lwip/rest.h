@@ -167,7 +167,7 @@ extern int rest_execute_route_handler(const rest_request_t *request, rest_route_
 extern int rest_response_set_error(rest_response_t *response, int status_code, const char *message);
 const char *rest_status_text_from_code(uint16_t code);
 const char *rest_method_to_string(rest_http_method_t method);
-bool rest_content_type_is_json(const char *content_type);
+bool rest_supported_content_type(const char *content_type);
 
 const rest_route_t *rest_get_routes(size_t *count);
 

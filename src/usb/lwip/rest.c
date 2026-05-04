@@ -293,11 +293,21 @@ const char *rest_method_to_string(rest_http_method_t method) {
     }
 }
 
-bool rest_content_type_is_json(const char *content_type) {
+bool rest_supported_content_type(const char *content_type) {
     if (content_type == NULL) {
         return false;
     }
-    return strncasecmp(content_type, "application/json", 16) == 0;
+    const char *supported_types[] = {
+        "application/json",
+        "application/x-pem-file"
+    };
+    printf("[rest] Checking content type: %s\n", content_type);
+    for (size_t i = 0; i < sizeof(supported_types) / sizeof(supported_types[0]); i++) {
+        if (strncasecmp(content_type, supported_types[i], strlen(supported_types[i])) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 #ifndef _MSC_VER

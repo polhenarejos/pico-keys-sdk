@@ -313,6 +313,9 @@ int base64url_encode(unsigned char *dst, size_t dlen, size_t *olen, const unsign
             dst[i] = '_';
         }
     }
+    if (*olen == 0) {
+        return 0;
+    }
     uint8_t *p = dst + *olen - 1;
     while (*p == '=') {
         *p-- = '\0';

@@ -46,7 +46,6 @@ typedef enum {
 
 #define PIN_KDF_DEFAULT_VERSION PIN_KDF_V2
 
-extern int ct_memcmp(const void *a, const void *b, size_t n);
 // Newer and safe functions
 extern void derive_kbase(uint8_t kbase[32]);
 extern void derive_kver(const uint8_t *pin, size_t pin_len, uint8_t kver[32]);
@@ -68,6 +67,7 @@ extern mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t
 extern uint32_t crc32c(const uint8_t *buf, size_t len);
 extern int base64url_encode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen);
 extern int base64url_decode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen);
+extern int b64url_decoded_len(size_t n, size_t *out_len);
 
 #define PIN_KDF_SIZE(x)  (12 + (x) + 16)
 

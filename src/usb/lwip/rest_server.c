@@ -21,6 +21,7 @@
 #include "usb.h"
 #include "pico_time.h"
 #include "serial.h"
+#include "mbedtls/constant_time.h"
 
 #include <ctype.h>
 #ifdef _WIN32
@@ -718,7 +719,7 @@ static int rest_verify_request_signature(const rest_request_t *request, const re
         return PICOKEYS_EXEC_ERROR;
     }
     mbedtls_md_free(&ctx);
-    if (ct_memcmp(hmac, hmac_x, sizeof(hmac)) != 0) {
+    if (mbedtls_ct_memcmp(hmac, hmac_x, sizeof(hmac)) != 0) {
         return PICOKEYS_EXEC_ERROR;
     }
     return PICOKEYS_OK;

@@ -27,16 +27,6 @@
 #include "otp.h"
 #include "random.h"
 
-int ct_memcmp(const void *a, const void *b, size_t n) {
-    const volatile uint8_t *x = (const volatile uint8_t *)a;
-    const volatile uint8_t *y = (const volatile uint8_t *)b;
-    uint8_t r = 0;
-    for (size_t i = 0; i < n; ++i) {
-        r |= x[i] ^ y[i];
-    }
-    return r;
-}
-
 static const mbedtls_md_info_t *SHA256(void) {
     return mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
 }
@@ -333,7 +323,9 @@ int base64url_encode(unsigned char *dst, size_t dlen, size_t *olen, const unsign
 
 int base64url_decode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen) {
     // First convert from base64url to standard base64
-    unsigned char *b64_src = (unsigned char *)malloc(slen + 2); // +2 for padding if needed
+    if ((slen % 4) == 1) return MBEDTLS_ERR_BASE64_INVALID_CHARACTER;
+    size_t padding = (4 - (slen % 4)) % 4;
+    unsigned char *b64_src = malloc(slen + padding);
     if (b64_src == NULL) {
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
@@ -348,7 +340,6 @@ int base64url_decode(unsigned char *dst, size_t dlen, size_t *olen, const unsign
             b64_src[i] = src[i];
         }
     }
-    size_t padding = (4 - (slen % 4)) % 4;
     for (size_t i = 0; i < padding; i++) {
         b64_src[slen + i] = '=';
     }
@@ -357,4 +348,19 @@ int base64url_decode(unsigned char *dst, size_t dlen, size_t *olen, const unsign
     int rc = mbedtls_base64_decode(dst, dlen, olen, b64_src, b64_len);
     free(b64_src);
     return rc;
+}
+
+int b64url_decoded_len(size_t n, size_t *out_len) {
+    if (out_len == NULL) return -1;
+    if ((n % 4) == 1) return -2; // longitud base64url invàlida
+
+    size_t pad = (4 - (n % 4)) % 4;   // 0,1,2
+    size_t total = n + pad;
+    size_t out = (total / 4) * 3;
+
+    if (pad == 1) out -= 1;
+    else if (pad == 2) out -= 2;
+
+    *out_len = out;
+    return 0;
 }

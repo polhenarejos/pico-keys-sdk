@@ -59,6 +59,9 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #include "rest_server.h"
 #include "tusb.h"
 
+void service_traffic(void);
+int lwip_itf_init(void);
+
 #define INIT_IP4(a, b, c, d) \
   { PP_HTONL(LWIP_MAKEU32(a, b, c, d)) }
 
@@ -98,7 +101,7 @@ static const dhcp_config_t dhcp_config = {
 };
 
 /* handle any DNS requests from dns-server */
-bool dns_query_proc(const char *name, ip4_addr_t *addr) {
+static bool dns_query_proc(const char *name, ip4_addr_t *addr) {
   if (0 == strcmp(name, "tiny.usb")) {
     *addr = ipaddr;
     return true;

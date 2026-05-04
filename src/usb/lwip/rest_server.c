@@ -845,7 +845,7 @@ void rest_handle_request(rest_conn_t *conn) {
     }
 }
 
-void rest_check_and_load_credentials(void) {
+static void rest_check_and_load_credentials(void) {
     file_t *ef = file_new(EF_TLS_KEY);
     if (!file_has_data(ef)) {
         mbedtls_ecdsa_context ecdsa;
@@ -1045,34 +1045,34 @@ static err_t rest_accept(void *arg, struct tcp_pcb *newpcb, err_t err) {
     return ERR_OK;
 }
 
-static err_t rest_server_init_conn(struct tcp_pcb **listener_pcb, uint16_t port, rest_conn_type_t conn_type, const tls_credentials_t *tls_credentials) {
-    if (*listener_pcb != NULL) {
+static err_t rest_server_init_conn(struct tcp_pcb **list_pcb, uint16_t port, rest_conn_type_t conn_type, const tls_credentials_t *tls_creds) {
+    if (*list_pcb != NULL) {
         return ERR_OK;
     }
     if (conn_type & REST_CONN_TLS) {
-        if (tls_credentials == NULL || tls_credentials->tls_key_pem == NULL || tls_credentials->tls_cert_pem == NULL) {
+        if (tls_creds == NULL || tls_creds->tls_key_pem == NULL || tls_creds->tls_cert_pem == NULL) {
             return ERR_VAL;
         }
-        if (tls_init_tls_context(tls_credentials) != 0) {
+        if (tls_init_tls_context(tls_creds) != 0) {
             return ERR_VAL;
         }
     }
 
-    *listener_pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
-    if (*listener_pcb == NULL) {
+    *list_pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
+    if (*list_pcb == NULL) {
         return ERR_MEM;
     }
-    err_t err = tcp_bind(*listener_pcb, IP_ANY_TYPE, port);
+    err_t err = tcp_bind(*list_pcb, IP_ANY_TYPE, port);
     if (err != ERR_OK) {
-        tcp_abort(*listener_pcb);
-        *listener_pcb = NULL;
+        tcp_abort(*list_pcb);
+        *list_pcb = NULL;
         return err;
     }
-    *listener_pcb = tcp_listen_with_backlog(*listener_pcb, REST_MAX_CONNS);
-    if (*listener_pcb == NULL) {
+    *list_pcb = tcp_listen_with_backlog(*list_pcb, REST_MAX_CONNS);
+    if (*list_pcb == NULL) {
         return ERR_MEM;
     }
-    tcp_accept(*listener_pcb, rest_accept);
+    tcp_accept(*list_pcb, rest_accept);
     return ERR_OK;
 }
 

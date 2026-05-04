@@ -191,7 +191,7 @@ int rest_execute_route_handler(const rest_request_t *request, rest_route_handler
     memset(response, 0, sizeof(*response));
     response->status_code = 200;
     response->content_type = "application/json";
-    response->body = "{\"ok\":true}";
+    response->body = (char *)"{\"ok\":true}";
     response->json = cJSON_CreateObject();
     if (response->json == NULL) {
         return -1;
@@ -288,6 +288,18 @@ const char *rest_method_to_string(rest_http_method_t method) {
             return "PUT";
         case REST_HTTP_DELETE:
             return "DELETE";
+        case REST_HTTP_UNKNOWN:
+        case REST_HTTP_GET_POST:
+        case REST_HTTP_GET_PUT:
+        case REST_HTTP_GET_DELETE:
+        case REST_HTTP_POST_PUT:
+        case REST_HTTP_POST_DELETE:
+        case REST_HTTP_PUT_DELETE:
+        case REST_HTTP_GET_POST_PUT:
+        case REST_HTTP_GET_POST_DELETE:
+        case REST_HTTP_GET_PUT_DELETE:
+        case REST_HTTP_POST_PUT_DELETE:
+        case REST_HTTP_GET_POST_PUT_DELETE:
         default:
             return "UNKNOWN";
     }

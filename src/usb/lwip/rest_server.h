@@ -72,7 +72,7 @@ typedef struct {
 } rest_conn_t;
 
 err_t rest_server_init(rest_conn_type_t conn_type);
-int lwip_itf_init(void);
+void rest_handle_request(rest_conn_t *conn);
 
 extern int rest_server_error(rest_response_t *response, int status_code, const char *message);
 

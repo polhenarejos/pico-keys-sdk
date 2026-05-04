@@ -405,7 +405,7 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
         }
         else if (index == 5) {
 #ifdef USB_ITF_LWIP
-            unsigned int chr_count = 0;
+            chr_count = 0;
             for (unsigned i = 0; i < sizeof(tud_network_mac_address); i++) {
                 _desc_str[1 + chr_count++] = "0123456789ABCDEF"[(tud_network_mac_address[i] >> 4) & 0xf];
                 _desc_str[1 + chr_count++] = "0123456789ABCDEF"[(tud_network_mac_address[i] >> 0) & 0xf];

@@ -27,7 +27,6 @@
 #endif
 
 extern void rest_close_conn(rest_conn_t *conn);
-extern void rest_handle_request(rest_conn_t *conn);
 
 static const int tls_ciphersuites[] = {
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,

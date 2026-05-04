@@ -64,8 +64,11 @@ int settimeofday(const struct timeval* tp, const struct timezone* tzp)
 }
 #endif
 
-
+#ifdef ENABLE_EMULATION
+bool set_rtc = true;
+#else
 bool set_rtc = false;
+#endif
 
 bool has_set_rtc(void) {
     return set_rtc;

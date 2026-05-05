@@ -313,7 +313,6 @@ bool rest_supported_content_type(const char *content_type) {
         "application/json",
         "application/x-pem-file"
     };
-    printf("[rest] Checking content type: %s\n", content_type);
     for (size_t i = 0; i < sizeof(supported_types) / sizeof(supported_types[0]); i++) {
         if (strncasecmp(content_type, supported_types[i], strlen(supported_types[i])) == 0) {
             return true;

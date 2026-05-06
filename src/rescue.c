@@ -338,23 +338,18 @@ static int cmd_read(void) {
         }
         res_APDU_size = 0;
         time_t tv_sec = get_rtc_time();
-#ifdef PICO_PLATFORM
-        struct timespec tv = {.tv_sec = tv_sec, .tv_nsec = 0};
-#else
-        struct timeval tv = {.tv_sec = tv_sec, .tv_usec = 0};
-#endif
         if (p2 == 0x1) {
-            struct tm *tm = localtime(&tv.tv_sec);
-            res_APDU_size += put_uint16_be(tm->tm_year + 1900, res_APDU);
-            res_APDU[res_APDU_size++] = tm->tm_mon;
-            res_APDU[res_APDU_size++] = tm->tm_mday;
-            res_APDU[res_APDU_size++] = tm->tm_wday;
-            res_APDU[res_APDU_size++] = tm->tm_hour;
-            res_APDU[res_APDU_size++] = tm->tm_min;
-            res_APDU[res_APDU_size++] = tm->tm_sec;
+            struct tm *tm = localtime(&tv_sec);
+            res_APDU_size += put_uint16_be((uint16_t)(tm->tm_year + 1900), res_APDU);
+            res_APDU[res_APDU_size++] = (uint8_t)tm->tm_mon;
+            res_APDU[res_APDU_size++] = (uint8_t)tm->tm_mday;
+            res_APDU[res_APDU_size++] = (uint8_t)tm->tm_wday;
+            res_APDU[res_APDU_size++] = (uint8_t)tm->tm_hour;
+            res_APDU[res_APDU_size++] = (uint8_t)tm->tm_min;
+            res_APDU[res_APDU_size++] = (uint8_t)tm->tm_sec;
         }
         else if (p2 == 0x2) {
-            res_APDU_size += put_uint32_be((uint32_t)tv.tv_sec, res_APDU);
+            res_APDU_size += put_uint32_be((uint32_t)tv_sec, res_APDU);
         }
     }
     return SW_OK();

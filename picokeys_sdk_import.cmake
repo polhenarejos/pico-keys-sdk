@@ -426,36 +426,44 @@ function(picokeys_apply_strict_flags)
         return()
     endif()
 
-    set(PICOKEYS_STRICT_FLAGS
-        -Wextra
-        -pipe
-        -funsigned-char
-        -fstrict-aliasing
-        -Wchar-subscripts
-        -Wundef
-        -Wshadow
-        -Wcast-align
-        -Wwrite-strings
-        -Wunused
-        -Wuninitialized
-        -Wpointer-arith
-        -Wredundant-decls
-        -Winline
-        -Wformat
-        -Wformat-security
-        -Wswitch-enum
-        -Winit-self
-        -Wmissing-include-dirs
-        -Wempty-body
-        -fdiagnostics-color=auto
-        -Wmissing-prototypes
-        -Wstrict-prototypes
-        -Wold-style-definition
-        -Wbad-function-cast
-        -Wnested-externs
-        -Wmissing-declarations
-        -Werror
-    )
+    if (MSVC)
+        set(PICOKEYS_STRICT_FLAGS
+            -Wall
+            -Zc:strictStrings
+            -WX
+        )
+    else ()
+        set(PICOKEYS_STRICT_FLAGS
+            -pipe
+            -funsigned-char
+            -fstrict-aliasing
+            -fdiagnostics-color=auto
+            -Wextra
+            -Wchar-subscripts
+            -Wundef
+            -Wshadow
+            -Wcast-align
+            -Wwrite-strings
+            -Wunused
+            -Wuninitialized
+            -Wpointer-arith
+            -Wredundant-decls
+            -Winline
+            -Wformat
+            -Wformat-security
+            -Wswitch-enum
+            -Winit-self
+            -Wmissing-include-dirs
+            -Wempty-body
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+            -Wold-style-definition
+            -Wbad-function-cast
+            -Wnested-externs
+            -Wmissing-declarations
+            -Werror
+        )
+    endif()
 
     foreach(src IN LISTS PKAS_SOURCES)
         if(PKAS_FILTER_REGEX)

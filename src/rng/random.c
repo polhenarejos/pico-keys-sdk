@@ -80,7 +80,7 @@ const uint8_t *random_bytes_get(size_t len) {
  */
 int random_fill_iterator(void *arg, unsigned char *out, size_t out_len) {
     random_fill_iterator_ctx_t *ctx = (random_fill_iterator_ctx_t *) arg;
-    uint32_t index = ctx ? ctx->index : 0;
+    uint8_t index = ctx ? ctx->index : 0;
     uint8_t n;
     int ret = 0;
 

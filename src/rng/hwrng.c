@@ -32,7 +32,7 @@
 
 static void hwrng_start(void) {
 #if defined(ENABLE_EMULATION)
-    srand(time(0));
+    srand((unsigned int)time(NULL));
 #elif defined(ESP_PLATFORM)
     bootloader_random_enable();
 #endif
@@ -188,8 +188,7 @@ uint32_t hwrng_get(void) {
 
     while (true) {
         hwrng_lock();
-        bool empty = rb->empty;
-        if (!empty) {
+        if (!rb->empty) {
             v = hwrng_buf_del(rb);
             hwrng_unlock();
             break;
@@ -210,9 +209,8 @@ void hwrng_wait_full(void) {
 #endif
     while (true) {
         hwrng_lock();
-        bool full = rb->full;
         hwrng_unlock();
-        if (full) {
+        if (rb->full) {
             break;
         }
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)

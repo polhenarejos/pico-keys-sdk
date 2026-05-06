@@ -62,7 +62,7 @@ typedef int socket_t;
 static struct tcp_pcb *listener_pcb = NULL;
 #else
 extern socket_t tls_listener_sock;
-static socket_t listener_sock = -1;
+static socket_t listener_sock = INVALID_SOCKET;
 static pthread_t rest_thread;
 #endif
 static rest_conn_t conns[REST_MAX_CONNS];
@@ -162,7 +162,7 @@ static void send_json_error(rest_conn_t *conn, int status_code, const char *erro
         rest_close_conn(conn);
         return;
     }
-    send_json(conn, status_code, rest_status_text_from_code(status_code), json);
+    send_json(conn, status_code, rest_status_text_from_code((uint16_t)status_code), json);
 }
 
 void rest_task(void) {
@@ -395,7 +395,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     }
 #ifdef ENABLE_EMULATION
     while (sent_total < (size_t)header_len) {
-        int n = send((socket_t)conn->sock, headers_buf + sent_total, (size_t)header_len - sent_total, 0);
+        int n = send((socket_t)conn->sock, headers_buf + sent_total, (int)((size_t)header_len - sent_total), 0);
         if (n <= 0) {
             rest_close_conn(conn);
             return;
@@ -404,7 +404,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     }
     sent_total = 0;
     while (sent_total < body_len) {
-        int n = send((socket_t)conn->sock, body + sent_total, body_len - sent_total, 0);
+        int n = send((socket_t)conn->sock, body + sent_total, (int)(body_len - sent_total), 0);
         if (n <= 0) {
             rest_close_conn(conn);
             return;
@@ -610,7 +610,7 @@ static int parse_request(rest_conn_t *conn, rest_request_t *request) {
     }
 
     headers_size = conn->request_headers_size;
-    content_length = conn->request_content_length;
+    content_length = (unsigned long)conn->request_content_length;
     header_end = conn->request + headers_size - 4;
 
     line_end = strstr(conn->request, "\r\n");

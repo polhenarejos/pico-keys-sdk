@@ -163,6 +163,7 @@ typedef int socklen_t;
 #else
 #include <strings.h>
 typedef int socket_t;
+#define INVALID_SOCKET (-1)
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -171,7 +172,7 @@ typedef int socket_t;
 #include <unistd.h>
 #endif
 
-socket_t tls_listener_sock = -1;
+socket_t tls_listener_sock = INVALID_SOCKET;
 
 int emulation_rest_tls_port(void) {
     const char *port_env = getenv("PICO_REST_TLS_PORT");

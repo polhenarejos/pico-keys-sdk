@@ -345,7 +345,7 @@ void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t of
 }
 
 void ccid_task(void) {
-    for (int itf = 0; itf < ITF_SC_TOTAL; itf++) {
+    for (uint8_t itf = 0; itf < ITF_SC_TOTAL; itf++) {
         int status = card_status(sc_itf_to_usb_itf(itf));
         if (status == PICOKEYS_OK) {
             driver_exec_finished_ccid(itf, finished_data_size);

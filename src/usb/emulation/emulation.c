@@ -336,7 +336,7 @@ uint16_t emul_read(uint8_t itf) {
                     }
 #endif
                     else {
-                        emul_rx_size += valread;
+                        emul_rx_size += (uint16_t)valread;
                     }
                     return (uint16_t)emul_rx_size;
                 }

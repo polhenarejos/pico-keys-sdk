@@ -32,6 +32,7 @@
 #include "compat/board.h"
 #endif
 
+extern struct tm *gmtime_utc(const time_t *timep, struct tm *result);
 extern bool has_set_rtc(void);
 extern time_t get_rtc_time(void);
 extern void set_rtc_time(time_t tv_sec);

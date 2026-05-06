@@ -24,7 +24,7 @@
 #include <stdbool.h>
 
 typedef struct {
-    uint32_t index;
+    uint8_t index;
     volatile bool cancel;
 } random_fill_iterator_ctx_t;
 

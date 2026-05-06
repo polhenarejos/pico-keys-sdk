@@ -64,6 +64,19 @@ int settimeofday(const struct timeval* tp, const struct timezone* tzp)
 }
 #endif
 
+struct tm *gmtime_utc(const time_t *timep, struct tm *result) {
+#ifdef _WIN32
+    struct tm *tmp = gmtime(timep);
+    if (tmp == NULL) {
+        return NULL;
+    }
+    *result = *tmp;
+    return result;
+#else
+    return gmtime_r(timep, result);
+#endif
+}
+
 #ifdef ENABLE_EMULATION
 bool set_rtc = true;
 #else
@@ -79,7 +92,7 @@ void set_rtc_time(time_t t) {
     struct timespec tv = {.tv_sec = t, .tv_nsec = 0};
     aon_timer_set_time(&tv);
 #else
-    struct timeval tv = {.tv_sec = t, .tv_usec = 0};
+    struct timeval tv = {.tv_sec = (long)t, .tv_usec = 0};
     settimeofday(&tv, NULL);
 #endif
     set_rtc = true;

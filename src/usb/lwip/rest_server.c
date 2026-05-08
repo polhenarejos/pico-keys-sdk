@@ -801,7 +801,8 @@ void rest_handle_request(rest_conn_t *conn) {
                 send_json_error(conn, 401, "session_expired");
                 return;
             }
-            if (rest_request_get_seq(request) < session->last_seq) {
+            uint32_t req_seq = rest_request_get_seq(request);
+            if (req_seq <= session->last_seq) {
                 send_json_error(conn, 401, "invalid_seq");
                 return;
             }
@@ -809,6 +810,8 @@ void rest_handle_request(rest_conn_t *conn) {
                 send_json_error(conn, 401, "invalid_signature");
                 return;
             }
+            session->last_activity_timestamp = board_millis();
+            session->last_seq = req_seq;
             request->session = session;
         }
         if (request->method == REST_HTTP_POST && strcmp(request->path, "/device/jobs/cancel") == 0) {

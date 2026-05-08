@@ -95,6 +95,7 @@ int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
         pin_derive_kenc(key, kenc);
     }
     else {
+        mbedtls_gcm_free(&gcm);
         return PICOKEYS_WRONG_DATA;
     }
     int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
@@ -127,6 +128,7 @@ int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
         pin_derive_kenc(key, kenc);
     }
     else {
+        mbedtls_gcm_free(&gcm);
         return PICOKEYS_WRONG_DATA;
     }
     int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
@@ -196,12 +198,20 @@ int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     }
     int r = mbedtls_aes_setkey_enc(&aes, key, key_size);
     if (r != 0) {
+        mbedtls_aes_free(&aes);
+        mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
         return PICOKEYS_EXEC_ERROR;
     }
+    int rc = 0;
     if (mode == PICOKEYS_AES_MODE_CBC) {
-        return mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, len, tmp_iv, data, data);
+        rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, len, tmp_iv, data, data);
     }
-    return mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, len, &iv_offset, tmp_iv, data, data);
+    else {
+        rc = mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, len, &iv_offset, tmp_iv, data, data);
+    }
+    mbedtls_aes_free(&aes);
+    mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
+    return rc;
 }
 
 int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mode, uint8_t *data, uint16_t len) {
@@ -215,13 +225,26 @@ int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     }
     int r = mbedtls_aes_setkey_dec(&aes, key, key_size);
     if (r != 0) {
+        mbedtls_aes_free(&aes);
+        mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
         return PICOKEYS_EXEC_ERROR;
     }
+    int rc = 0;
     if (mode == PICOKEYS_AES_MODE_CBC) {
-        return mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, len, tmp_iv, data, data);
+        rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, len, tmp_iv, data, data);
     }
-    r = mbedtls_aes_setkey_enc(&aes, key, key_size); //CFB requires set_enc instead set_dec
-    return mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_DECRYPT, len, &iv_offset, tmp_iv, data, data);
+    else {
+        r = mbedtls_aes_setkey_enc(&aes, key, key_size); //CFB requires set_enc instead set_dec
+        if (r != 0) {
+            mbedtls_aes_free(&aes);
+            mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
+            return PICOKEYS_EXEC_ERROR;
+        }
+        rc = mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_DECRYPT, len, &iv_offset, tmp_iv, data, data);
+    }
+    mbedtls_aes_free(&aes);
+    mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
+    return rc;
 }
 
 int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len) {

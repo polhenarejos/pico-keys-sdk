@@ -475,6 +475,7 @@ static void otp_invalidate_key(uint16_t row, uint16_t len) {
         if (inval) {
             memset(inval, 0xFF, len * 2);
             otp_write_data_raw(row, inval, len * 2);
+            mbedtls_platform_zeroize(inval, len * 2);
             free(inval);
         }
     }
@@ -489,6 +490,7 @@ static otp_ret_t otp_chaff(uint16_t row, uint16_t len) {
             chaff[i] ^= 0xFF;
         }
         otp_ret_t ret = otp_write_data_raw(row + 32, chaff, len * 2);
+        mbedtls_platform_zeroize(chaff, len * 2);
         free(chaff);
         return ret;
     }
@@ -506,6 +508,7 @@ static otp_ret_t otp_migrate_key(uint16_t new_row, uint16_t old_row, uint16_t le
                 otp_chaff(new_row, len);
                 otp_invalidate_key(old_row, 32);
             }
+            mbedtls_platform_zeroize(new_key, len);
             free(new_key);
             return ret;
         }
@@ -539,6 +542,7 @@ void otp_init_files(void) {
 #ifdef PICO_RP2350
         otp_chaff(OTP_KEY_1, 32);
 #endif
+        mbedtls_platform_zeroize(mkek, sizeof(mkek));
         write_otp[0] = OTP_KEY_1;
     }
     OTP_READ(OTP_KEY_1, otp_key_1);

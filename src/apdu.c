@@ -45,6 +45,9 @@ int process_apdu(void) {
         }
         chain_used = (size_t)(chain_ptr - chain_buf);
         if (chain_used + apdu.nc >= sizeof(chain_buf)) {
+            memset(chain_buf, 0, sizeof(chain_buf));
+            chain_ptr = NULL;
+            is_chaining = false;
             return SW_CLA_NOT_SUPPORTED();
         }
         memcpy(chain_ptr, apdu.data, apdu.nc);
@@ -57,6 +60,8 @@ int process_apdu(void) {
             memmove(apdu.data + (chain_ptr - chain_buf), apdu.data, apdu.nc);
             memcpy(apdu.data, chain_buf, chain_ptr - chain_buf);
             apdu.nc += (uint16_t)(chain_ptr - chain_buf);
+            memset(chain_buf, 0, sizeof(chain_buf));
+            chain_ptr = NULL;
             is_chaining = false;
         }
     }

@@ -84,6 +84,7 @@ typedef enum {
     REST_ROUTE_NONE         = 0x0,
     REST_ROUTE_REQUIRE_AUTH = 0x1,
     REST_ROUTE_REQUIRE_TLS  = 0x2,
+    REST_ROUTE_ALLOW_QUERY  = 0x4
 } rest_route_flags_t;
 
 typedef int (*rest_route_param_parser_t)(const char *str, const char *param_str, rest_param_t params_out[REST_MAX_REQUEST_PARAMS]);
@@ -123,6 +124,11 @@ typedef struct {
 } rest_session_t;
 
 typedef struct {
+    const char *key;
+    const char *value;
+} rest_query_t;
+
+typedef struct {
     rest_http_method_t method;
     char path[REST_MAX_PATH_SIZE];
     const char *body;
@@ -130,6 +136,8 @@ typedef struct {
     const char *content_type;
     char *headers[REST_HEADER_TOTAL_COUNT];
     rest_param_t params[REST_MAX_REQUEST_PARAMS];
+    rest_query_t *query;
+    uint8_t query_count;
     rest_session_t *session;
     rest_request_conn_type_t conn_type;
 } rest_request_t;

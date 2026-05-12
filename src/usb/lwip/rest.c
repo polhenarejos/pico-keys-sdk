@@ -419,3 +419,15 @@ rest_route_handler_t rest_background_job_pop(void) {
     }
     return NULL;
 }
+
+rest_query_t *rest_query_get(const rest_request_t *request, const char *key) {
+    if (request == NULL || key == NULL) {
+        return NULL;
+    }
+    for (size_t i = 0; i < request->query_count; i++) {
+        if (request->query[i].key != NULL && strcmp(request->query[i].key, key) == 0) {
+            return &request->query[i];
+        }
+    }
+    return NULL;
+}

@@ -190,6 +190,7 @@ extern int rest_session_cleanup_expired(time_t expiration_time);
 extern void rest_session_clear_all(void);
 extern int rest_session_derive_key(const rest_session_t *session, uint8_t sk[32]);
 extern int rest_session_derive_shared(const rest_session_t *session, uint8_t derived_key[32]);
+extern rest_query_t *rest_query_get(const rest_request_t *request, const char *key);
 
 #if DEBUG_APDU
 extern void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len);

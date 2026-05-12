@@ -62,7 +62,7 @@ static int get_macos_serial(uint8_t *out) {
 
 #pragma comment(lib, "wbemuuid.lib")
 
-int get_system_uuid(char *out) {
+static int get_system_uuid(char *out) {
     char serial[64] = {0};
     HRESULT hr;
     IWbemLocator *locator = NULL;
@@ -184,7 +184,7 @@ static int append_field(char *out, size_t out_len, const char *prefix,const char
     return 0;
 }
 
-int get_linux_hardware_id(char *out) {
+static int get_linux_hardware_id(char *out) {
     if (!out) {
         return -1;
     }

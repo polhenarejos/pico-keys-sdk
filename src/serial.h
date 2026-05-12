@@ -21,7 +21,7 @@
 #include <stdint.h>
 
 #if !defined (PICO_PLATFORM)
-#if __APPLE__
+#if defined(__APPLE__) || defined(_MSC_VER) || defined(__linux__)
 #define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 16
 #else
 #define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8

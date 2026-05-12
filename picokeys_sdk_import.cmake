@@ -343,6 +343,14 @@ set(CJSON_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson/cJSON.c
 )
 
+set(LIBCVC_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/src/cvc_build.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/src/cvc_parse.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/src/cvc_sign.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/src/cvc_tlv.c
+    ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/src/cvc_write.c
+)
+
 set(LIBRARIES)
 if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
     list(APPEND LIBRARIES mbedtls)
@@ -357,14 +365,10 @@ if(NOT ESP_PLATFORM)
         target_include_directories(mbedtls SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include)
     endif()
     if(ENABLE_LIBCVC)
-        if(EXISTS "${LIBCVC_PATH}/CMakeLists.txt")
-            if(NOT TARGET cvc)
-                add_subdirectory(${LIBCVC_PATH} ${CMAKE_BINARY_DIR}/libcvc_build)
-            endif()
-            list(APPEND LIBRARIES cvc)
-        else()
-            message(FATAL_ERROR "ENABLE_LIBCVC is ON but libcvc source is missing at ${LIBCVC_PATH}")
-        endif()
+        add_library(libcvc STATIC ${LIBCVC_SOURCES})
+        target_include_directories(libcvc SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/src ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/include)
+        target_link_libraries(libcvc PRIVATE mbedtls)
+        list(APPEND LIBRARIES libcvc)
     endif()
     if(USB_ITF_HID)
         add_library(tinycbor STATIC ${CBOR_SOURCES})

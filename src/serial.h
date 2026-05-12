@@ -21,7 +21,11 @@
 #include <stdint.h>
 
 #if !defined (PICO_PLATFORM)
+#if __APPLE__
+#define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 16
+#else
 #define PICO_UNIQUE_BOARD_ID_SIZE_BYTES 8
+#endif
 typedef struct { uint8_t id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES]; } picokey_serial_t;
 #else
 #include "pico/unique_id.h"

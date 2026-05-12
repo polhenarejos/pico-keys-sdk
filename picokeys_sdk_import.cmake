@@ -515,6 +515,10 @@ endif()
 if(ENABLE_EMULATION)
     if(APPLE)
         add_definitions("-Wno-deprecated-declarations")
+        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
+                "-framework IOKit"
+                "-framework CoreFoundation"
+        )
     endif()
     add_compile_definitions(ENABLE_EMULATION)
     list(APPEND PICOKEYS_SOURCES

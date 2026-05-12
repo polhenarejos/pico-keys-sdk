@@ -980,6 +980,17 @@ void rest_handle_request(rest_conn_t *conn) {
     }
 }
 
+int x509_set_random_serial(mbedtls_x509write_cert *crt) {
+    uint8_t serial[16];
+    random_fill_buffer(serial, sizeof(serial));
+    serial[0] &= 0x7F;
+
+    size_t off = 0;
+    while (off < sizeof(serial) - 1 && serial[off] == 0x00) off++;
+
+    return mbedtls_x509write_crt_set_serial_raw(crt, serial + off, sizeof(serial) - off);
+}
+
 static void rest_check_and_load_credentials(void) {
     file_t *ef = file_new(EF_TLS_KEY);
     if (!file_has_data(ef)) {
@@ -1030,9 +1041,7 @@ static void rest_check_and_load_credentials(void) {
         if (ret != 0) goto out;
         ret = mbedtls_x509write_crt_set_issuer_name(&crt, "CN=pico-novus");
         if (ret != 0) goto out;
-        uint8_t serial[16];
-        random_fill_buffer(serial, sizeof(serial));
-        mbedtls_x509write_crt_set_serial_raw(&crt, serial, sizeof(serial));
+        x509_set_random_serial(&crt);
         if (ret != 0) goto out;
         ret = mbedtls_x509write_crt_set_validity(&crt, "20260101000000", "20360101000000");
         if (ret != 0) goto out;

@@ -74,6 +74,8 @@ typedef struct {
 err_t rest_server_init(rest_conn_type_t conn_type);
 void rest_handle_request(rest_conn_t *conn);
 
+extern int x509_set_random_serial(mbedtls_x509write_cert *crt);
+
 extern int rest_server_error(rest_response_t *response, int status_code, const char *message);
 
 #endif

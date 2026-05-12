@@ -27,7 +27,7 @@
 #include <time.h>
 #endif
 
-#if __APPLE__
+#if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 
@@ -56,7 +56,7 @@ static int get_macos_serial(uint8_t *out) {
     }
     return ok ? 0 : -4;
 }
-#elif _MSC_VER
+#elif defined(_MSC_VER)
 #include <windows.h>
 #include <wbemidl.h>
 
@@ -129,7 +129,7 @@ int get_system_uuid(char *out) {
     }
     return serial[0] ? 0 : -8;
 }
-#elif __linux__
+#elif defined(__linux__)
 #include <string.h>
 #include <ctype.h>
 
@@ -215,49 +215,20 @@ static int serial_id_is_zero(const uint8_t *id, size_t len) {
     return 1;
 }
 
-#ifndef ESP_PLATFORM
-static void serial_fill_fallback_id(picokey_serial_t *serial, int err) {
-    uint8_t seed[64] = {0};
-    struct timespec ts = {0};
-    uintptr_t self_ptr = (uintptr_t)serial;
-    uintptr_t init_ptr = (uintptr_t)&serial_init;
-    size_t off = 0;
-
-    (void)timespec_get(&ts, TIME_UTC);
-    memcpy(seed + off, &err, sizeof(err));
-    off += sizeof(err);
-    memcpy(seed + off, &ts.tv_sec, sizeof(ts.tv_sec));
-    off += sizeof(ts.tv_sec);
-    memcpy(seed + off, &ts.tv_nsec, sizeof(ts.tv_nsec));
-    off += sizeof(ts.tv_nsec);
-    memcpy(seed + off, &self_ptr, sizeof(self_ptr));
-    off += sizeof(self_ptr);
-    memcpy(seed + off, &init_ptr, sizeof(init_ptr));
-    off += sizeof(init_ptr);
-
-    mbedtls_sha256(seed, off, pico_serial_hash, false);
-    memcpy(serial->id, pico_serial_hash, sizeof(serial->id));
-}
-#endif
-
-#ifdef ESP_PLATFORM
+#if defined(ESP_PLATFORM)
 #define pico_get_unique_board_id(a) do { uint32_t value; esp_efuse_read_block(EFUSE_BLK1, &value, 0, 32); memcpy((uint8_t *)(a), &value, sizeof(uint32_t)); esp_efuse_read_block(EFUSE_BLK1, &value, 32, 32); memcpy((uint8_t *)(a)+4, &value, sizeof(uint32_t)); } while(0)
-#else
-#if __APPLE__
+#elif defined(__APPLE__)
 #define pico_get_unique_board_id(a) get_macos_serial((uint8_t *)(a))
-#elif _MSC_VER
+#elif defined(_MSC_VER)
 #define pico_get_unique_board_id(a) get_system_uuid((char *)(a))
-#elif __linux__
+#elif defined(__linux__)
 #define pico_get_unique_board_id(a) get_linux_hardware_id((char *)(a))
-#else
-#error "Unsupported platform"
-#endif
 #endif
 
 void serial_init(void) {
     int serial_rc = 0;
 
-#ifndef ESP_PLATFORM
+#if defined(__APPLE__) || defined(_MSC_VER) || defined(__linux__)
     serial_rc = pico_get_unique_board_id(&pico_serial);
 #else
     pico_get_unique_board_id(&pico_serial);
@@ -265,7 +236,7 @@ void serial_init(void) {
 
     if (serial_rc != 0 || serial_id_is_zero(pico_serial.id, sizeof(pico_serial.id))) {
         printf("serial init: failed to read stable hardware id (rc=%d); using fallback id\n", serial_rc);
-        serial_fill_fallback_id(&pico_serial, serial_rc);
+        memset(pico_serial.id, 0, sizeof(pico_serial.id));
     }
 
     memset(pico_serial_str, 0, sizeof(pico_serial_str));

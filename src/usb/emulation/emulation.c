@@ -216,7 +216,11 @@ uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_s
     uint16_t size = htons(buffer_size);
     socket_t sock = get_sock_itf(itf);
     // DEBUG_PAYLOAD(buffer,buffer_size);
+#ifdef _WIN32
     int ret = 0;
+#else
+    ssize_t ret = 0;
+#endif
     do {
         ret = send(sock, (const char *)&size, sizeof(size), 0);
         if (ret == SOCKET_ERROR) {
@@ -295,7 +299,11 @@ uint16_t emul_read(uint8_t itf) {
     __pragma(warning(pop))
 #endif
     struct timeval timeout;
+#ifdef _WIN32
     int valread = 0;
+#else
+    ssize_t valread = 0;
+#endif
     timeout.tv_sec = 0;
     timeout.tv_usec = 0 * 1000;
     int n = select((int)(sock + 1), &input, NULL, NULL, &timeout);

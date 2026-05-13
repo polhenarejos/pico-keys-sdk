@@ -190,9 +190,9 @@ int emulation_rest_tls_port(void) {
 
 int tls_send_cb(void *ctx, const unsigned char *buf, size_t len) {
     const socket_t fd = (socket_t)(*(const intptr_t *)ctx);
-    int r = send(fd, (const char *)buf, (int)len, 0);
+    ssize_t r = send(fd, (const char *)buf, (int)len, 0);
     if (r >= 0) {
-        return r;
+        return (int)r;
     }
 #ifdef _MSC_VER
     {
@@ -211,9 +211,9 @@ int tls_send_cb(void *ctx, const unsigned char *buf, size_t len) {
 
 int tls_recv_cb(void *ctx, unsigned char *buf, size_t len) {
     const socket_t fd = (socket_t)(*(const intptr_t *)ctx);
-    int r = recv(fd, (char *)buf, (int)len, 0);
+    ssize_t r = recv(fd, (char *)buf, (int)len, 0);
     if (r > 0) {
-        return r;
+        return (int)r;
     }
     if (r == 0) {
         return MBEDTLS_ERR_SSL_CONN_EOF;

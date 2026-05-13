@@ -306,10 +306,11 @@ void rest_close_conn(rest_conn_t *conn) {
         mbedtls_ssl_free(&conn->ssl);
     }
     if (conn->sock >= 0) {
+        socket_t fd = (socket_t)conn->sock;
 #ifdef _MSC_VER
-        shutdown((SOCKET)conn->sock, 1);
+        shutdown((SOCKET)fd, 1);
 #endif
-        (void)close(conn->sock);
+        (void)close(fd);
     }
     clear_conn(conn);
 #else
@@ -445,7 +446,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     }
 #ifdef ENABLE_EMULATION
     while (sent_total < (size_t)header_len) {
-        int n = send((socket_t)conn->sock, headers_buf + sent_total, (int)((size_t)header_len - sent_total), 0);
+        ssize_t n = send((socket_t)conn->sock, headers_buf + sent_total, (int)((size_t)header_len - sent_total), 0);
         if (n <= 0) {
             rest_close_conn(conn);
             return;
@@ -454,7 +455,7 @@ static void send_response(rest_conn_t *conn, int status_code, const char *status
     }
     sent_total = 0;
     while (sent_total < body_len) {
-        int n = send((socket_t)conn->sock, body + sent_total, (int)(body_len - sent_total), 0);
+        ssize_t n = send((socket_t)conn->sock, body + sent_total, (int)(body_len - sent_total), 0);
         if (n <= 0) {
             rest_close_conn(conn);
             return;
@@ -1285,7 +1286,7 @@ static void *rest_emulation_thread(void *arg) {
                 }
             }
             else {
-                int n = recv((socket_t)conn->sock, conn->request + conn->request_len, (int)(REST_MAX_REQUEST_SIZE - conn->request_len), 0);
+                ssize_t n = recv((socket_t)conn->sock, conn->request + conn->request_len, (int)(REST_MAX_REQUEST_SIZE - conn->request_len), 0);
                 if (n <= 0) {
                     rest_close_conn(conn);
                     break;

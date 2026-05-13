@@ -30,7 +30,8 @@ extern int gettimeofday(struct timeval *tp, struct timezone *tzp);
 static inline uint32_t board_millis(void) {
     struct timeval start;
     gettimeofday(&start, NULL);
-    return start.tv_sec * 1000 + start.tv_usec / 1000;
+    uint64_t ms = (uint64_t)start.tv_sec * 1000ULL + (uint64_t)start.tv_usec / 1000ULL;
+    return (uint32_t)ms;
 }
 
 #endif // _BOARD_H_

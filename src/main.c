@@ -159,7 +159,7 @@ int main(void) {
 
     random_init();
 
-    otp_init_files();
+    otp_init();
 
     low_flash_init();
 

@@ -80,6 +80,7 @@ if(NOT DEFINED ENABLE_EMULATION)
     set(ENABLE_EMULATION 0)
 endif()
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/openssl.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/build_helpers.cmake)
 
 option(ENABLE_DELAYED_BOOT "Enable/disable delayed boot" OFF)
 configure_bool_option(
@@ -233,14 +234,38 @@ if(ENABLE_PQC)
     )
 endif()
 
+if(ESP_PLATFORM)
+    list(APPEND PICOKEYS_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_esp32.c
+    )
+elseif(ENABLE_EMULATION)
+    if(APPLE)
+        list(APPEND PICOKEYS_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_macos.c
+        )
+    else()
+        list(APPEND PICOKEYS_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_emulation.c
+        )
+    endif()
+elseif(PICO_RP2350)
+    list(APPEND PICOKEYS_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_rp2350.c
+    )
+elseif(PICO_RP2040)
+    list(APPEND PICOKEYS_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_rp2040.c
+    )
+endif()
+
 list(APPEND PICOKEYS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/usb/usb.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/flash.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/low_flash.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/fs/otp.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/phy.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp.c
     ${CMAKE_CURRENT_LIST_DIR}/src/rng/random.c
     ${CMAKE_CURRENT_LIST_DIR}/src/rng/hwrng.c
     ${CMAKE_CURRENT_LIST_DIR}/src/eac.c
@@ -284,6 +309,7 @@ list(APPEND INCLUDES
     ${CMAKE_CURRENT_LIST_DIR}/src/fs
     ${CMAKE_CURRENT_LIST_DIR}/src/rng
     ${CMAKE_CURRENT_LIST_DIR}/src/led
+    ${CMAKE_CURRENT_LIST_DIR}/src/otp
     ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
 )
 set(SYSTEM_INCLUDES
@@ -427,68 +453,6 @@ function(add_impl_library target)
     target_compile_definitions(${target} INTERFACE LIB_${TARGET_UPPER}=1)
 endfunction()
 
-# Apply strict warning flags to a caller-provided source list.
-# Usage:
-#   picokeys_apply_strict_flags(SOURCES ${SOURCES} FILTER_REGEX "/src/fido/")
-function(picokeys_apply_strict_flags)
-    set(options)
-    set(oneValueArgs FILTER_REGEX)
-    set(multiValueArgs SOURCES)
-    cmake_parse_arguments(PKAS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-    if(NOT PKAS_SOURCES)
-        return()
-    endif()
-
-    if (MSVC)
-        set(PICOKEYS_STRICT_FLAGS
-            -Wall
-            -Zc:strictStrings
-            -WX
-        )
-    else ()
-        set(PICOKEYS_STRICT_FLAGS
-            -pipe
-            -funsigned-char
-            -fstrict-aliasing
-            -fdiagnostics-color=auto
-            -Wextra
-            -Wchar-subscripts
-            -Wundef
-            -Wshadow
-            -Wcast-align
-            -Wwrite-strings
-            -Wunused
-            -Wuninitialized
-            -Wpointer-arith
-            -Wredundant-decls
-            -Winline
-            -Wformat
-            -Wformat-security
-            -Wswitch-enum
-            -Winit-self
-            -Wmissing-include-dirs
-            -Wempty-body
-            -Wmissing-prototypes
-            -Wstrict-prototypes
-            -Wold-style-definition
-            -Wbad-function-cast
-            -Wnested-externs
-            -Wmissing-declarations
-            -Werror
-        )
-    endif()
-
-    foreach(src IN LISTS PKAS_SOURCES)
-        if(PKAS_FILTER_REGEX)
-            if(NOT src MATCHES "${PKAS_FILTER_REGEX}")
-                continue()
-            endif()
-        endif()
-        set_property(SOURCE "${src}" APPEND PROPERTY COMPILE_OPTIONS ${PICOKEYS_STRICT_FLAGS})
-    endforeach()
-endfunction()
-
 if(USB_ITF_HID)
     list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/hid/hid.c
@@ -506,7 +470,6 @@ if(USB_ITF_CCID)
         ${CMAKE_CURRENT_LIST_DIR}/src/usb/ccid
     )
 endif()
-
 
 if(NOT MSVC)
     add_compile_options("-fmacro-prefix-map=${CMAKE_CURRENT_LIST_DIR}/=")
@@ -546,9 +509,8 @@ else()
 endif()
 
 if(MSVC)
-    set(
-        CMAKE_C_FLAGS
-        "${CMAKE_C_FLAGS} -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105 -wd4141 -wd4200"
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}
+        -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105 -wd4141 -wd4200"
     )
 
     add_compile_definitions(

@@ -3,6 +3,7 @@ set(PICOKEYS_SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/../../../..)
 set(PICOKEYS_INCLUDE_DIRS
     ${PICOKEYS_SDK_DIR}/src
     ${PICOKEYS_SDK_DIR}/src/fs
+    ${PICOKEYS_SDK_DIR}/src/otp
     ${PICOKEYS_SDK_DIR}/src/rng
     ${PICOKEYS_SDK_DIR}/src/usb
     ${PICOKEYS_SDK_DIR}/src/led

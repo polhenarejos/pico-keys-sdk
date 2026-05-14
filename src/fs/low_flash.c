@@ -74,13 +74,14 @@ extern uint32_t FLASH_SIZE_BYTES;
 extern const uintptr_t start_data_pool;
 extern const uintptr_t end_rom_pool;
 
+PACK(
 typedef struct page_flash {
     uint8_t page[FLASH_SECTOR_SIZE];
     uintptr_t address;
     bool ready;
     bool erase;
     size_t page_size; //this param is for easy erase. It allows to erase with a single call. IT DOES NOT APPLY TO WRITE
-} page_flash_t;
+}) page_flash_t;
 
 static page_flash_t flash_pages[TOTAL_FLASH_PAGES];
 

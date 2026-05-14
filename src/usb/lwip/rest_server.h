@@ -51,24 +51,31 @@ typedef enum {
 } rest_conn_type_t;
 
 typedef struct {
-    bool in_use;
 #ifdef ENABLE_EMULATION
     intptr_t sock;
 #else
     struct tcp_pcb *pcb;
 #endif
-    char request[REST_MAX_REQUEST_SIZE + 1];
     size_t request_len;
     rest_conn_type_t conn_type;
+#ifdef _MSC_VER
+    char _padding[sizeof(void *) - sizeof(rest_conn_type_t)];
+#endif
     mbedtls_ssl_context ssl;
     unsigned char rx_cipher[REST_MAX_REQUEST_SIZE];
     size_t rx_cipher_len;
+    size_t request_headers_size;
+    size_t request_content_length;
+    bool in_use;
     bool handshake_done;
     bool request_complete;
     bool request_dispatched;
     bool request_headers_parsed;
-    size_t request_headers_size;
-    size_t request_content_length;
+    char request[REST_MAX_REQUEST_SIZE + 1];
+#ifdef ENABLE_EMULATION
+    char _padding2[2];
+#endif
+
 } rest_conn_t;
 
 err_t rest_server_init(rest_conn_type_t conn_type);

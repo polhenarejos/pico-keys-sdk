@@ -20,11 +20,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "compat/compat.h"
 
+PACK(
 typedef struct asn1_ctx {
     uint8_t *data;
     uint16_t len;
-} asn1_ctx_t;
+}) asn1_ctx_t;
 
 extern int asn1_ctx_init(uint8_t *, uint16_t, asn1_ctx_t *);
 extern int asn1_ctx_clear(asn1_ctx_t *ctx);

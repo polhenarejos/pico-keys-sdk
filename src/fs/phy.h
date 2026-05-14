@@ -69,6 +69,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+PACK(
 typedef struct phy_data {
     union {
         struct {
@@ -99,7 +100,7 @@ typedef struct phy_data {
     bool enabled_usb_itf_present;
     bool led_driver_present;
 
-} phy_data_t;
+}) phy_data_t;
 
 #define PHY_MAX_SIZE    ((2+4)+(2+4)+(2+32)+(2+2)+(2+1)+(2+1)+(2+1)+(2+1)+(2+1))
 

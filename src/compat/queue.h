@@ -34,6 +34,9 @@ typedef struct {
     size_t max_elem;
     uint8_t buf[1024];
     bool is_init;
+#ifdef _MSC_VER
+    char padding[sizeof(void *) - sizeof(bool)];
+#endif
 } queue_t;
 
 static inline void queue_free(queue_t *a) {

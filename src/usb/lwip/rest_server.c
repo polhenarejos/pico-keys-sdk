@@ -31,6 +31,7 @@
 #endif
 typedef SOCKET socket_t;
 typedef int socklen_t;
+typedef SSIZE_T ssize_t;
 #define close closesocket
 #include <string.h>
 #define strcasecmp _stricmp
@@ -70,16 +71,20 @@ static pthread_t rest_thread;
 #endif
 static rest_conn_t conns[REST_MAX_CONNS];
 
+PACK(
 typedef struct {
     volatile long pending;
     rest_conn_t *conn;
     rest_route_handler_t handler;
     rest_request_t request;
-} rest_core1_job_t;
+}) rest_core1_job_t;
 
 typedef struct {
-    bool ready;
     rest_response_t response;
+    bool ready;
+#ifdef _MSC_VER
+    char _padding[sizeof(void *) - sizeof(bool)];
+#endif
 } rest_core1_result_t;
 
 static rest_core1_job_t rest_core1_job = {0};
@@ -110,10 +115,11 @@ static void rest_core1_job_pending_store(bool pending) {
 #endif
 }
 
+PACK(
 typedef struct {
     rest_header_id_t id;
     const char *name;
-} rest_header_descriptor_t;
+}) rest_header_descriptor_t;
 
 static const rest_header_descriptor_t rest_http_headers[REST_HEADER_TOTAL_COUNT] = {
     { REST_HEADER_USER_AGENT, "User-Agent" },

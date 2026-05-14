@@ -72,13 +72,14 @@ typedef enum {
     REST_PARAM_STRING
 } rest_param_type_t;
 
+PACK(
 typedef struct {
     union {
         int32_t int_param;
         char *str_param;
     } param;
     rest_param_type_t type;
-} rest_param_t;
+}) rest_param_t;
 
 typedef enum {
     REST_ROUTE_NONE         = 0x0,
@@ -110,6 +111,7 @@ typedef enum {
     REST_SESSION_TERMINATED = 0x6,
 } rest_session_status_t;
 
+PACK(
 typedef struct {
     uint8_t public_key[32];
     uint8_t id[16];
@@ -121,13 +123,14 @@ typedef struct {
     rest_session_status_t status;
     uint8_t token[32];
     uint8_t user_id;
-} rest_session_t;
+}) rest_session_t;
 
 typedef struct {
     const char *key;
     const char *value;
 } rest_query_t;
 
+PACK(
 typedef struct {
     rest_http_method_t method;
     char path[REST_MAX_PATH_SIZE];
@@ -140,19 +143,23 @@ typedef struct {
     uint8_t query_count;
     rest_session_t *session;
     rest_request_conn_type_t conn_type;
-} rest_request_t;
+}) rest_request_t;
 
 typedef struct {
-    uint16_t status_code;
     const char *content_type;
     char *body; // heap !
     size_t body_len;
     cJSON *json;
     char *headers[REST_HEADER_TOTAL_COUNT];
+    uint16_t status_code;
+#ifdef _MSC_VER
+    char _padding[6];
+#endif
 } rest_response_t;
 
 typedef int (*rest_route_handler_t)(const rest_request_t *request, rest_response_t *response);
 
+PACK(
 typedef struct {
     rest_http_method_t method;
     const char *path;
@@ -160,7 +167,7 @@ typedef struct {
     rest_route_flags_t flags;
     rest_route_param_parser_t param_parser;
     rest_session_role_t role; // Minimum required role to access this route (only relevant if REST_ROUTE_REQUIRE_AUTH flag is set)
-} rest_route_t;
+}) rest_route_t;
 
 typedef struct {
     rest_route_handler_t handler;

@@ -71,13 +71,15 @@ static int hwrng_mix_process(void) {
     return 0;
 }
 
-struct hwrng_buf {
+PACK(
+typedef struct hwrng_buf {
     uint32_t *buf;
-    uint8_t head, tail;
+    uint8_t head;
+    uint8_t tail;
     uint8_t size;
     unsigned int full : 1;
     unsigned int empty : 1;
-};
+}) hwrng_buf_t;
 
 static mutex_t hwrng_mutex;
 static bool hwrng_mutex_initialized = false;

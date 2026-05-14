@@ -23,13 +23,12 @@
 
 #ifdef _MSC_VER
 #include <windows.h>
-struct timezone
+PACK(struct timezone
 {
     __int32  tz_minuteswest; /* minutes W of Greenwich */
     bool  tz_dsttime;     /* type of dst correction */
-};
-int gettimeofday(struct timeval* tp, struct timezone* tzp)
-{
+});
+int gettimeofday(struct timeval* tp, struct timezone* tzp) {
     (void)tzp;
     // Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
     // This magic number is the number of 100 nanosecond intervals since January 1, 1601 (UTC)
@@ -49,8 +48,7 @@ int gettimeofday(struct timeval* tp, struct timezone* tzp)
     tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
     return 0;
 }
-int settimeofday(const struct timeval* tp, const struct timezone* tzp)
-{
+int settimeofday(const struct timeval* tp, const struct timezone* tzp) {
     (void)tzp;
     SYSTEMTIME st;
     FILETIME ft;

@@ -20,8 +20,10 @@
 
 #ifdef _MSC_VER
 #include <string.h>
+#include <BaseTsd.h>
 #define strcasecmp _stricmp
 #define strncasecmp _strnicmp
+typedef SSIZE_T ssize_t;
 #else
 #include <strings.h>
 #endif

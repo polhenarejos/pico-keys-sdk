@@ -254,15 +254,15 @@ int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, ui
     return aes_decrypt(key, iv, 256, PICOKEYS_AES_MODE_CFB, data, len);
 }
 
-struct lv_data {
+PACK(struct lv_data {
     unsigned char *value;
     uint8_t len;
-};
+});
 
-struct ec_curve_mbed_id {
+PACK(struct ec_curve_mbed_id {
     struct lv_data curve;
     mbedtls_ecp_group_id id;
-};
+});
 struct ec_curve_mbed_id ec_curves_mbed[] = {
     {   { (unsigned char *)
           "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFE\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",

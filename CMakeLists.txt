@@ -78,7 +78,7 @@ if(NOT ESP_PLATFORM)
         elseif(MSVC)
             target_compile_options(pico_rescue PRIVATE -WX)
 
-            target_link_libraries(pico_rescue PRIVATE wsock32 ws2_32 Bcrypt)
+            target_link_libraries(pico_rescue PRIVATE wsock32 ws2_32 Bcrypt Ncrypt)
         else()
             target_link_options(pico_rescue PRIVATE -Wl,--gc-sections)
         endif()

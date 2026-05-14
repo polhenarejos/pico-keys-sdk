@@ -239,9 +239,18 @@ if(ESP_PLATFORM)
         ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_esp32.c
     )
 elseif(ENABLE_EMULATION)
-    if(APPLE)
+    if(MSVC)
+        list(APPEND PICOKEYS_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_windows.c
+        )
+    elseif(APPLE)
         list(APPEND PICOKEYS_SOURCES
             ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_macos.c
+        )
+    elseif(UNIX AND NOT APPLE)
+        add_compile_definitions(OTP_LINUX_USE_TSS=1)
+        list(APPEND PICOKEYS_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_linux.c
         )
     else()
         list(APPEND PICOKEYS_SOURCES
@@ -385,6 +394,16 @@ if(USE_OPENSSL_EMULATION_WRAPPER)
     list(APPEND LIBRARIES OpenSSL::Crypto)
 endif()
 
+if(UNIX AND NOT APPLE AND ENABLE_EMULATION)
+    find_library(TSS2_ESYS_LIB NAMES tss2-esys)
+    find_library(TSS2_TCTILDR_LIB NAMES tss2-tctildr)
+    if(TSS2_ESYS_LIB AND TSS2_TCTILDR_LIB)
+        list(APPEND LIBRARIES ${TSS2_ESYS_LIB} ${TSS2_TCTILDR_LIB})
+    else()
+        message(WARNING "Linux OTP TPM backend enabled but tpm2-tss libraries not found (need tss2-esys and tss2-tctildr)")
+    endif()
+endif()
+
 if(NOT ESP_PLATFORM)
     if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
         add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
@@ -473,8 +492,7 @@ endif()
 
 if(NOT MSVC)
     add_compile_options("-fmacro-prefix-map=${CMAKE_CURRENT_LIST_DIR}/=")
-endif()
-if(MSVC)
+else()
     list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/mman.c
     )
@@ -486,6 +504,10 @@ if(ENABLE_EMULATION)
                 "-framework IOKit"
                 "-framework CoreFoundation"
         )
+    elseif(MSVC)
+        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Ncrypt)
+    elseif(UNIX AND NOT APPLE AND TSS2_ESYS_LIB AND TSS2_TCTILDR_LIB)
+        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${TSS2_ESYS_LIB} ${TSS2_TCTILDR_LIB})
     endif()
     add_compile_definitions(ENABLE_EMULATION)
     list(APPEND PICOKEYS_SOURCES
@@ -509,9 +531,7 @@ else()
 endif()
 
 if(MSVC)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}
-        -wd4820 -wd4255 -wd5045 -wd4706 -wd4061 -wd5105 -wd4141 -wd4200"
-    )
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -wd5045")
 
     add_compile_definitions(
         _CRT_SECURE_NO_WARNINGS

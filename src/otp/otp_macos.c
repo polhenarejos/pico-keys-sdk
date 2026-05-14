@@ -185,7 +185,7 @@ cleanup:
     return rc;
 }
 
-static int macos_se_vault_load_or_create_key2(uint8_t out_key32[32]) {
+static int macos_se_vault_load_or_create_key(uint8_t out_key32[32]) {
     int rc = -1;
     SecKeyRef se_private_key = NULL;
     SecKeyRef local_private_key = NULL;
@@ -264,10 +264,9 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
     memset(_otp2, 0xBE, sizeof(_otp2));
 
 #if defined(MACOS_APP) && MACOS_APP
-    if (macos_se_vault_load_or_create_key2(_otp2) != 0) {
+    if (macos_se_vault_load_or_create_key(_otp2) != 0) {
         printf("Warning: failed to load MACOS_APP Secure Enclave key; using dummy otp_key_2\n");
     }
-    DEBUG_DATA(_otp2, 32);
 #endif
     *otp_key_1_out = _otp1;
     *otp_key_2_out = _otp2;

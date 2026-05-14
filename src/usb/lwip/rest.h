@@ -159,7 +159,6 @@ typedef struct {
 
 typedef int (*rest_route_handler_t)(const rest_request_t *request, rest_response_t *response);
 
-PACK(
 typedef struct {
     rest_http_method_t method;
     const char *path;
@@ -167,7 +166,7 @@ typedef struct {
     rest_route_flags_t flags;
     rest_route_param_parser_t param_parser;
     rest_session_role_t role; // Minimum required role to access this route (only relevant if REST_ROUTE_REQUIRE_AUTH flag is set)
-}) rest_route_t;
+} rest_route_t;
 
 typedef struct {
     rest_route_handler_t handler;

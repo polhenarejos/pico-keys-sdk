@@ -34,11 +34,10 @@ extern bool app_exists(const uint8_t *aid, size_t aid_len);
 extern int register_app(int (*)(app_t *, uint8_t), const uint8_t *);
 extern int select_app(const uint8_t *aid, size_t aid_len);
 
-PACK(
 typedef struct cmd {
     uint8_t ins;
     int (*cmd_handler)(void);
-}) cmd_t;
+} cmd_t;
 
 extern uint8_t num_apps;
 extern app_t apps[16];

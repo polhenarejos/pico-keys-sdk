@@ -218,19 +218,63 @@ if(ENABLE_PQC)
             MLK_CONFIG_MULTILEVEL_NO_SHARED
             MLK_CONFIG_NAMESPACE_PREFIX=mlkem
         )
+
+        file(GLOB_RECURSE MLDSA_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mldsa/mldsa/src/*.c
+        )
+        list(FILTER MLDSA_SOURCES EXCLUDE REGEX "/native/")
+
+        add_library(mldsa44 STATIC ${MLDSA_SOURCES})
+        target_include_directories(mldsa44 PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mldsa/mldsa/src
+            ${CMAKE_CURRENT_LIST_DIR}/config/mldsa
+        )
+        target_compile_definitions(mldsa44 PRIVATE
+            MLD_CONFIG_PARAMETER_SET=44
+            MLD_CONFIG_MULTILEVEL_WITH_SHARED
+            MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+        )
+
+        add_library(mldsa65 STATIC ${MLDSA_SOURCES})
+        target_include_directories(mldsa65 PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mldsa/mldsa/src
+            ${CMAKE_CURRENT_LIST_DIR}/config/mldsa
+        )
+        target_compile_definitions(mldsa65 PRIVATE
+            MLD_CONFIG_PARAMETER_SET=65
+            MLD_CONFIG_MULTILEVEL_NO_SHARED
+            MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+        )
+
+        add_library(mldsa87 STATIC ${MLDSA_SOURCES})
+        target_include_directories(mldsa87 PRIVATE
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mldsa/mldsa/src
+            ${CMAKE_CURRENT_LIST_DIR}/config/mldsa
+        )
+        target_compile_definitions(mldsa87 PRIVATE
+            MLD_CONFIG_PARAMETER_SET=87
+            MLD_CONFIG_MULTILEVEL_NO_SHARED
+            MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+        )
     endif()
 
     list(APPEND INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/third-party/mlkem/mlkem
         ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mldsa/mldsa
+        ${CMAKE_CURRENT_LIST_DIR}/config/mldsa
     )
     list(APPEND SYSTEM_INCLUDES
         ${CMAKE_CURRENT_LIST_DIR}/third-party/mlkem/mlkem
         ${CMAKE_CURRENT_LIST_DIR}/config/mlkem
+        ${CMAKE_CURRENT_LIST_DIR}/third-party/mldsa/mldsa
+        ${CMAKE_CURRENT_LIST_DIR}/config/mldsa
     )
     add_compile_definitions(
         MLK_CONFIG_NAMESPACE_PREFIX=mlkem
         MLK_CONFIG_MULTILEVEL_BUILD=1
+        MLD_CONFIG_NAMESPACE_PREFIX=mldsa
+        MLD_CONFIG_MULTILEVEL_BUILD=1
     )
 endif()
 
@@ -452,6 +496,9 @@ if(ENABLE_PQC)
         mlkem768
         mlkem1024
         mlkem512
+        mldsa44
+        mldsa65
+        mldsa87
     )
 endif()
 
@@ -531,7 +578,7 @@ else()
 endif()
 
 if(MSVC)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -wd5045 -wd4820")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -wd5045 -wd4820 -wd5105")
 
     add_compile_definitions(
         _CRT_SECURE_NO_WARNINGS

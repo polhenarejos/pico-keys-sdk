@@ -24,11 +24,16 @@ if(ENABLE_PQC)
     list(APPEND PICOKEYS_INCLUDE_DIRS
         ${PICOKEYS_SDK_DIR}/third-party/mlkem/mlkem
         ${PICOKEYS_SDK_DIR}/config/mlkem
+        ${PICOKEYS_SDK_DIR}/third-party/mldsa/mldsa
+        ${PICOKEYS_SDK_DIR}/config/mldsa
     )
     list(APPEND PICOKEYS_REQUIRES
         mlkem512
         mlkem768
         mlkem1024
+        mldsa44
+        mldsa65
+        mldsa87
     )
 endif()
 

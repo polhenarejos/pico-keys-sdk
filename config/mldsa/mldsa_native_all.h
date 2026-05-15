@@ -10,19 +10,19 @@
 
 /* API for MLDSA-44 */
 #define MLD_CONFIG_PARAMETER_SET 44
-#include "mldsa_native/mldsa_native.h"
+#include "mldsa_native.h"
 #undef MLD_CONFIG_PARAMETER_SET
 #undef MLD_H
 
 /* API for MLDSA-65 */
 #define MLD_CONFIG_PARAMETER_SET 65
-#include "mldsa_native/mldsa_native.h"
+#include "mldsa_native.h"
 #undef MLD_CONFIG_PARAMETER_SET
 #undef MLD_H
 
 /* API for MLDSA-87 */
 #define MLD_CONFIG_PARAMETER_SET 87
-#include "mldsa_native/mldsa_native.h"
+#include "mldsa_native.h"
 #undef MLD_CONFIG_PARAMETER_SET
 #undef MLD_H
 

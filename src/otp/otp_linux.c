@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <termios.h>
 
 #include "picokeys.h"
 #include "otp_platform.h"
@@ -36,6 +38,51 @@
 
 #define OTP_LINUX_DEFAULT_TPM_HANDLE "0x81010001"
 #define OTP_LINUX_DEFAULT_PEER_KEY_FILE ".config/pico-novus/otp_peer_p256.bin"
+
+static int read_tpm_pin_prompt(const char *prompt, char *pin_out, size_t pin_out_size) {
+    const char *pin_env = getenv("PICO_NOVUS_TPM_PIN");
+    if (!pin_out || pin_out_size < 2) {
+        return -1;
+    }
+    if (pin_env && pin_env[0] != '\0') {
+        size_t n = strlen(pin_env);
+        if (n >= pin_out_size) {
+            return -1;
+        }
+        memcpy(pin_out, pin_env, n + 1);
+        return 0;
+    }
+    if (!isatty(STDIN_FILENO)) {
+        fprintf(stderr, "[otp-linux] No TTY for PIN prompt; set PICO_NOVUS_TPM_PIN\n");
+        return -1;
+    }
+    struct termios oldt;
+    struct termios newt;
+    if (tcgetattr(STDIN_FILENO, &oldt) != 0) {
+        return -1;
+    }
+    newt = oldt;
+    newt.c_lflag &= ~(ECHO);
+    fprintf(stderr, "%s", prompt ? prompt : "Enter TPM key PIN: ");
+    fflush(stderr);
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &newt) != 0) {
+        return -1;
+    }
+    if (!fgets(pin_out, (int)pin_out_size, stdin)) {
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fprintf(stderr, "\n");
+        return -1;
+    }
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fprintf(stderr, "\n");
+    {
+        size_t n = strlen(pin_out);
+        if (n > 0 && pin_out[n - 1] == '\n') {
+            pin_out[n - 1] = '\0';
+        }
+    }
+    return (pin_out[0] != '\0') ? 0 : -1;
+}
 
 static int derive_secp256k1_privkey_from_secret(const uint8_t *secret, size_t secret_len, uint8_t out_key32[32]) {
     int rc = -1;
@@ -278,7 +325,7 @@ cleanup:
     return rc;
 }
 
-static int load_or_create_tpm_p256_key(ESYS_CONTEXT *esys, TPM2_HANDLE handle, ESYS_TR *key_out) {
+static int load_or_create_tpm_p256_key(ESYS_CONTEXT *esys, TPM2_HANDLE handle, const char *pin, ESYS_TR *key_out, int *created_out) {
     TSS2_RC rc;
     ESYS_TR key = ESYS_TR_NONE;
     ESYS_TR transient = ESYS_TR_NONE;
@@ -291,16 +338,48 @@ static int load_or_create_tpm_p256_key(ESYS_CONTEXT *esys, TPM2_HANDLE handle, E
     TPM2B_CREATION_DATA *creation_data = NULL;
     TPM2B_DIGEST *creation_hash = NULL;
     TPMT_TK_CREATION *creation_ticket = NULL;
+    TPMS_CAPABILITY_DATA *cap_data = NULL;
+    TPMI_YES_NO more_data = TPM2_NO;
+    TPM2B_AUTH auth = {0};
 
     if (!esys || !key_out) {
         return -1;
     }
     *key_out = ESYS_TR_NONE;
+    if (created_out) {
+        *created_out = 0;
+    }
+    if (pin && pin[0] != '\0') {
+        size_t pin_len = strlen(pin);
+        if (pin_len > sizeof(auth.buffer)) {
+            return -1;
+        }
+        auth.size = (UINT16)pin_len;
+        memcpy(auth.buffer, pin, pin_len);
+    }
 
-    rc = Esys_TR_FromTPMPublic(esys, handle, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, &key);
-    if (rc == TSS2_RC_SUCCESS) {
+    rc = Esys_GetCapability(esys, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, TPM2_CAP_HANDLES, handle, 1, &more_data, &cap_data);
+    if (rc != TSS2_RC_SUCCESS) {
+        fprintf(stderr, "[otp-linux] Esys_GetCapability failed while checking key handle: 0x%x\n", rc);
+        goto cleanup;
+    }
+    if (cap_data && cap_data->data.handles.count > 0 && cap_data->data.handles.handle[0] == handle) {
+        rc = Esys_TR_FromTPMPublic(esys, handle, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, &key);
+        if (rc != TSS2_RC_SUCCESS) {
+            fprintf(stderr, "[otp-linux] Esys_TR_FromTPMPublic failed for existing key: 0x%x\n", rc);
+            goto cleanup;
+        }
+        if (auth.size > 0) {
+            rc = Esys_TR_SetAuth(esys, key, &auth);
+            if (rc != TSS2_RC_SUCCESS) {
+                Esys_TR_Close(esys, &key);
+                key = ESYS_TR_NONE;
+                goto cleanup;
+            }
+        }
         *key_out = key;
-        return 0;
+        key = ESYS_TR_NONE;
+        goto cleanup;
     }
 
     in_public.publicArea.type = TPM2_ALG_ECC;
@@ -311,6 +390,9 @@ static int load_or_create_tpm_p256_key(ESYS_CONTEXT *esys, TPM2_HANDLE handle, E
     in_public.publicArea.parameters.eccDetail.curveID = TPM2_ECC_NIST_P256;
     in_public.publicArea.parameters.eccDetail.kdf.scheme = TPM2_ALG_NULL;
 
+    if (auth.size > 0) {
+        in_sensitive.sensitive.userAuth = auth;
+    }
     rc = Esys_CreatePrimary(esys, ESYS_TR_RH_OWNER, ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE, &in_sensitive, &in_public, &outside_info, &creation_pcr, &transient, &out_public, &creation_data, &creation_hash, &creation_ticket);
     if (rc != TSS2_RC_SUCCESS || transient == ESYS_TR_NONE) {
         fprintf(stderr, "[otp-linux] Esys_CreatePrimary failed while provisioning TPM key: 0x%x\n", rc);
@@ -331,23 +413,43 @@ static int load_or_create_tpm_p256_key(ESYS_CONTEXT *esys, TPM2_HANDLE handle, E
     }
 
     if (persisted != ESYS_TR_NONE) {
-        *key_out = persisted;
+        Esys_TR_Close(esys, &persisted);
         persisted = ESYS_TR_NONE;
     }
-    else {
-        rc = Esys_TR_FromTPMPublic(esys, handle, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, key_out);
+    rc = Esys_TR_FromTPMPublic(esys, handle, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, key_out);
+    if (rc != TSS2_RC_SUCCESS) {
+        fprintf(stderr, "[otp-linux] Persisted key created but reload failed: 0x%x\n", rc);
+        *key_out = ESYS_TR_NONE;
+        goto cleanup;
+    }
+    if (auth.size > 0) {
+        rc = Esys_TR_SetAuth(esys, *key_out, &auth);
         if (rc != TSS2_RC_SUCCESS) {
-            fprintf(stderr, "[otp-linux] Persisted key created but reload failed: 0x%x\n", rc);
+            Esys_TR_Close(esys, key_out);
             *key_out = ESYS_TR_NONE;
             goto cleanup;
         }
     }
+    if (created_out) {
+        *created_out = 1;
+    }
 
 cleanup:
-    if (creation_ticket) Esys_Free(creation_ticket);
-    if (creation_hash) Esys_Free(creation_hash);
-    if (creation_data) Esys_Free(creation_data);
-    if (out_public) Esys_Free(out_public);
+    if (cap_data) {
+        Esys_Free(cap_data);
+    }
+    if (creation_ticket) {
+        Esys_Free(creation_ticket);
+    }
+    if (creation_hash) {
+        Esys_Free(creation_hash);
+    }
+    if (creation_data) {
+        Esys_Free(creation_data);
+    }
+    if (out_public) {
+        Esys_Free(out_public);
+    }
     if (persisted != ESYS_TR_NONE) {
         Esys_TR_Close(esys, &persisted);
     }
@@ -367,6 +469,8 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     uint8_t peer_priv[32] = {0};
     uint8_t ecdh_secret[132] = {0};
     size_t ecdh_secret_len = 0;
+    char pin[128] = {0};
+    int created_now = 0;
 
     int rc_out = -1;
     TSS2_RC rc;
@@ -402,13 +506,23 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
         fprintf(stderr, "[otp-linux] Esys_Initialize failed: 0x%x\n", rc);
         goto cleanup;
     }
-
-    {
-        unsigned long handle_num = strtoul(handle_hex, NULL, 0);
-        if (load_or_create_tpm_p256_key(esys, (TPM2_HANDLE)handle_num, &tpm_key) != 0) {
-            fprintf(stderr, "[otp-linux] Cannot load/create persistent TPM key at handle: %s\n", handle_hex);
+    unsigned long handle_num = strtoul(handle_hex, NULL, 0);
+    if (read_tpm_pin_prompt("Enter or set TPM key PIN: ", pin, sizeof(pin)) != 0) {
+        fprintf(stderr, "[otp-linux] PIN is required to unlock/provision TPM key\n");
+        goto cleanup;
+    }
+    if (load_or_create_tpm_p256_key(esys, (TPM2_HANDLE)handle_num, pin, &tpm_key, &created_now) != 0) {
+        fprintf(stderr, "[otp-linux] Cannot load/create persistent TPM key at handle: %s\n", handle_hex);
+        goto cleanup;
+    }
+    if (created_now && !getenv("PICO_NOVUS_TPM_PIN") && isatty(STDIN_FILENO)) {
+        char confirm[128] = {0};
+        if (read_tpm_pin_prompt("Confirm TPM key PIN: ", confirm, sizeof(confirm)) != 0 || strcmp(pin, confirm) != 0) {
+            fprintf(stderr, "[otp-linux] PIN confirmation mismatch\n");
+            memset(confirm, 0, sizeof(confirm));
             goto cleanup;
         }
+        memset(confirm, 0, sizeof(confirm));
     }
 
     rc = Esys_ReadPublic(esys, tpm_key, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE, &tpm_pub, NULL, NULL);
@@ -434,6 +548,9 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
 
     rc = Esys_ECDH_ZGen(esys, tpm_key, ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE, &peer_pub, &z_point);
     if (rc != TSS2_RC_SUCCESS || !z_point) {
+        if (rc == TPM2_RC_AUTH_FAIL || rc == TPM2_RC_BAD_AUTH) {
+            fprintf(stderr, "[otp-linux] TPM key auth failed (wrong PIN?)\n");
+        }
         fprintf(stderr, "[otp-linux] Esys_ECDH_ZGen failed: 0x%x\n", rc);
         goto cleanup;
     }
@@ -456,8 +573,13 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     rc_out = 0;
 
 cleanup:
-    if (z_point) Esys_Free(z_point);
-    if (tpm_pub) Esys_Free(tpm_pub);
+    memset(pin, 0, sizeof(pin));
+    if (z_point) {
+        Esys_Free(z_point);
+    }
+    if (tpm_pub) {
+        Esys_Free(tpm_pub);
+    }
     if (esys) {
         if (tpm_key != ESYS_TR_NONE) {
             Esys_TR_Close(esys, &tpm_key);

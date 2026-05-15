@@ -1,20 +1,20 @@
-set(MLKEM_DIR ${CMAKE_CURRENT_LIST_DIR}/../../../../third-party/mlkem/mlkem)
+set(MLDSA_DIR ${CMAKE_CURRENT_LIST_DIR}/../../../../third-party/mldsa/mldsa)
 
-file(GLOB_RECURSE MLKEM_SOURCES
-    ${MLKEM_DIR}/src/*.c
+file(GLOB_RECURSE MLDSA_SOURCES
+    ${MLDSA_DIR}/src/*.c
 )
-list(FILTER MLKEM_SOURCES EXCLUDE REGEX "/native/")
+list(FILTER MLDSA_SOURCES EXCLUDE REGEX "/native/")
 
 idf_component_register(
-    SRCS ${MLKEM_SOURCES}
-    INCLUDE_DIRS ${MLKEM_DIR}
+    SRCS ${MLDSA_SOURCES}
+    INCLUDE_DIRS ${MLDSA_DIR}
 )
 idf_component_set_property(${COMPONENT_NAME} WHOLE_ARCHIVE ON)
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
-    MLK_CONFIG_PARAMETER_SET=512
-    MLK_CONFIG_MULTILEVEL_WITH_SHARED
-    MLK_CONFIG_NAMESPACE_PREFIX=mlkem
+    MLD_CONFIG_PARAMETER_SET=44
+    MLD_CONFIG_MULTILEVEL_WITH_SHARED
+    MLD_CONFIG_NAMESPACE_PREFIX=mldsa
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE

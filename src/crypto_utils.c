@@ -120,26 +120,27 @@ int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
     const uint8_t *tag   = in_buf + in_len - 16;
 
     mbedtls_gcm_context gcm;
-    mbedtls_gcm_init(&gcm);
     uint8_t kenc[32];
     if (version == PIN_KDF_V2) {
         pin_derive_kenc2(key, kenc);
-    } else if (version == PIN_KDF_V1) {
+    }
+    else if (version == PIN_KDF_V1) {
         pin_derive_kenc(key, kenc);
     }
     else {
-        mbedtls_gcm_free(&gcm);
         return PICOKEYS_WRONG_DATA;
     }
-    int rc = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
+    mbedtls_gcm_init(&gcm);
+    int ret = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, kenc, 256);
     mbedtls_platform_zeroize(kenc, sizeof(kenc));
-    if (rc != 0) {
-        return rc;
+    if (ret != 0) {
+        return ret;
     }
 
-    rc = mbedtls_gcm_auth_decrypt(&gcm, in_len - 16 - 12, nonce, 12, pico_serial_hash, sizeof(pico_serial_hash), tag, 16, ct, out_buf);
+    MBEDTLS_MPI_CHK(mbedtls_gcm_auth_decrypt(&gcm, in_len - 16 - 12, nonce, 12, pico_serial_hash, sizeof(pico_serial_hash), tag, 16, ct, out_buf));
+    cleanup:
     mbedtls_gcm_free(&gcm);
-    return rc;
+    return ret;
 }
 
 // Old functions, kept for compatibility. NOT SECURE, use the new ones above.

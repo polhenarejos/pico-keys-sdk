@@ -16,9 +16,9 @@
  */
 
 #include "picokeys.h"
-#include "asn1.h"
+#include "tlv.h"
 
-int asn1_ctx_init(uint8_t *data, uint16_t len, asn1_ctx_t *ctx) {
+int tlv_ctx_init(uint8_t *data, uint16_t len, tlv_ctx_t *ctx) {
     if (!ctx) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
@@ -27,20 +27,20 @@ int asn1_ctx_init(uint8_t *data, uint16_t len, asn1_ctx_t *ctx) {
     return PICOKEYS_OK;
 }
 
-int asn1_ctx_clear(asn1_ctx_t *ctx) {
+int tlv_ctx_clear(tlv_ctx_t *ctx) {
     ctx->data = NULL;
     ctx->len = 0;
     return PICOKEYS_OK;
 }
 
-uint16_t asn1_len(asn1_ctx_t *ctx) {
+uint16_t tlv_len(tlv_ctx_t *ctx) {
     if (ctx->data && ctx->len > 0) {
         return ctx->len;
     }
     return 0;
 }
 
-uint32_t asn1_get_uint(asn1_ctx_t *ctx) {
+uint32_t tlv_get_uint(tlv_ctx_t *ctx) {
     uint32_t d = ctx->data[0];
     for (uint16_t lt = 1; lt < MIN(ctx->len, sizeof(uint32_t)); lt++) {
         d <<= 8;
@@ -49,15 +49,15 @@ uint32_t asn1_get_uint(asn1_ctx_t *ctx) {
     return d;
 }
 
-uint16_t asn1_len_tag(uint16_t tag, uint16_t len) {
-    uint16_t ret = 1 + format_tlv_len(len, NULL) + len;
+uint16_t tlv_len_tag(uint16_t tag, uint16_t len) {
+    uint16_t ret = 1 + tlv_format_len(len, NULL) + len;
     if (tag > 0x00ff) {
         return ret + 1;
     }
     return ret;
 }
 
-uint8_t format_tlv_len(uint16_t len, uint8_t *out) {
+uint8_t tlv_format_len(uint16_t len, uint8_t *out) {
     if (len < 128) {
         if (out) {
             *out = (uint8_t)len;
@@ -78,11 +78,7 @@ uint8_t format_tlv_len(uint16_t len, uint8_t *out) {
     return 3;
 }
 
-int walk_tlv(const asn1_ctx_t *ctxi,
-             uint8_t **p,
-             uint16_t *tag,
-             uint16_t *tag_len,
-             uint8_t **data) {
+int tlv_walk(const tlv_ctx_t *ctxi, uint8_t **p, uint16_t *tag, uint16_t *tag_len, uint8_t **data) {
     if (!p) {
         return 0;
     }
@@ -92,8 +88,7 @@ int walk_tlv(const asn1_ctx_t *ctxi,
     if (*p - ctxi->data >= ctxi->len) {
         return 0;
     }
-    uint16_t tg = 0x0;
-    uint16_t tgl = 0;
+    uint16_t tg = 0x0, tgl = 0;
     tg = *(*p)++;
     if ((tg & 0x1f) == 0x1f) {
         tg <<= 8;
@@ -120,14 +115,10 @@ int walk_tlv(const asn1_ctx_t *ctxi,
     return 1;
 }
 
-bool asn1_find_tag(const asn1_ctx_t *ctxi,
-                   uint16_t itag,
-                   asn1_ctx_t *ctxo) {
-    uint16_t tag = 0x0;
-    uint8_t *p = NULL;
-    uint8_t *tdata = NULL;
-    uint16_t tlen = 0;
-    while (walk_tlv(ctxi, &p, &tag, &tlen, &tdata)) {
+bool tlv_find_tag(const tlv_ctx_t *ctxi, uint16_t itag, tlv_ctx_t *ctxo) {
+    uint16_t tag = 0x0, tlen = 0;
+    uint8_t *p = NULL, *tdata = NULL;
+    while (tlv_walk(ctxi, &p, &tag, &tlen, &tdata)) {
         if (itag == tag) {
             if (ctxo != NULL) {
                 ctxo->data = tdata;

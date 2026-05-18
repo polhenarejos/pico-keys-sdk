@@ -15,33 +15,27 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef _ASN1_H_
-#define _ASN1_H_
+#ifndef _TLV_H_
+#define _TLV_H_
 
 #include <stdint.h>
 #include <stdbool.h>
 #include "compat/compat.h"
 
 PACK(
-typedef struct asn1_ctx {
+typedef struct tlv_ctx {
     uint8_t *data;
     uint16_t len;
-}) asn1_ctx_t;
+}) tlv_ctx_t;
 
-extern int asn1_ctx_init(uint8_t *, uint16_t, asn1_ctx_t *);
-extern int asn1_ctx_clear(asn1_ctx_t *ctx);
-extern uint16_t asn1_len(asn1_ctx_t *ctx);
-extern uint32_t asn1_get_uint(asn1_ctx_t *ctx);
+extern int tlv_ctx_init(uint8_t *, uint16_t, tlv_ctx_t *);
+extern int tlv_ctx_clear(tlv_ctx_t *ctx);
+extern uint16_t tlv_len(tlv_ctx_t *ctx);
+extern uint32_t tlv_get_uint(tlv_ctx_t *ctx);
 
-extern int walk_tlv(const asn1_ctx_t *ctxi,
-                    uint8_t **p,
-                    uint16_t *tag,
-                    uint16_t *tag_len,
-                    uint8_t **data);
-extern uint8_t format_tlv_len(uint16_t len, uint8_t *out);
-extern bool asn1_find_tag(const asn1_ctx_t *ctxi,
-                          uint16_t itag,
-                          asn1_ctx_t *ctxo);
-extern uint16_t asn1_len_tag(uint16_t tag, uint16_t len);
+extern int tlv_walk(const tlv_ctx_t *ctxi, uint8_t **p, uint16_t *tag, uint16_t *tag_len, uint8_t **data);
+extern uint8_t tlv_format_len(uint16_t len, uint8_t *out);
+extern bool tlv_find_tag(const tlv_ctx_t *ctxi, uint16_t itag, tlv_ctx_t *ctxo);
+extern uint16_t tlv_len_tag(uint16_t tag, uint16_t len);
 
 #endif

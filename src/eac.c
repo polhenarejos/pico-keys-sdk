@@ -20,7 +20,7 @@
 #include "crypto_utils.h"
 #include "random.h"
 #include "mbedtls/cmac.h"
-#include "asn1.h"
+#include "tlv.h"
 #include "apdu.h"
 #ifdef ENABLE_EMULATION
 #include "usb/emulation/emulation.h"
@@ -118,9 +118,9 @@ int sm_unwrap(void) {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    asn1_ctx_t ctxi;
-    asn1_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
-    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+    tlv_ctx_t ctxi;
+    tlv_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
+    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x87 || tag == 0x85) {
             body = tag_data;
             body_size = tag_len;
@@ -218,9 +218,9 @@ uint16_t sm_get_le(void) {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    asn1_ctx_t ctxi;
-    asn1_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
-    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+    tlv_ctx_t ctxi;
+    tlv_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
+    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag == 0x97) {
             uint16_t le = 0;
             for (uint16_t t = 1; t <= tag_len; t++) {
@@ -277,12 +277,12 @@ int sm_verify(void) {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    asn1_ctx_t ctxi;
-    asn1_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
-    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+    tlv_ctx_t ctxi;
+    tlv_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
+    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag & 0x1) {
             input[input_len++] = (uint8_t)tag;
-            uint8_t tlen = format_tlv_len(tag_len, input + input_len);
+            uint8_t tlen = tlv_format_len(tag_len, input + input_len);
             input_len += tlen;
             memcpy(input + input_len, tag_data, tag_len);
             input_len += tag_len;

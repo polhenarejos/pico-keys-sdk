@@ -17,7 +17,7 @@
 
 #include "picokeys.h"
 #include "file.h"
-#include "asn1.h"
+#include "tlv.h"
 #include "apdu.h"
 #include <stdio.h>
 
@@ -377,9 +377,9 @@ uint16_t meta_find(uint16_t fid, uint8_t **out) {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    asn1_ctx_t ctxi;
-    asn1_ctx_init(file_get_data(ef), file_get_size(ef), &ctxi);
-    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+    tlv_ctx_t ctxi;
+    tlv_ctx_init(file_get_data(ef), file_get_size(ef), &ctxi);
+    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag_len < 2) {
             continue;
         }
@@ -402,16 +402,16 @@ int meta_delete(uint16_t fid) {
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
     uint8_t *fdata = NULL;
-    asn1_ctx_t ctxi;
-    asn1_ctx_init(file_get_data(ef), file_get_size(ef), &ctxi);
-    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
-        uint8_t *tpos = p - tag_len - format_tlv_len(tag_len, NULL) - 1;
+    tlv_ctx_t ctxi;
+    tlv_ctx_init(file_get_data(ef), file_get_size(ef), &ctxi);
+    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+        uint8_t *tpos = p - tag_len - tlv_format_len(tag_len, NULL) - 1;
         if (tag_len < 2) {
             continue;
         }
         uint16_t cfid = get_uint16_be(tag_data);
         if (cfid == fid) {
-            uint16_t new_len = ctxi.len - 1 - tag_len - format_tlv_len(tag_len, NULL);
+            uint16_t new_len = ctxi.len - 1 - tag_len - tlv_format_len(tag_len, NULL);
             if (new_len == 0) {
                 flash_clear_file(ef);
             }
@@ -447,9 +447,9 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     uint16_t tag = 0x0;
     uint8_t *tag_data = NULL, *p = NULL;
     uint16_t tag_len = 0;
-    asn1_ctx_t ctxi;
-    asn1_ctx_init(fdata, ef_size, &ctxi);
-    while (walk_tlv(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+    tlv_ctx_t ctxi;
+    tlv_ctx_init(fdata, ef_size, &ctxi);
+    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag_len < 2) {
             continue;
         }
@@ -465,7 +465,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 return PICOKEYS_OK;
             }
             else {   //needs reallocation
-                uint8_t *tpos = p - asn1_len_tag(tag, tag_len);
+                uint8_t *tpos = p - tlv_len_tag(tag, tag_len);
                 memmove(tpos, p, fdata + ef_size - p);
                 tpos += fdata + ef_size - p;
                 volatile uintptr_t meta_offset = tpos - fdata;
@@ -482,7 +482,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 }
                 uint8_t *f = fdata + meta_offset;
                 *f++ = fid & 0xff;
-                f += format_tlv_len(len + 2, f);
+                f += tlv_format_len(len + 2, f);
                 f += put_uint16_be(fid, f);
                 memcpy(f, data, len);
                 r = file_put_data(ef, fdata, ef_size);
@@ -494,13 +494,13 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
             }
         }
     }
-    fdata = (uint8_t *) realloc(fdata, ef_size + asn1_len_tag(fid & 0x1f, len + 2));
+    fdata = (uint8_t *) realloc(fdata, ef_size + tlv_len_tag(fid & 0x1f, len + 2));
     uint8_t *f = fdata + ef_size;
     *f++ = fid & 0x1f;
-    f += format_tlv_len(len + 2, f);
+    f += tlv_format_len(len + 2, f);
     f += put_uint16_be(fid, f);
     memcpy(f, data, len);
-    r = file_put_data(ef, fdata, ef_size + (uint16_t)asn1_len_tag(fid & 0x1f, len + 2));
+    r = file_put_data(ef, fdata, ef_size + (uint16_t)tlv_len_tag(fid & 0x1f, len + 2));
     free(fdata);
     if (r != PICOKEYS_OK) {
         return PICOKEYS_EXEC_ERROR;

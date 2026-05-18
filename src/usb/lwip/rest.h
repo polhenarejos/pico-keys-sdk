@@ -18,6 +18,7 @@
 #ifndef REST_H
 #define REST_H
 
+#include "compat/compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -71,6 +71,13 @@ typedef struct {
     bool request_complete;
     bool request_dispatched;
     bool request_headers_parsed;
+#ifndef ENABLE_EMULATION
+    const char *tx_body;
+    size_t tx_body_len;
+    size_t tx_body_sent;
+    bool tx_pending;
+    bool tx_body_owned;
+#endif
     char request[REST_MAX_REQUEST_SIZE + 1];
 #ifdef ENABLE_EMULATION
     char _padding2[2];

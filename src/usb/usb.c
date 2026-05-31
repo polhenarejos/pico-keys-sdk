@@ -347,7 +347,14 @@ int card_status(uint8_t itf) {
             }
 #ifndef ENABLE_EMULATION
             else if (m == EV_PRESS_BUTTON) {
-                uint32_t flag = button_wait() ? EV_BUTTON_TIMEOUT : EV_BUTTON_PRESSED;
+                int ret = button_wait();
+                uint32_t flag = EV_BUTTON_PRESSED;
+                if (ret == 1) { //timeout
+                    flag = EV_BUTTON_TIMEOUT;
+                }
+                else if (ret == 2) { //cancelled
+                    flag = EV_BUTTON_CANCELLED;
+                }
                 queue_try_add(&usb_to_card_q, &flag);
             }
 #endif

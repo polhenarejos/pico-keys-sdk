@@ -49,6 +49,7 @@
 #define EV_EXIT                   8
 #define EV_BUTTON_TIMEOUT        16
 #define EV_BUTTON_PRESSED        32
+#define EV_BUTTON_CANCELLED      64
 
 enum { ITF_INVALID = 0xFF };
 

@@ -40,6 +40,7 @@ bool is_req_button_pending(void) {
 }
 
 bool cancel_button = false;
+bool touch_accept_button = false;
 
 #if !defined(ENABLE_EMULATION)
 #ifdef ESP_PLATFORM
@@ -94,7 +95,7 @@ static bool button_pressed_state = false;
 static uint32_t button_pressed_time = 0;
 static uint8_t button_press = 0;
 
-bool button_wait(void) {
+int button_wait(void) {
     /* Disabled by default. As LED may not be properly configured,
        it will not be possible to indicate button press unless it
        is commissioned. */
@@ -103,7 +104,7 @@ bool button_wait(void) {
         button_timeout = phy_data.up_btn * 1000;
     }
     if (button_timeout == 0) {
-        return false;
+        return 0;
     }
     signal_user_presence_request_data_t data = {
         .timeout = button_timeout / 1000,
@@ -137,14 +138,14 @@ bool button_wait(void) {
     req_button_pending = false;
     if (timeout) {
         signal_emit(SIGNAL_USER_PRESENCE_TIMEOUT);
+        return 1;
     }
     else if (cancel_button) {
         signal_emit(SIGNAL_USER_PRESENCE_CANCELLED);
+        return 2;
     }
-    else {
-        signal_emit(SIGNAL_USER_PRESENCE_COMPLETED);
-    }
-    return timeout || cancel_button;
+    signal_emit(SIGNAL_USER_PRESENCE_COMPLETED);
+    return 0;
 }
 #endif
 
@@ -170,4 +171,3 @@ void button_task(void) {
     }
 #endif
 }
-

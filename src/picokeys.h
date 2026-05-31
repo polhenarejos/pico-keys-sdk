@@ -172,4 +172,33 @@ extern bool is_req_button_pending(void);
 
 extern int set_atr(void);
 
+
+#define MAX_SIGNALS 32
+typedef enum {
+    SIGNAL_NONE = 0,
+    SIGNAL_BOOT = 1,
+    SIGNAL_USB_MOUNTED = 2,
+    SIGNAL_BUTTON_PRESS = 3,
+    SIGNAL_BUTTON_RELEASE = 4,
+    SIGNAL_USER_PRESENCE_REQUEST = 5,
+} signal_code_t;
+
+typedef enum {
+    SIGNAL_FLAG_NONE = 0x0,
+    SIGNAL_FLAG_ERROR_CONTINUE = 0x1,
+} signal_flag_t;
+
+typedef int (*signal_handler_t)(signal_code_t, void *);
+
+typedef struct {
+    signal_code_t code;
+    signal_flag_t flags;
+    signal_handler_t handler;
+} signal_t;
+
+extern int signal_add(signal_code_t code, signal_flag_t flags, signal_handler_t handler);
+extern int signal_remove(signal_code_t code, signal_handler_t handler);
+extern int signal_emit_param(signal_code_t code, void *data);
+extern int signal_emit(signal_code_t code);
+
 #endif

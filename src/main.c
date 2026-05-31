@@ -50,6 +50,9 @@ app_t *current_app = NULL;
 
 const uint8_t *ccid_atr = NULL;
 
+signal_t signals[MAX_SIGNALS] = {0};
+uint8_t num_signals = 0;
+
 bool app_exists(const uint8_t *aid, size_t aid_len) {
     for (int a = 0; a < num_apps; a++) {
         if (aid_len >= apps[a].aid[0] && !memcmp(apps[a].aid + 1, aid, apps[a].aid[0])) {
@@ -214,4 +217,44 @@ int main(void) {
 #endif
 
     return 0;
+}
+
+int signal_add(signal_code_t code, signal_flag_t flags, signal_handler_t handler) {
+    if (num_signals >= MAX_SIGNALS) {
+        return -1;
+    }
+    signals[num_signals].code = code;
+    signals[num_signals].flags = flags;
+    signals[num_signals].handler = handler;
+    num_signals++;
+    return 0;
+}
+
+int signal_remove(signal_code_t code, signal_handler_t handler) {
+    for (int i = 0; i < num_signals; i++) {
+        if (signals[i].code == code && signals[i].handler == handler) {
+            for (int j = i; j < num_signals - 1; j++) {
+                signals[j] = signals[j + 1];
+            }
+            num_signals--;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int signal_emit_param(signal_code_t code, void *data) {
+    for (int i = 0; i < num_signals; i++) {
+        if (signals[i].code == code) {
+            int ret = signals[i].handler(code, data);
+            if (ret != 0 && (signals[i].flags & SIGNAL_FLAG_ERROR_CONTINUE) == 0) {
+                return ret;
+            }
+        }
+    }
+    return 0;
+}
+
+int signal_emit(signal_code_t code) {
+    return signal_emit_param(code, NULL);
 }

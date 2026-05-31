@@ -27,6 +27,7 @@
 #include "driver/gpio.h"
 #endif
 #include "usb.h"
+#include "signal.h"
 
 extern void execute_tasks(void);
 
@@ -104,6 +105,10 @@ bool button_wait(void) {
     if (button_timeout == 0) {
         return false;
     }
+    signal_user_presence_request_data_t data = {
+        .timeout = button_timeout / 1000,
+    };
+    signal_emit_param(SIGNAL_USER_PRESENCE_REQUEST, &data);
     uint32_t start_button = board_millis();
     bool timeout = false;
     cancel_button = false;
@@ -130,6 +135,15 @@ bool button_wait(void) {
     }
     led_set_mode(led_mode);
     req_button_pending = false;
+    if (timeout) {
+        signal_emit(SIGNAL_USER_PRESENCE_TIMEOUT);
+    }
+    else if (cancel_button) {
+        signal_emit(SIGNAL_USER_PRESENCE_CANCELLED);
+    }
+    else {
+        signal_emit(SIGNAL_USER_PRESENCE_COMPLETED);
+    }
     return timeout || cancel_button;
 }
 #endif

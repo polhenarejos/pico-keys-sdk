@@ -330,6 +330,7 @@ list(APPEND PICOKEYS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/pico_time.c
     ${CMAKE_CURRENT_LIST_DIR}/src/button.c
     ${CMAKE_CURRENT_LIST_DIR}/src/led/led.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/signal.c
 )
 
 if(ESP_PLATFORM)

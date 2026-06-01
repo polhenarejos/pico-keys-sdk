@@ -104,6 +104,7 @@ int button_wait(void) {
         button_timeout = phy_data.up_btn * 1000;
     }
     if (button_timeout == 0) {
+        signal_emit(SIGNAL_USER_PRESENCE_COMPLETED);
         return 0;
     }
     signal_user_presence_request_data_t data = {

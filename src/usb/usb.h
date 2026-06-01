@@ -92,7 +92,7 @@ extern void card_exit(void);
 extern int card_status(uint8_t itf);
 extern void usb_init(void);
 
-extern uint16_t finished_data_size;
+extern volatile uint16_t finished_data_size;
 extern void usb_set_timeout_counter(uint8_t itf, uint32_t v);
 extern void card_init_core1(void);
 

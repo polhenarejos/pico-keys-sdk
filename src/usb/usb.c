@@ -250,20 +250,21 @@ void usb_send_event(uint32_t flag) {
     if (flag == EV_CMD_AVAILABLE) {
         timeout_start();
     }
+#ifndef ENABLE_EMULATION
+    mutex_exit(&mutex);
+#endif
+
     if (flag != EV_CMD_AVAILABLE) {
         uint32_t m;
         queue_remove_blocking(&card_to_usb_q , &m);
     }
-#ifndef ENABLE_EMULATION
-    mutex_exit(&mutex);
-#endif
 }
 
 void card_init_core1(void) {
     low_flash_init_core1();
 }
 
-uint16_t finished_data_size = 0;
+volatile uint16_t finished_data_size = 0;
 
 void card_start(uint8_t itf, void *(*func)(void *)) {
     timeout_start();

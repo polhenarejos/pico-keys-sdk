@@ -132,6 +132,10 @@ static void core0_loop(void *arg) {
         hwrng_task();
         flash_task();
         button_task();
+#ifdef PICO_PLATFORM
+        // Avoid a pure busy loop on core0; gives the system a scheduling hint.
+        tight_loop_contents();
+#endif
 #ifdef ESP_PLATFORM
         vTaskDelay(pdMS_TO_TICKS(10));
 #endif

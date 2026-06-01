@@ -209,6 +209,8 @@ static void send_json_error(rest_conn_t *conn, int status_code, const char *erro
 }
 
 void rest_task(void) {
+    const uint32_t status_poll_interval_ms = 1;
+    static uint32_t last_status_poll_ms = 0;
     if (!rest_core1_job_pending_load()) {
         rest_route_handler_t handler = rest_background_job_pop();
         if (handler != NULL) {
@@ -219,6 +221,12 @@ void rest_task(void) {
         }
         return;
     }
+    uint32_t now_ms = board_millis();
+    if (now_ms - last_status_poll_ms < status_poll_interval_ms) {
+        return;
+    }
+    last_status_poll_ms = now_ms;
+
     int status = card_status(ITF_LWIP);
     if (status != PICOKEYS_OK) {
         return;

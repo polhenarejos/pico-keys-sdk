@@ -601,6 +601,8 @@ void driver_exec_finished_cont_hid(uint8_t itf, uint16_t size_next, uint16_t off
 }
 
 void hid_task(void) {
+    const uint32_t status_poll_interval_ms = 1;
+    static uint32_t last_status_poll_ms = 0;
 #ifdef ENABLE_EMULATION
     uint16_t rx_len = emul_read(ITF_HID);
     if (rx_len) {
@@ -620,12 +622,16 @@ void hid_task(void) {
     if (proc_pkt == 0) {
         driver_process_usb_nopacket_hid();
     }
-    int status = card_status(ITF_HID);
-    if (status == PICOKEYS_OK) {
-        driver_exec_finished_hid(finished_data_size);
-    }
-    else if (status == PICOKEYS_ERR_BLOCKED) {
-        send_keepalive();
+    uint32_t now_ms = board_millis();
+    if (now_ms - last_status_poll_ms >= status_poll_interval_ms) {
+        last_status_poll_ms = now_ms;
+        int status = card_status(ITF_HID);
+        if (status == PICOKEYS_OK) {
+            driver_exec_finished_hid(finished_data_size);
+        }
+        else if (status == PICOKEYS_ERR_BLOCKED) {
+            send_keepalive();
+        }
     }
     if (hid_tx[ITF_HID_CTAP].w_ptr > hid_tx[ITF_HID_CTAP].r_ptr && last_write_result[ITF_HID_CTAP] != WRITE_PENDING) {
         if (driver_write_hid(ITF_HID_CTAP, hid_tx[ITF_HID_CTAP].buffer + hid_tx[ITF_HID_CTAP].r_ptr, 64) > 0) {

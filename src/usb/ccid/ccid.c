@@ -345,13 +345,20 @@ void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t of
 }
 
 void ccid_task(void) {
+    const uint32_t status_poll_interval_ms = 1;
+    static uint32_t last_status_poll_ms[8] = {0};
+    uint32_t now_ms = board_millis();
     for (uint8_t itf = 0; itf < ITF_SC_TOTAL; itf++) {
-        int status = card_status(sc_itf_to_usb_itf(itf));
-        if (status == PICOKEYS_OK) {
-            driver_exec_finished_ccid(itf, finished_data_size);
-        }
-        else if (status == PICOKEYS_ERR_BLOCKED) {
-            driver_exec_timeout_ccid(itf);
+        if (itf < (sizeof(last_status_poll_ms) / sizeof(last_status_poll_ms[0])) &&
+            now_ms - last_status_poll_ms[itf] >= status_poll_interval_ms) {
+            last_status_poll_ms[itf] = now_ms;
+            int status = card_status(sc_itf_to_usb_itf(itf));
+            if (status == PICOKEYS_OK) {
+                driver_exec_finished_ccid(itf, finished_data_size);
+            }
+            else if (status == PICOKEYS_ERR_BLOCKED) {
+                driver_exec_timeout_ccid(itf);
+            }
         }
         if (ccid_tx[itf].w_ptr > ccid_tx[itf].r_ptr) {
             if (driver_write_ccid(itf, ccid_tx[itf].buffer + ccid_tx[itf].r_ptr, ccid_tx[itf].w_ptr - ccid_tx[itf].r_ptr) > 0) {

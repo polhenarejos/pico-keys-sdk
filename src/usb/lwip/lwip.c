@@ -232,11 +232,37 @@ void tud_network_init_cb(void) {
 }
 
 int lwip_itf_init(void) {
+  const uint32_t init_timeout_ms = 5000;
+  uint32_t start_ms = board_millis();
   init_lwip();
-  while (!netif_is_up(&netif_data));
+
+  while (!netif_is_up(&netif_data)) {
+    if (board_millis() - start_ms >= init_timeout_ms) {
+      return -1;
+    }
+#if defined(ESP_PLATFORM)
+    vTaskDelay(pdMS_TO_TICKS(1));
+#else
+    sleep_ms(1);
+#endif
+  }
+
 #if !defined(ESP_PLATFORM)
-  while (dhserv_init(&dhcp_config) != ERR_OK);
-  while (dnserv_init(IP_ADDR_ANY, 53, dns_query_proc) != ERR_OK);
+  start_ms = board_millis();
+  while (dhserv_init(&dhcp_config) != ERR_OK) {
+    if (board_millis() - start_ms >= init_timeout_ms) {
+      return -1;
+    }
+    sleep_ms(1);
+  }
+
+  start_ms = board_millis();
+  while (dnserv_init(IP_ADDR_ANY, 53, dns_query_proc) != ERR_OK) {
+    if (board_millis() - start_ms >= init_timeout_ms) {
+      return -1;
+    }
+    sleep_ms(1);
+  }
 #else
   if (dhcps == NULL) {
     dhcps = dhcps_new();
@@ -246,10 +272,27 @@ int lwip_itf_init(void) {
     ip_addr_t dns_server;
     ip_addr_copy_from_ip4(dns_server, ipaddr);
     (void) dhcps_dns_setserver(dhcps, &dns_server);
-    while (dhcps_start(dhcps, &netif_data, ipaddr) != ERR_OK);
+    start_ms = board_millis();
+    while (dhcps_start(dhcps, &netif_data, ipaddr) != ERR_OK) {
+      if (board_millis() - start_ms >= init_timeout_ms) {
+        return -1;
+      }
+      vTaskDelay(pdMS_TO_TICKS(1));
+    }
   }
 #endif
-  while (rest_server_init(REST_CONN_ALL) != ERR_OK);
+
+  start_ms = board_millis();
+  while (rest_server_init(REST_CONN_ALL) != ERR_OK) {
+    if (board_millis() - start_ms >= init_timeout_ms) {
+      return -1;
+    }
+#if defined(ESP_PLATFORM)
+    vTaskDelay(pdMS_TO_TICKS(1));
+#else
+    sleep_ms(1);
+#endif
+  }
 
   return 0;
 }

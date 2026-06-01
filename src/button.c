@@ -111,24 +111,37 @@ int button_wait(void) {
     };
     signal_emit_param(SIGNAL_USER_PRESENCE_REQUEST, &data);
     uint32_t start_button = board_millis();
+    const uint32_t button_poll_interval_ms = 2;
+    uint32_t next_button_poll_ms = start_button;
+    bool button_pressed = picok_board_button_read();
     bool timeout = false;
     cancel_button = false;
     uint32_t led_mode = led_get_mode();
     led_set_mode(MODE_BUTTON);
     req_button_pending = true;
-    while (picok_board_button_read() == false && cancel_button == false) {
+    while (button_pressed == false && cancel_button == false) {
         execute_tasks();
+        uint32_t now = board_millis();
+        if (now >= next_button_poll_ms) {
+            button_pressed = picok_board_button_read();
+            next_button_poll_ms = now + button_poll_interval_ms;
+        }
         //sleep_ms(10);
-        if (start_button + button_timeout < board_millis()) { /* timeout */
+        if (start_button + button_timeout < now) { /* timeout */
             timeout = true;
             break;
         }
     }
     if (!timeout) {
-        while (picok_board_button_read() == true && cancel_button == false) {
+        while (button_pressed == true && cancel_button == false) {
             execute_tasks();
+            uint32_t now = board_millis();
+            if (now >= next_button_poll_ms) {
+                button_pressed = picok_board_button_read();
+                next_button_poll_ms = now + button_poll_interval_ms;
+            }
             //sleep_ms(10);
-            if (start_button + 15000 < board_millis()) { /* timeout */
+            if (start_button + 15000 < now) { /* timeout */
                 timeout = true;
                 break;
             }

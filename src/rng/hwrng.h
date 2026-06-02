@@ -18,11 +18,13 @@
 #ifndef _NEUG_H_
 #define _NEUG_H_
 #include <stdint.h>
+#include <stddef.h>
 
-void hwrng_init(uint32_t *buf, uint8_t size);
-uint32_t hwrng_get(void);
+void hwrng_init(uint8_t *buf, size_t size);
+size_t hwrng_read(uint8_t *buf, size_t len);
 void hwrng_flush(void);
 void hwrng_wait_full(void);
 void *hwrng_task(void);
+uint32_t hwrng_get(void);
 
 #endif

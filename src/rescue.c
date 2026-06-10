@@ -31,7 +31,7 @@
 #include "random.h"
 #include "crypto_utils.h"
 #include "usb.h"
-
+#include "trusted.h"
 
 #ifdef PICO_PLATFORM
 extern char __flash_binary_start;
@@ -351,6 +351,18 @@ static int cmd_read(void) {
         else if (p2 == 0x2) {
             res_APDU_size += put_uint32_be((uint32_t)tv_sec, res_APDU);
         }
+    }
+    else if (p1 == 0x5) { // GET TRUST DIGEST
+        uint8_t digest[32];
+        int ret = trusted_region_sha256(digest);
+        if (ret != PICOKEYS_OK) {
+            return SW_EXEC_ERROR();
+        }
+        memcpy(res_APDU, digest, 32);
+        res_APDU_size = 32;
+    }
+    else {
+        return SW_INCORRECT_P1P2();
     }
     return SW_OK();
 }

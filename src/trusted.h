@@ -23,16 +23,23 @@
 
 extern const uint8_t __trusted_start[];
 extern const uint8_t __trusted_end[];
-extern const uint8_t __trusted_load_start[];
-extern const uint8_t __trusted_load_end[];
 
 /* The canonical trusted measurement is always the flash image range. */
 const uint8_t *trusted_region_start(void);
 const uint8_t *trusted_region_end(void);
-const uint8_t *trusted_region_load_start(void);
-const uint8_t *trusted_region_load_end(void);
 size_t trusted_region_size(void);
 void trusted_region_init(void);
 int trusted_region_sha256(uint8_t out[32]);
+
+typedef void *(*picokeys_trusted_memset_fn)(void *, int, size_t);
+typedef void *(*picokeys_trusted_memcpy_fn)(void *, const void *, size_t);
+typedef void *(*picokeys_trusted_memmove_fn)(void *, const void *, size_t);
+typedef int (*picokeys_trusted_memcmp_fn)(const void *, const void *, size_t);
+typedef size_t (*picokeys_trusted_strlen_fn)(const char *);
+typedef int (*picokeys_trusted_strncmp_fn)(const char *, const char *, size_t);
+typedef char *(*picokeys_trusted_strncpy_fn)(char *, const char *, size_t);
+typedef char *(*picokeys_trusted_strchr_fn)(const char *, int);
+typedef void *(*picokeys_trusted_calloc_fn)(size_t, size_t);
+typedef void (*picokeys_trusted_free_fn)(void *);
 
 #endif

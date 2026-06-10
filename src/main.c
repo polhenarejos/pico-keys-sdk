@@ -42,6 +42,7 @@
 #include "pico_time.h"
 #include "serial.h"
 #include "mbedtls/sha256.h"
+#include "trusted.h"
 
 app_t apps[16];
 uint8_t num_apps = 0;
@@ -152,6 +153,7 @@ int app_main(void) {
 #else
 int main(void) {
 #endif
+    trusted_region_init();
     serial_init();
 
 #ifndef ENABLE_EMULATION

@@ -81,6 +81,8 @@ if(NOT DEFINED ENABLE_EMULATION)
 endif()
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/openssl.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/build_helpers.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/trusted.cmake)
+picokeys_init_trusted_config()
 
 option(ENABLE_DELAYED_BOOT "Enable/disable delayed boot" OFF)
 configure_bool_option(
@@ -455,49 +457,11 @@ endif()
 if(NOT ESP_PLATFORM)
     if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
         add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
-        target_include_directories(mbedtls SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include)
-
-        if(PICO_PLATFORM AND NOT ENABLE_EMULATION)
-            set(TRUSTED_MBEDTLS_ARCHIVE ${CMAKE_CURRENT_BINARY_DIR}/libtrusted_mbedtls.a)
-            add_custom_command(
-                OUTPUT ${TRUSTED_MBEDTLS_ARCHIVE}
-                COMMAND ${CMAKE_COMMAND} -E rm -f ${TRUSTED_MBEDTLS_ARCHIVE}
-                COMMAND ${CMAKE_OBJCOPY} --prefix-alloc-sections=.trusted $<TARGET_FILE:mbedtls> ${TRUSTED_MBEDTLS_ARCHIVE}
-                DEPENDS mbedtls
-                VERBATIM
-            )
-            add_custom_target(trusted_mbedtls_archive DEPENDS ${TRUSTED_MBEDTLS_ARCHIVE})
-            add_library(trusted_mbedtls STATIC IMPORTED GLOBAL)
-            add_dependencies(trusted_mbedtls trusted_mbedtls_archive)
-            set_target_properties(trusted_mbedtls PROPERTIES
-                IMPORTED_LOCATION ${TRUSTED_MBEDTLS_ARCHIVE}
-            )
-            add_compile_definitions(PICOKEYS_HAS_TRUSTED_REGION=1)
-        elseif(ENABLE_EMULATION AND NOT MSVC)
-            set(TRUSTED_REGION_EMBED_INPUT
-                ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}mbedtls${CMAKE_STATIC_LIBRARY_SUFFIX}
-            )
-            if(APPLE)
-                set(PICOKEYS_TRUSTED_SECTION_DIRECTIVE ".section __DATA,__trusted_region,regular,no_dead_strip")
-                set(PICOKEYS_TRUSTED_START_SYM "___trusted_start")
-                set(PICOKEYS_TRUSTED_END_SYM "___trusted_end")
-                set(PICOKEYS_TRUSTED_LOAD_START_SYM "___trusted_load_start")
-                set(PICOKEYS_TRUSTED_LOAD_END_SYM "___trusted_load_end")
-            else()
-                set(PICOKEYS_TRUSTED_SECTION_DIRECTIVE ".section .trusted_region,\"a\",@progbits")
-                set(PICOKEYS_TRUSTED_START_SYM "__trusted_start")
-                set(PICOKEYS_TRUSTED_END_SYM "__trusted_end")
-                set(PICOKEYS_TRUSTED_LOAD_START_SYM "__trusted_load_start")
-                set(PICOKEYS_TRUSTED_LOAD_END_SYM "__trusted_load_end")
-            endif()
-            set(TRUSTED_REGION_EMBED_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/trusted_region_embed.S)
-            configure_file(
-                ${CMAKE_CURRENT_LIST_DIR}/src/trusted_region_embed.in.S
-                ${TRUSTED_REGION_EMBED_SOURCE}
-                @ONLY
-            )
-            add_compile_definitions(PICOKEYS_HAS_TRUSTED_REGION=1)
-        endif()
+        target_include_directories(mbedtls SYSTEM PUBLIC
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
+            ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
+        )
+        configure_picokeys_mbedtls_target(mbedtls)
     endif()
     if(ENABLE_LIBCVC)
         add_library(libcvc STATIC ${LIBCVC_SOURCES})
@@ -517,29 +481,7 @@ if(NOT ESP_PLATFORM)
     endif()
 endif()
 
-if(ESP_PLATFORM AND NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
-    add_library(trusted_mbedtls_payload STATIC ${MBEDTLS_SOURCES})
-    target_include_directories(trusted_mbedtls_payload
-        SYSTEM PRIVATE
-            ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
-            ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
-    )
-    set(TRUSTED_REGION_EMBED_INPUT
-        ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}trusted_mbedtls_payload${CMAKE_STATIC_LIBRARY_SUFFIX}
-    )
-    set(PICOKEYS_TRUSTED_SECTION_DIRECTIVE ".section .rodata.trusted_region,\"a\",@progbits")
-    set(PICOKEYS_TRUSTED_START_SYM "__trusted_start")
-    set(PICOKEYS_TRUSTED_END_SYM "__trusted_end")
-    set(PICOKEYS_TRUSTED_LOAD_START_SYM "__trusted_load_start")
-    set(PICOKEYS_TRUSTED_LOAD_END_SYM "__trusted_load_end")
-    set(TRUSTED_REGION_EMBED_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/trusted_region_embed.S)
-    configure_file(
-        ${CMAKE_CURRENT_LIST_DIR}/src/trusted_region_embed.in.S
-        ${TRUSTED_REGION_EMBED_SOURCE}
-        @ONLY
-    )
-    add_compile_definitions(PICOKEYS_HAS_TRUSTED_REGION=1)
-endif()
+picokeys_setup_trusted_mbedtls()
 
 if(PICO_PLATFORM)
     list(APPEND LIBRARIES
@@ -614,14 +556,7 @@ else()
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/mman.c
     )
 endif()
-if(DEFINED TRUSTED_REGION_EMBED_SOURCE)
-    set_source_files_properties(${TRUSTED_REGION_EMBED_SOURCE} PROPERTIES
-        OBJECT_DEPENDS "${TRUSTED_REGION_EMBED_INPUT}"
-    )
-    list(APPEND PICOKEYS_SOURCES
-        ${TRUSTED_REGION_EMBED_SOURCE}
-    )
-endif()
+picokeys_configure_trusted_support_sources()
 
 if(ENABLE_EMULATION)
     if(APPLE)
@@ -760,6 +695,7 @@ if(PICO_RP2350)
         )
         target_link_libraries(mbedtls PRIVATE pico_sha256_headers)
     endif()
+    picokeys_configure_rp2350_trusted()
     list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt/sha256_alt.c
     )
@@ -772,19 +708,7 @@ if(NOT TARGET picokeys_sdk)
     if(PICO_PLATFORM)
         pico_add_library(picokeys_sdk)
 
-        if(TARGET trusted_mbedtls)
-            target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
-                "-Wl,--whole-archive"
-                trusted_mbedtls
-                "-Wl,--no-whole-archive"
-            )
-            target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
-                "LINKER:-T,${CMAKE_CURRENT_LIST_DIR}/../trusted_region.ld"
-            )
-            set_property(TARGET ${CMAKE_PROJECT_NAME} APPEND PROPERTY LINK_DEPENDS
-                ${CMAKE_CURRENT_LIST_DIR}/../trusted_region.ld
-            )
-        endif()
+        picokeys_link_trusted_region(${CMAKE_PROJECT_NAME})
         target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBRARIES})
     else()
         add_impl_library(picokeys_sdk)

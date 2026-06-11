@@ -335,13 +335,6 @@ list(APPEND PICOKEYS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/signal.c
 )
 
-if(PICO_RP2350 OR ENABLE_EMULATION OR ESP_PLATFORM)
-    add_compile_definitions(PICOKEYS_HAS_TRUSTED_REGION=1)
-    list(APPEND PICOKEYS_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/src/trusted.c
-    )
-endif()
-
 if(ESP_PLATFORM)
     list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/led/led_neopixel.c
@@ -460,35 +453,6 @@ if(UNIX AND NOT APPLE AND ENABLE_EMULATION)
     endif()
 endif()
 
-if(NOT ESP_PLATFORM)
-    if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
-        add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
-        target_include_directories(mbedtls SYSTEM PUBLIC
-            ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
-            ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
-        )
-        configure_picokeys_mbedtls_target(mbedtls)
-    endif()
-    if(ENABLE_LIBCVC)
-        add_library(libcvc STATIC ${LIBCVC_SOURCES})
-        target_include_directories(libcvc SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/src ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/include)
-        target_link_libraries(libcvc PRIVATE mbedtls)
-        list(APPEND LIBRARIES libcvc)
-    endif()
-    if(USB_ITF_HID)
-        add_library(tinycbor STATIC ${CBOR_SOURCES})
-        target_include_directories(tinycbor SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src)
-        list(APPEND LIBRARIES tinycbor)
-    endif()
-    if(USB_ITF_LWIP)
-        add_library(cjson STATIC ${CJSON_SOURCES})
-        target_include_directories(cjson SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson)
-        list(APPEND LIBRARIES cjson)
-    endif()
-endif()
-
-picokeys_setup_trusted_mbedtls()
-
 if(PICO_PLATFORM)
     list(APPEND LIBRARIES
         pico_stdlib
@@ -562,7 +526,6 @@ else()
         ${CMAKE_CURRENT_LIST_DIR}/src/fs/mman.c
     )
 endif()
-picokeys_configure_trusted_support_sources()
 
 if(ENABLE_EMULATION)
     if(APPLE)
@@ -616,6 +579,48 @@ endif()
 
 if(PICO_PLATFORM)
     pico_sdk_init()
+    picokeys_resolve_trusted_toolchain()
+    picokeys_setup_trusted_mbedtls()
+else()
+    picokeys_resolve_trusted_toolchain()
+    picokeys_setup_trusted_mbedtls()
+endif()
+picokeys_configure_trusted_support_sources()
+
+if(NOT ESP_PLATFORM)
+    if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
+        if(PICO_RP2350)
+            add_library(mbedtls INTERFACE)
+            target_include_directories(mbedtls INTERFACE
+                ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
+                ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
+            )
+            target_link_libraries(mbedtls INTERFACE trusted_mbedtls)
+        else()
+            add_library(mbedtls STATIC ${MBEDTLS_SOURCES})
+            target_include_directories(mbedtls SYSTEM PUBLIC
+                ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
+                ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
+            )
+            configure_picokeys_mbedtls_target(mbedtls)
+        endif()
+    endif()
+    if(ENABLE_LIBCVC)
+        add_library(libcvc STATIC ${LIBCVC_SOURCES})
+        target_include_directories(libcvc SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/src ${CMAKE_CURRENT_LIST_DIR}/third-party/libcvc/include)
+        target_link_libraries(libcvc PRIVATE mbedtls)
+        list(APPEND LIBRARIES libcvc)
+    endif()
+    if(USB_ITF_HID)
+        add_library(tinycbor STATIC ${CBOR_SOURCES})
+        target_include_directories(tinycbor SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/tinycbor/src)
+        list(APPEND LIBRARIES tinycbor)
+    endif()
+    if(USB_ITF_LWIP)
+        add_library(cjson STATIC ${CJSON_SOURCES})
+        target_include_directories(cjson SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR}/third-party/cjson)
+        list(APPEND LIBRARIES cjson)
+    endif()
 endif()
 
 if(ESP_PLATFORM)
@@ -680,6 +685,10 @@ if(USB_ITF_LWIP)
 endif()
 
 if(PICO_RP2350)
+    add_compile_definitions(PICOKEYS_HAS_TRUSTED_REGION=1)
+    list(APPEND PICOKEYS_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/src/trusted/trusted.c
+    )
     pico_set_uf2_family(${CMAKE_PROJECT_NAME} "rp2350-arm-s")
     pico_embed_pt_in_binary(${CMAKE_PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/config/rp2350/pt.json")
     if(NOT IS_CYW43)
@@ -696,17 +705,24 @@ if(PICO_RP2350)
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt
     )
     if(TARGET mbedtls)
-        target_include_directories(mbedtls PRIVATE
+        target_include_directories(mbedtls INTERFACE
             ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt
         )
-        target_link_libraries(mbedtls PRIVATE pico_sha256_headers)
+        target_link_libraries(mbedtls INTERFACE pico_sha256_headers)
     endif()
     picokeys_configure_rp2350_trusted()
     list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/config/rp2350/alt/sha256_alt.c
     )
     add_compile_definitions(MBEDTLS_SHA256_ALT=1)
+    if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
+        list(APPEND LIBRARIES mbedtls)
+    endif()
     list(APPEND LIBRARIES pico_sha256)
+elseif(PICO_RP2040)
+    if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
+        list(APPEND LIBRARIES mbedtls)
+    endif()
 endif()
 set(INTERNAL_SOURCES ${PICOKEYS_SOURCES})
 

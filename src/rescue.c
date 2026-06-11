@@ -31,7 +31,9 @@
 #include "random.h"
 #include "crypto_utils.h"
 #include "usb.h"
+#if defined(PICOKEYS_HAS_TRUSTED_REGION)
 #include "trusted.h"
+#endif
 
 #ifdef PICO_PLATFORM
 extern char __flash_binary_start;
@@ -352,6 +354,7 @@ static int cmd_read(void) {
             res_APDU_size += put_uint32_be((uint32_t)tv_sec, res_APDU);
         }
     }
+#if defined(PICOKEYS_HAS_TRUSTED_REGION)
     else if (p1 == 0x5) { // GET TRUST DIGEST
         uint8_t digest[32];
         int ret = trusted_region_sha256(digest);
@@ -361,6 +364,7 @@ static int cmd_read(void) {
         memcpy(res_APDU, digest, 32);
         res_APDU_size = 32;
     }
+#endif
     else {
         return SW_INCORRECT_P1P2();
     }

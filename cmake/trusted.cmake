@@ -1,5 +1,13 @@
 include_guard(GLOBAL)
 
+function(picokeys_trusted_region_enabled out_var)
+    if(PICO_RP2350 OR ENABLE_EMULATION OR ESP_PLATFORM)
+        set(${out_var} TRUE PARENT_SCOPE)
+    else()
+        set(${out_var} FALSE PARENT_SCOPE)
+    endif()
+endfunction()
+
 macro(picokeys_init_trusted_config)
     set(PICOKEYS_TRUSTED_REGION_FLASH_BASE "0x100B0000" CACHE STRING "Fixed flash base for the trusted measurement region on Pico firmware builds")
     set(PICOKEYS_TRUSTED_STATE_RAM_BASE "0x20070000" CACHE STRING "Fixed RAM base for trusted writable state on Pico firmware builds")
@@ -27,15 +35,18 @@ macro(picokeys_init_trusted_config)
 endmacro()
 
 function(configure_picokeys_mbedtls_target target_name)
-    target_sources(${target_name} PRIVATE ${TRUSTED_MBEDTLS_HELPER_SOURCES})
-    target_compile_definitions(${target_name} PRIVATE
-        MBEDTLS_PLATFORM_ZEROIZE_ALT
-        memset=picokeys_trusted_memset
-        memcpy=picokeys_trusted_memcpy
-        memmove=picokeys_trusted_memmove
-        memcmp=picokeys_trusted_memcmp
-    )
-    target_compile_options(${target_name} PRIVATE -fno-builtin)
+    picokeys_trusted_region_enabled(enable_trusted_region)
+    if(enable_trusted_region)
+        target_sources(${target_name} PRIVATE ${TRUSTED_MBEDTLS_HELPER_SOURCES})
+        target_compile_definitions(${target_name} PRIVATE
+            MBEDTLS_PLATFORM_ZEROIZE_ALT
+            memset=picokeys_trusted_memset
+            memcpy=picokeys_trusted_memcpy
+            memmove=picokeys_trusted_memmove
+            memcmp=picokeys_trusted_memcmp
+        )
+        target_compile_options(${target_name} PRIVATE -fno-builtin)
+    endif()
 endfunction()
 
 function(configure_picokeys_trusted_mbedtls_target target_name)
@@ -77,7 +88,7 @@ endfunction()
 macro(picokeys_setup_trusted_mbedtls)
     if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
         if(NOT ESP_PLATFORM)
-            if(PICO_PLATFORM AND NOT ENABLE_EMULATION)
+            if(PICO_PLATFORM AND PICO_RP2350 AND NOT ENABLE_EMULATION)
                 add_library(trusted_mbedtls_build STATIC ${MBEDTLS_SOURCES})
                 target_include_directories(trusted_mbedtls_build SYSTEM PUBLIC
                     ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
@@ -190,14 +201,17 @@ macro(picokeys_setup_trusted_mbedtls)
 endmacro()
 
 macro(picokeys_configure_trusted_support_sources)
-    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-        set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/src/trusted_mem.c PROPERTIES
-            COMPILE_OPTIONS "-fno-builtin;-fno-tree-loop-distribute-patterns"
-        )
-    else()
-        set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/src/trusted_mem.c PROPERTIES
-            COMPILE_OPTIONS "-fno-builtin"
-        )
+    picokeys_trusted_region_enabled(enable_trusted_region)
+    if(enable_trusted_region)
+        if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+            set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/src/trusted_mem.c PROPERTIES
+                COMPILE_OPTIONS "-fno-builtin;-fno-tree-loop-distribute-patterns"
+            )
+        else()
+            set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/src/trusted_mem.c PROPERTIES
+                COMPILE_OPTIONS "-fno-builtin"
+            )
+        endif()
     endif()
     if(DEFINED TRUSTED_REGION_EMBED_SOURCE)
         set_source_files_properties(${TRUSTED_REGION_EMBED_SOURCE} PROPERTIES

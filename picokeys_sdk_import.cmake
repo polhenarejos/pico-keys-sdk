@@ -591,7 +591,7 @@ if(NOT ESP_PLATFORM)
     if(NOT SKIP_MBEDTLS_FOR_OPENSSL_EMULATION)
         if(PICO_RP2350)
             add_library(mbedtls INTERFACE)
-            target_include_directories(mbedtls INTERFACE
+            target_include_directories(mbedtls SYSTEM INTERFACE
                 ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/include
                 ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
             )

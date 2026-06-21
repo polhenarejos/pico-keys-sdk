@@ -162,6 +162,14 @@ static file_t *search_dynamic_file(uint16_t fid) {
     return NULL;
 }
 
+void file_for_each_dynamic(file_iter_cb cb, void *ctx) {
+    for (int i = 0; i < dynamic_files; i++) {
+        if (file_has_data(&dynamic_file[i]) && !cb(&dynamic_file[i], ctx)) {
+            break;
+        }
+    }
+}
+
 file_t *file_search(const uint16_t fid) {
     file_t *ef = file_search_by_fid(fid, NULL, SPECIFY_EF);
     if (ef) {
@@ -393,7 +401,7 @@ uint16_t meta_find(uint16_t fid, uint8_t **out) {
     }
     return 0;
 }
-int meta_delete(uint16_t fid) {
+static int meta_delete_internal(uint16_t fid, bool commit) {
     file_t *ef = file_search(EF_META);
     if (!ef) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
@@ -429,11 +437,17 @@ int meta_delete(uint16_t fid) {
                     return PICOKEYS_EXEC_ERROR;
                 }
             }
-            flash_commit();
+            if (commit) {
+                flash_commit();
+            }
             break;
         }
     }
     return PICOKEYS_OK;
+}
+
+int meta_delete(uint16_t fid) {
+    return meta_delete_internal(fid, true);
 }
 int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     int r;
@@ -512,16 +526,24 @@ bool file_has_data(const file_t *f) {
     return f != NULL && f->data != NULL && file_get_size(f) > 0;
 }
 
-int file_delete(file_t *ef) {
+int file_delete_no_commit(file_t *ef) {
     if (ef == NULL) {
         return PICOKEYS_OK;
     }
-    meta_delete(ef->fid);
+    meta_delete_internal(ef->fid, false);
     if (flash_clear_file(ef) != PICOKEYS_OK) {
         return PICOKEYS_EXEC_ERROR;
     }
     if (delete_dynamic_file(ef) != PICOKEYS_OK) {
         return PICOKEYS_EXEC_ERROR;
+    }
+    return PICOKEYS_OK;
+}
+
+int file_delete(file_t *ef) {
+    int ret = file_delete_no_commit(ef);
+    if (ret != PICOKEYS_OK) {
+        return ret;
     }
     flash_commit();
     return PICOKEYS_OK;

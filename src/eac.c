@@ -27,6 +27,7 @@
 #else
 #include "usb/usb.h"
 #endif
+#include "mbedtls/constant_time.h"
 
 static uint8_t sm_nonce[8];
 static uint8_t sm_kmac[16];
@@ -305,7 +306,7 @@ int sm_verify(void) {
     if (r != 0) {
         return PICOKEYS_EXEC_ERROR;
     }
-    if (memcmp(signature, mac, mac_len) == 0) {
+    if (mbedtls_ct_memcmp(signature, mac, mac_len) == 0) {
         return PICOKEYS_OK;
     }
     return PICOKEYS_VERIFICATION_FAILED;

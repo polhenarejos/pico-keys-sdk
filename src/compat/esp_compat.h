@@ -22,6 +22,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/task.h"
 typedef QueueHandle_t queue_t;
 #define queue_init(a,b,c) do { *(a) = xQueueCreate(c, b); } while(0)
 #define queue_add_blocking(a,b) xQueueSend(*(a), b, portMAX_DELAY)

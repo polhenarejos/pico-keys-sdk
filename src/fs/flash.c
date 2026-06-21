@@ -37,6 +37,7 @@ uint32_t FLASH_SIZE_BYTES = (2 * 1024 * 1024);
 
 extern void low_flash_task(void);
 extern void low_flash_commit(void);
+extern bool low_flash_commit_sync(uint32_t timeout_ms);
 
 /*
  * ------------------------------------------------------
@@ -192,4 +193,8 @@ void flash_task(void) {
 
 void flash_commit(void) {
     low_flash_commit();
+}
+
+bool flash_commit_sync(uint32_t timeout_ms) {
+    return low_flash_commit_sync(timeout_ms);
 }

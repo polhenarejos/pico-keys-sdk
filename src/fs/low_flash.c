@@ -18,6 +18,7 @@
 #include "picokeys.h"
 #include "serial.h"
 #include "crypto_utils.h"
+#include "pico_time.h"
 #include <stdio.h>
 #ifdef PICO_PLATFORM
  #include "hardware/flash.h"
@@ -101,6 +102,7 @@ bool flash_available = false;
 //this function has to be called from the core 0
 void low_flash_task(void);
 void low_flash_commit(void);
+bool low_flash_commit_sync(uint32_t timeout_ms);
 
 void low_flash_task(void){
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
@@ -254,6 +256,30 @@ void low_flash_commit(void) {
     mutex_enter_blocking(&mtx_flash);
     flash_available = true;
     mutex_exit(&mtx_flash);
+}
+
+static bool low_flash_available(void) {
+    mutex_enter_blocking(&mtx_flash);
+    bool available = flash_available;
+    mutex_exit(&mtx_flash);
+    return available;
+}
+
+bool low_flash_commit_sync(uint32_t timeout_ms) {
+    low_flash_commit();
+
+    uint32_t start = board_millis();
+    while (low_flash_available()) {
+        if (board_millis() - start >= timeout_ms) {
+            return false;
+        }
+#if defined(PICO_PLATFORM)
+        tight_loop_contents();
+#elif defined(ESP_PLATFORM)
+        vTaskDelay(1);
+#endif
+    }
+    return true;
 }
 
 static page_flash_t *find_free_page(uintptr_t addr) {

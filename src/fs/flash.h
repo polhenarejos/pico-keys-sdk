@@ -42,5 +42,6 @@ extern bool flash_check_blank(const uint8_t *p_start, size_t size);
 extern void flash_task(void);
 extern void low_flash_init(void);
 extern void flash_commit(void);
+extern bool flash_commit_sync(uint32_t timeout_ms);
 
 #endif // _FLASH_H

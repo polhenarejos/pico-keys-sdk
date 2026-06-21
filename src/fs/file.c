@@ -537,6 +537,12 @@ int flash_clear_file(file_t *file) {
     //printf("nc %lx->%lx   %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);
     flash_program_uintptr(prev_addr, next_addr);
     flash_program_halfword((uintptr_t) file->data, 0);
+    uint16_t len = file_get_size(file);
+    if (len > 0) {
+        uint8_t *zr = (uint8_t *)calloc(1, len);
+        flash_program_block((uintptr_t) file->data + sizeof(uint16_t), zr, len);
+        free(zr);
+    }
     if (next_addr > 0) {
         flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);
     }

@@ -42,9 +42,6 @@
 #include "pico_time.h"
 #include "serial.h"
 #include "mbedtls/sha256.h"
-#if defined(PICOKEYS_HAS_TRUSTED_REGION)
-#include "trusted.h"
-#endif
 
 app_t apps[16];
 uint8_t num_apps = 0;
@@ -155,9 +152,7 @@ int app_main(void) {
 #else
 int main(void) {
 #endif
-#if defined(PICOKEYS_HAS_TRUSTED_REGION)
-    trusted_region_init();
-#endif
+
     serial_init();
 
 #ifndef ENABLE_EMULATION

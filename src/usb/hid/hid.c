@@ -339,6 +339,10 @@ int driver_process_usb_packet_hid(uint16_t read) {
         }
         last_packet_time = board_millis();
         DEBUG_PAYLOAD((uint8_t *)ctap_req, 64);
+        if (FRAME_TYPE(ctap_req) == TYPE_CONT && msg_packet.len == 0) {
+            last_packet_time = 0;
+            return 0;
+        }
         if (ctap_req->cid == 0x0 ||
             (ctap_req->cid == CID_BROADCAST && (FRAME_TYPE(ctap_req) != TYPE_INIT || ctap_req->init.cmd != CTAPHID_INIT))) {
             return ctap_error(CTAP1_ERR_INVALID_CHANNEL);
@@ -346,6 +350,13 @@ int driver_process_usb_packet_hid(uint16_t read) {
         if (board_millis() < lock && ctap_req->cid != last_req.cid &&
             last_cmd_time + 100 > board_millis()) {
             return ctap_error(CTAP1_ERR_CHANNEL_BUSY);
+        }
+        if (FRAME_TYPE(ctap_req) == TYPE_INIT && ctap_req->init.cmd == CTAPHID_CANCEL) {
+            msg_packet.len = msg_packet.current_len = 0;
+            last_packet_time = 0;
+            cancel_button = true;
+            hid_tx[ITF_HID_CTAP].r_ptr = hid_tx[ITF_HID_CTAP].w_ptr = 0;
+            return 0;
         }
         if (FRAME_TYPE(ctap_req) == TYPE_INIT) {
             if (MSG_LEN(ctap_req) > CTAP_MAX_PACKET_SIZE) {
@@ -374,9 +385,6 @@ int driver_process_usb_packet_hid(uint16_t read) {
             last_cmd_time = board_millis();
         }
         else {
-            if (msg_packet.len == 0) { //Received a cont with a prior init pkt
-                return 0;
-            }
             if (last_seq != ctap_req->cont.seq) {
                 return ctap_error(CTAP1_ERR_INVALID_SEQ);
             }
@@ -527,13 +535,6 @@ int driver_process_usb_packet_hid(uint16_t read) {
                 return ctap_error((uint8_t)(-apdu_sent));
             }
             send_keepalive();
-        }
-        else if (ctap_req->init.cmd == CTAPHID_CANCEL) {
-            ctap_error(0x2D);
-            msg_packet.len = msg_packet.current_len = 0;
-            last_packet_time = 0;
-            cancel_button = true;
-            hid_tx[ITF_HID_CTAP].r_ptr = hid_tx[ITF_HID_CTAP].w_ptr = 0;
         }
         else {
             if (msg_packet.len == 0) {

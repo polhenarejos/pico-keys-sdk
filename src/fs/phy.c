@@ -72,8 +72,11 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
     }
     if (phy->led_driver_present) {
         *p++ = PHY_LED_DRIVER;
-        *p++ = 1;
+        *p++ = phy->led_order_present ? 2 : 1;
         *p++ = phy->led_driver;
+        if (phy->led_order_present) {
+            *p++ = phy->led_order;
+        }
     }
 
     *len = (uint8_t)(p - data);
@@ -84,82 +87,96 @@ int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
     if (!phy || !data || !len) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
+    memset(phy, 0, sizeof(*phy));
     const uint8_t *p = data;
+    const uint8_t *end = data + len;
     uint8_t tag, tlen;
-    while (p < data + len) {
+    while (p + 2 <= end) {
         tag = *p++;
         tlen = *p++;
+        if ((uint16_t)tlen > (uint16_t)(end - p)) {
+            break;
+        }
+        const uint8_t *v = p;
         switch (tag) {
             case PHY_VIDPID:
                 if (tlen == 4) {
-                    memcpy(phy->vidpid, p, 4);
-                    phy->vidpid[1] = *p++;
-                    phy->vidpid[0] = *p++;
-                    phy->vidpid[3] = *p++;
-                    phy->vidpid[2] = *p++;
+                    memcpy(phy->vidpid, v, 4);
+                    phy->vidpid[1] = v[0];
+                    phy->vidpid[0] = v[1];
+                    phy->vidpid[3] = v[2];
+                    phy->vidpid[2] = v[3];
                     phy->vidpid_present = true;
                 }
                 break;
             case PHY_LED_GPIO:
                 if (tlen == 1) {
-                    phy->led_gpio = *p++;
+                    phy->led_gpio = v[0];
                     phy->led_gpio_present = true;
                 }
                 break;
             case PHY_LED_BTNESS:
                 if (tlen == 1) {
-                    phy->led_brightness = *p++;
+                    phy->led_brightness = v[0];
                     phy->led_brightness_present = true;
                 }
                 break;
             case PHY_OPTS:
                 if (tlen == 2) {
-                    phy->opts = get_uint16_be(p);
-                    p += 2;
+                    phy->opts = get_uint16_be(v);
                 }
                 break;
             case PHY_UP_BTN:
                 if (tlen == 1) {
-                    phy->up_btn = *p++;
+                    phy->up_btn = v[0];
                     phy->up_btn_present = true;
                 }
                 break;
             case PHY_USB_PRODUCT:
                 if (tlen > 0 && tlen <= sizeof(phy->usb_product)) {
+                    size_t copy_len = tlen;
+                    if (v[copy_len - 1] == '\0') {
+                        copy_len--;
+                    }
                     memset(phy->usb_product, 0, sizeof(phy->usb_product));
-                    strlcpy(phy->usb_product, (const char *)p, sizeof(phy->usb_product));
+                    memcpy(phy->usb_product, v, copy_len);
                     phy->usb_product_present = true;
-                    p += strlen(phy->usb_product) + 1;
                 }
                 break;
             case PHY_ENABLED_CURVES:
                 if (tlen == 4) {
-                    phy->enabled_curves = get_uint32_be(p);
-                    p += 4;
+                    phy->enabled_curves = get_uint32_be(v);
                     phy->enabled_curves_present = true;
                 }
                 break;
 
             case PHY_ENABLED_USB_ITF:
                 if (tlen == 1) {
-                    phy->enabled_usb_itf = *p++;
+                    phy->enabled_usb_itf = v[0];
                     phy->enabled_usb_itf_present = true;
                 }
                 break;
             case PHY_LED_DRIVER:
-                if (tlen == 1) {
-                    phy->led_driver = *p++;
+                if (tlen >= 1) {
+                    phy->led_driver = v[0];
                     phy->led_driver_present = true;
+                    if (tlen >= 2) {
+                        phy->led_order = v[1];
+                        phy->led_order_present = true;
+                    }
                 }
                 break;
             default:
-                p += tlen;
                 break;
         }
+        p += tlen;
     }
-    if (!phy_data.enabled_usb_itf_present) {
-        phy_data.enabled_usb_itf = PHY_USB_ITF_ALL;
-        phy_data.enabled_usb_itf_present = true;
+    if (!phy->enabled_usb_itf_present) {
+        phy->enabled_usb_itf = PHY_USB_ITF_ALL;
+        phy->enabled_usb_itf_present = true;
+    }
+    if (!phy->led_order_present) {
+        phy->led_order = PHY_LED_ORDER_RGB;
     }
     return PICOKEYS_OK;
 }

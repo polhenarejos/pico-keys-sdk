@@ -66,6 +66,13 @@
 
 #define PHY_LED_DRIVER_NONE     0xFF
 
+#define PHY_LED_ORDER_RGB 0x0
+#define PHY_LED_ORDER_RBG 0x1
+#define PHY_LED_ORDER_GRB 0x2
+#define PHY_LED_ORDER_GBR 0x3
+#define PHY_LED_ORDER_BRG 0x4
+#define PHY_LED_ORDER_BGR 0x5
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -90,6 +97,7 @@ typedef struct phy_data {
     uint8_t up_btn;
     uint8_t enabled_usb_itf;
     uint8_t led_driver;
+    uint8_t led_order;
 
     bool vidpid_present;
     bool led_gpio_present;
@@ -99,10 +107,11 @@ typedef struct phy_data {
     bool enabled_curves_present;
     bool enabled_usb_itf_present;
     bool led_driver_present;
+    bool led_order_present;
 
 }) phy_data_t;
 
-#define PHY_MAX_SIZE    ((2+4)+(2+4)+(2+32)+(2+2)+(2+1)+(2+1)+(2+1)+(2+1)+(2+1))
+#define PHY_MAX_SIZE    ((2+4)+(2+4)+(2+32)+(2+2)+(2+1)+(2+1)+(2+1)+(2+1)+(2+2))
 
 #ifndef ENABLE_EMULATION
 extern int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len);

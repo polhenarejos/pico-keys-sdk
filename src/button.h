@@ -29,5 +29,6 @@ extern int button_wait(void);
 extern void button_task(void);
 extern bool cancel_button;
 extern bool touch_accept_button;
+extern bool force_button_wait;
 
 #endif // BUTTON_H

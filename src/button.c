@@ -41,6 +41,7 @@ bool is_req_button_pending(void) {
 
 bool cancel_button = false;
 bool touch_accept_button = false;
+bool force_button_wait = false;
 
 #if !defined(ENABLE_EMULATION)
 #ifdef ESP_PLATFORM
@@ -103,9 +104,12 @@ int button_wait(void) {
     if (phy_data.up_btn_present) {
         button_timeout = phy_data.up_btn * 1000;
     }
-    if (button_timeout == 0) {
+    if (button_timeout == 0 && !force_button_wait) {
         signal_emit(SIGNAL_USER_PRESENCE_COMPLETED);
         return 0;
+    }
+    if (button_timeout == 0) {
+        button_timeout = 30000;
     }
     signal_user_presence_request_data_t data = {
         .timeout = button_timeout / 1000,

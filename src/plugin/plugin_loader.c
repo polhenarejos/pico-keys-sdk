@@ -20,6 +20,9 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
+
+static pk_plugin_imports_t plugin_imports;
 
 #ifdef ENABLE_EMULATION
 #ifdef _WIN32
@@ -108,10 +111,55 @@ static int pk_plugin_ptr_in_range(const void *ptr) {
            addr < ((uintptr_t)PICOKEYS_PLUGIN_FLASH_BASE + (uintptr_t)PICOKEYS_PLUGIN_FLASH_SIZE);
 }
 
+static int pk_plugin_ram_range_valid(uintptr_t start, uint32_t size) {
+    uintptr_t ram_base = (uintptr_t)PICOKEYS_PLUGIN_RAM_BASE;
+    uintptr_t ram_end = ram_base + (uintptr_t)PICOKEYS_PLUGIN_RAM_SIZE;
+    uintptr_t end = start + (uintptr_t)size;
+
+    if (size == 0u) {
+        return 1;
+    }
+    if (end < start) {
+        return 0;
+    }
+    return start >= ram_base && end <= ram_end;
+}
+
+static int pk_plugin_flash_range_valid(uintptr_t start, uint32_t size) {
+    uintptr_t flash_base = (uintptr_t)PICOKEYS_PLUGIN_FLASH_BASE;
+    uintptr_t flash_end = flash_base + (uintptr_t)PICOKEYS_PLUGIN_FLASH_SIZE;
+    uintptr_t end = start + (uintptr_t)size;
+
+    if (size == 0u) {
+        return 1;
+    }
+    if (end < start) {
+        return 0;
+    }
+    return start >= flash_base && end <= flash_end;
+}
+
+static int pk_plugin_runtime_init(const pk_plugin_header_t *plugin) {
+    if (!pk_plugin_ram_range_valid(plugin->data_start, plugin->data_size) ||
+        !pk_plugin_ram_range_valid(plugin->bss_start, plugin->bss_size) ||
+        !pk_plugin_flash_range_valid(plugin->data_load_start, plugin->data_size)) {
+        printf("Plugin rejected: bad RAM image\n");
+        return 0;
+    }
+
+    if (plugin->data_size != 0u) {
+        memcpy((void *)plugin->data_start, (const void *)plugin->data_load_start, plugin->data_size);
+    }
+    if (plugin->bss_size != 0u) {
+        memset((void *)plugin->bss_start, 0, plugin->bss_size);
+    }
+    return 1;
+}
+
 static const pk_plugin_header_t *pk_plugin_get_valid(void) {
     const pk_plugin_header_t *plugin = pk_plugin_header();
 
-    printf("Plugin header @ 0x%08lx: magic=0x%08lx abi=%lu header=%lu image=%lu hello=0x%08lx\n",
+    printf("Plugin header @ 0x%08lx: magic=0x%08lx abi=%lu header=%lu image=%lu init=0x%08lx\n",
            (unsigned long)PICOKEYS_PLUGIN_FLASH_BASE,
            (unsigned long)plugin->magic,
            (unsigned long)plugin->abi_version,
@@ -149,12 +197,18 @@ void plugin_init(void) {
         printf("No valid plugin found\n");
         return;
     }
+#ifndef ENABLE_EMULATION
+    if (!pk_plugin_runtime_init(plugin)) {
+        printf("No valid plugin found\n");
+        return;
+    }
+#endif
 
-    const pk_plugin_imports_t imports = {
+    plugin_imports = (pk_plugin_imports_t){
         .abi_version = PICOKEYS_PLUGIN_ABI_VERSION,
-        .struct_size = sizeof(imports),
+        .struct_size = sizeof(plugin_imports),
         .printf = printf,
         .signal_add = signal_add,
     };
-    plugin->init(&imports);
+    plugin->init(&plugin_imports);
 }

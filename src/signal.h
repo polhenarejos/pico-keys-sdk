@@ -40,7 +40,7 @@ typedef enum {
     SIGNAL_FLAG_MAY_DUPLICATE = 0x2,
 } signal_flag_t;
 
-typedef int (*signal_handler_t)(uint8_t, void *);
+typedef int (*signal_handler_t)(uint8_t code, void *data);
 
 typedef struct {
     uint32_t timeout;

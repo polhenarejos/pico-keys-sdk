@@ -37,6 +37,8 @@ function(picokeys_add_plugin TARGET)
         target_link_options(${TARGET} PRIVATE
             "LINKER:--defsym=__picokeys_plugin_flash_base=${PICOKEYS_PLUGIN_FLASH_BASE}"
             "LINKER:--defsym=__picokeys_plugin_flash_size=${PICOKEYS_PLUGIN_FLASH_SIZE}"
+            "LINKER:--defsym=__picokeys_plugin_ram_base=${PICOKEYS_PLUGIN_RAM_BASE}"
+            "LINKER:--defsym=__picokeys_plugin_ram_size=${PICOKEYS_PLUGIN_RAM_SIZE}"
             "LINKER:-T,${PK_PLUGIN_LINKER}"
             "LINKER:-n"
             "LINKER:--gc-sections"
@@ -71,6 +73,8 @@ function(picokeys_add_plugin TARGET)
     target_compile_definitions(${TARGET} PRIVATE
         PICOKEYS_PLUGIN_FLASH_BASE=${PICOKEYS_PLUGIN_FLASH_BASE}
         PICOKEYS_PLUGIN_FLASH_SIZE=${PICOKEYS_PLUGIN_FLASH_SIZE}
+        PICOKEYS_PLUGIN_RAM_BASE=${PICOKEYS_PLUGIN_RAM_BASE}
+        PICOKEYS_PLUGIN_RAM_SIZE=${PICOKEYS_PLUGIN_RAM_SIZE}
     )
 endfunction()
 

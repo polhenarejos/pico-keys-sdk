@@ -118,6 +118,8 @@ endif()
 if(PICO_RP2350 OR ENABLE_EMULATION)
     set(PICOKEYS_PLUGIN_FLASH_BASE "0x10112000" CACHE STRING "XIP address where the premium plugin UF2 starts" FORCE)
     set(PICOKEYS_PLUGIN_FLASH_SIZE "0x000fa000" CACHE STRING "Maximum premium plugin size in bytes" FORCE)
+    set(PICOKEYS_PLUGIN_RAM_BASE "0x2007c000" CACHE STRING "RAM base reserved for premium plugin mutable state" FORCE)
+    set(PICOKEYS_PLUGIN_RAM_SIZE "0x00004000" CACHE STRING "Maximum premium plugin RAM usage in bytes" FORCE)
     set(PICOKEYS_PLUGIN_DIR "" CACHE PATH "Optional external PicoKeys plugin source directory")
     include(${CMAKE_CURRENT_LIST_DIR}/cmake/plugin.cmake)
 endif()
@@ -693,9 +695,13 @@ if(PICO_RP2350)
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
         PICOKEYS_PLUGIN_FLASH_BASE=${PICOKEYS_PLUGIN_FLASH_BASE}
         PICOKEYS_PLUGIN_FLASH_SIZE=${PICOKEYS_PLUGIN_FLASH_SIZE}
+        PICOKEYS_PLUGIN_RAM_BASE=${PICOKEYS_PLUGIN_RAM_BASE}
+        PICOKEYS_PLUGIN_RAM_SIZE=${PICOKEYS_PLUGIN_RAM_SIZE}
     )
     target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
         "LINKER:--defsym=__picokeys_plugin_flash_base=${PICOKEYS_PLUGIN_FLASH_BASE}"
+        "LINKER:--defsym=__picokeys_plugin_ram_base=${PICOKEYS_PLUGIN_RAM_BASE}"
+        "LINKER:--defsym=__picokeys_plugin_ram_size=${PICOKEYS_PLUGIN_RAM_SIZE}"
         "LINKER:-T,${CMAKE_CURRENT_LIST_DIR}/src/plugin/core_plugin_region_assert.ld"
     )
     if(NOT IS_CYW43)

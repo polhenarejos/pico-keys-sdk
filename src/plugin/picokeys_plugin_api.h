@@ -42,7 +42,7 @@
 #endif
 
 #define PICOKEYS_PLUGIN_MAGIC 0x504b504cUL /* PKPL */
-#define PICOKEYS_PLUGIN_ABI_VERSION 1u
+#define PICOKEYS_PLUGIN_ABI_VERSION 2u
 
 #ifndef PICOKEYS_PLUGIN_FLASH_BASE
 #define PICOKEYS_PLUGIN_FLASH_BASE 0x10112000UL
@@ -52,6 +52,14 @@
 #define PICOKEYS_PLUGIN_FLASH_SIZE 0x000fa000UL
 #endif
 
+#ifndef PICOKEYS_PLUGIN_RAM_BASE
+#define PICOKEYS_PLUGIN_RAM_BASE 0x2007c000UL
+#endif
+
+#ifndef PICOKEYS_PLUGIN_RAM_SIZE
+#define PICOKEYS_PLUGIN_RAM_SIZE 0x00004000UL
+#endif
+
 typedef struct pk_plugin_imports {
     uint32_t abi_version;
     uint32_t struct_size;
@@ -59,13 +67,18 @@ typedef struct pk_plugin_imports {
     int (*signal_add)(uint8_t code, signal_flag_t flags, signal_handler_t handler);
 } pk_plugin_imports_t;
 
-typedef void (*pk_plugin_init_fn)(const pk_plugin_imports_t *imports);
+typedef void (*pk_plugin_init_fn)(pk_plugin_imports_t *imports);
 
 typedef struct pk_plugin_header {
     uint32_t magic;
     uint32_t abi_version;
     uint32_t header_size;
     uint32_t image_size;
+    uintptr_t data_load_start;
+    uintptr_t data_start;
+    uint32_t data_size;
+    uintptr_t bss_start;
+    uint32_t bss_size;
     pk_plugin_init_fn init;
 } pk_plugin_header_t;
 

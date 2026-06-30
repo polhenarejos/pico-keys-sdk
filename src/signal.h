@@ -18,39 +18,47 @@
 #ifndef _SIGNAL_H_
 #define _SIGNAL_H_
 
+#include <stdint.h>
+
 #define MAX_SIGNALS 32
-typedef enum {
-    SIGNAL_NONE = 0,
-    SIGNAL_BOOT = 1,
-    SIGNAL_USB_MOUNTED = 2,
-    SIGNAL_BUTTON_PRESS = 3,
-    SIGNAL_BUTTON_RELEASE = 4,
-    SIGNAL_USER_PRESENCE_REQUEST = 5,
-    SIGNAL_USER_PRESENCE_COMPLETED = 6,
-    SIGNAL_USER_PRESENCE_CANCELLED = 7,
-    SIGNAL_USER_PRESENCE_TIMEOUT = 8,
-} signal_code_t;
+#define MAX_NODES 4
+
+static const uint8_t SIGNAL_NONE = 0;
+static const uint8_t SIGNAL_BOOT = 1;
+static const uint8_t SIGNAL_USB_MOUNTED = 2;
+static const uint8_t SIGNAL_BUTTON_PRESS = 3;
+static const uint8_t SIGNAL_BUTTON_RELEASE = 4;
+static const uint8_t SIGNAL_USER_PRESENCE_REQUEST = 5;
+static const uint8_t SIGNAL_USER_PRESENCE_COMPLETED = 6;
+static const uint8_t SIGNAL_USER_PRESENCE_CANCELLED = 7;
+static const uint8_t SIGNAL_USER_PRESENCE_TIMEOUT = 8;
+static const uint8_t SIGNAL_INIT = 9;
 
 typedef enum {
     SIGNAL_FLAG_NONE = 0x0,
     SIGNAL_FLAG_ERROR_CONTINUE = 0x1,
+    SIGNAL_FLAG_MAY_DUPLICATE = 0x2,
 } signal_flag_t;
 
-typedef int (*signal_handler_t)(signal_code_t, void *);
+typedef int (*signal_handler_t)(uint8_t, void *);
 
 typedef struct {
     uint32_t timeout;
 } signal_user_presence_request_data_t;
 
 typedef struct {
-    signal_code_t code;
     signal_flag_t flags;
     signal_handler_t handler;
+} signal_node_t;
+
+typedef struct {
+    signal_node_t nodes[MAX_NODES];
+    uint8_t node_count;
 } signal_t;
 
-extern int signal_add(signal_code_t code, signal_flag_t flags, signal_handler_t handler);
-extern int signal_remove(signal_code_t code, signal_handler_t handler);
-extern int signal_emit_param(signal_code_t code, void *data);
-extern int signal_emit(signal_code_t code);
+extern int signal_add(uint8_t code, signal_flag_t flags, signal_handler_t handler);
+extern int signal_remove(uint8_t code, signal_handler_t handler);
+extern int signal_emit_param(uint8_t code, void *data);
+extern int signal_emit(uint8_t code);
 
 #endif // _SIGNAL_H_

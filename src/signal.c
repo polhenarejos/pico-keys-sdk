@@ -19,47 +19,74 @@
 #include "signal.h"
 
 static signal_t signals[MAX_SIGNALS] = {0};
-static uint8_t num_signals = 0;
 
-int signal_add(signal_code_t code, signal_flag_t flags, signal_handler_t handler) {
-    if (num_signals >= MAX_SIGNALS) {
+int signal_add(uint8_t code, signal_flag_t flags, signal_handler_t handler) {
+    if (code >= MAX_SIGNALS) {
         return PICOKEYS_ERR_NO_MEMORY;
     }
     if (handler == NULL) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    signals[num_signals].code = code;
-    signals[num_signals].flags = flags;
-    signals[num_signals].handler = handler;
-    num_signals++;
-    return PICOKEYS_OK;
+    if (signals[code].node_count >= MAX_NODES) {
+        return PICOKEYS_ERR_NO_MEMORY;
+    }
+    if (!(flags & SIGNAL_FLAG_MAY_DUPLICATE)) {
+        for (int i = 0; i < MAX_NODES; i++) {
+            if (signals[code].nodes[i].handler == handler) {
+                return PICOKEYS_ERR_MEMORY_FATAL;
+            }
+        }
+    }
+    for (int i = 0; i < MAX_NODES; i++) {
+        if (signals[code].nodes[i].handler == NULL) {
+            signals[code].nodes[i].flags = flags;
+            signals[code].nodes[i].handler = handler;
+            signals[code].node_count++;
+            return PICOKEYS_OK;
+        }
+    }
+    return PICOKEYS_ERR_NO_MEMORY;
 }
 
-int signal_remove(signal_code_t code, signal_handler_t handler) {
-    for (int i = 0; i < num_signals; i++) {
-        if (signals[i].code == code && signals[i].handler == handler) {
-            for (int j = i; j < num_signals - 1; j++) {
-                signals[j] = signals[j + 1];
-            }
-            num_signals--;
+int signal_remove(uint8_t code, signal_handler_t handler) {
+    if (code >= MAX_SIGNALS) {
+        return PICOKEYS_ERR_NO_MEMORY;
+    }
+    if (handler == NULL) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    if (signals[code].node_count == 0) {
+        return PICOKEYS_ERR_FILE_NOT_FOUND;
+    }
+    for (int i = 0; i < MAX_NODES; i++) {
+        if (signals[code].nodes[i].handler == handler) {
+            signals[code].nodes[i].flags = 0;
+            signals[code].nodes[i].handler = NULL;
+            signals[code].node_count--;
             return PICOKEYS_OK;
         }
     }
     return PICOKEYS_ERR_FILE_NOT_FOUND;
 }
 
-int signal_emit_param(signal_code_t code, void *data) {
-    for (int i = 0; i < num_signals; i++) {
-        if (signals[i].code == code) {
-            int ret = signals[i].handler(code, data);
-            if (ret != 0 && (signals[i].flags & SIGNAL_FLAG_ERROR_CONTINUE) == 0) {
+int signal_emit_param(uint8_t code, void *data) {
+    if (code >= MAX_SIGNALS) {
+        return PICOKEYS_ERR_NO_MEMORY;
+    }
+    if (signals[code].node_count == 0) {
+        return PICOKEYS_ERR_FILE_NOT_FOUND;
+    }
+    for (int i = 0; i < MAX_NODES; i++) {
+        if (signals[code].nodes[i].handler != NULL) {
+            int ret = signals[code].nodes[i].handler(code, data);
+            if (ret != 0 && (signals[code].nodes[i].flags & SIGNAL_FLAG_ERROR_CONTINUE) == 0) {
                 return ret;
             }
         }
     }
-    return PICOKEYS_ERR_FILE_NOT_FOUND;
+    return PICOKEYS_OK;
 }
 
-int signal_emit(signal_code_t code) {
+int signal_emit(uint8_t code) {
     return signal_emit_param(code, NULL);
 }

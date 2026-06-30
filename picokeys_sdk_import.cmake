@@ -115,6 +115,13 @@ else()
     add_compile_definitions(CFG_TUSB_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/src/usb/tusb_config.h")
 endif()
 
+if(PICO_RP2350 OR ENABLE_EMULATION)
+    set(PICOKEYS_PLUGIN_FLASH_BASE "0x10112000" CACHE STRING "XIP address where the premium plugin UF2 starts" FORCE)
+    set(PICOKEYS_PLUGIN_FLASH_SIZE "0x000fa000" CACHE STRING "Maximum premium plugin size in bytes" FORCE)
+    set(PICOKEYS_PLUGIN_DIR "" CACHE PATH "Optional external PicoKeys plugin source directory")
+    include(${CMAKE_CURRENT_LIST_DIR}/cmake/plugin.cmake)
+endif()
+
 message(STATUS "USB VID/PID:\t\t\t ${USB_VID}:${USB_PID}")
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/deps.cmake)
 
@@ -283,6 +290,9 @@ if(ESP_PLATFORM)
         ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_esp32.c
     )
 elseif(ENABLE_EMULATION)
+    list(APPEND PICOKEYS_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/src/plugin/plugin_loader.c
+    )
     if(MSVC)
         list(APPEND PICOKEYS_SOURCES
             ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_windows.c
@@ -304,6 +314,7 @@ elseif(ENABLE_EMULATION)
 elseif(PICO_RP2350)
     list(APPEND PICOKEYS_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/src/otp/otp_rp2350.c
+        ${CMAKE_CURRENT_LIST_DIR}/src/plugin/plugin_loader.c
     )
 elseif(PICO_RP2040)
     list(APPEND PICOKEYS_SOURCES
@@ -364,6 +375,7 @@ list(APPEND INCLUDES
     ${CMAKE_CURRENT_LIST_DIR}/src/rng
     ${CMAKE_CURRENT_LIST_DIR}/src/led
     ${CMAKE_CURRENT_LIST_DIR}/src/otp
+    ${CMAKE_CURRENT_LIST_DIR}/src/plugin
     ${CMAKE_CURRENT_LIST_DIR}/third-party/mbedtls/library
 )
 set(SYSTEM_INCLUDES
@@ -660,9 +672,31 @@ if(USB_ITF_LWIP)
     endif()
 endif()
 
+if(ENABLE_EMULATION)
+    list(APPEND LIBRARIES ${CMAKE_DL_LIBS})
+
+    if(PICOKEYS_PLUGIN_DIR)
+        get_filename_component(PICOKEYS_PLUGIN_DIR_ABS "${PICOKEYS_PLUGIN_DIR}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+        if(NOT EXISTS "${PICOKEYS_PLUGIN_DIR_ABS}/CMakeLists.txt")
+            message(FATAL_ERROR "PICOKEYS_PLUGIN_DIR does not contain CMakeLists.txt: ${PICOKEYS_PLUGIN_DIR_ABS}")
+        endif()
+        add_subdirectory("${PICOKEYS_PLUGIN_DIR_ABS}" "${CMAKE_BINARY_DIR}/picokeys_plugin_manual")
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/plugin/CMakeLists.txt")
+        add_subdirectory("${CMAKE_SOURCE_DIR}/plugin" "${CMAKE_BINARY_DIR}/picokeys_plugin")
+    endif()
+endif()
+
 if(PICO_RP2350)
     pico_set_uf2_family(${CMAKE_PROJECT_NAME} "rp2350-arm-s")
     pico_embed_pt_in_binary(${CMAKE_PROJECT_NAME} "${CMAKE_CURRENT_LIST_DIR}/config/rp2350/pt.json")
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+        PICOKEYS_PLUGIN_FLASH_BASE=${PICOKEYS_PLUGIN_FLASH_BASE}
+        PICOKEYS_PLUGIN_FLASH_SIZE=${PICOKEYS_PLUGIN_FLASH_SIZE}
+    )
+    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
+        "LINKER:--defsym=__picokeys_plugin_flash_base=${PICOKEYS_PLUGIN_FLASH_BASE}"
+        "LINKER:-T,${CMAKE_CURRENT_LIST_DIR}/src/plugin/core_plugin_region_assert.ld"
+    )
     if(NOT IS_CYW43)
         pico_set_binary_type(${CMAKE_PROJECT_NAME} copy_to_ram)
     endif()
@@ -687,6 +721,16 @@ if(PICO_RP2350)
     )
     add_compile_definitions(MBEDTLS_SHA256_ALT=1)
     list(APPEND LIBRARIES pico_sha256)
+
+    if(NOT ENABLE_EMULATION AND PICOKEYS_PLUGIN_DIR)
+        get_filename_component(PICOKEYS_PLUGIN_DIR_ABS "${PICOKEYS_PLUGIN_DIR}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+        if(NOT EXISTS "${PICOKEYS_PLUGIN_DIR_ABS}/CMakeLists.txt")
+            message(FATAL_ERROR "PICOKEYS_PLUGIN_DIR does not contain CMakeLists.txt: ${PICOKEYS_PLUGIN_DIR_ABS}")
+        endif()
+        add_subdirectory("${PICOKEYS_PLUGIN_DIR_ABS}" "${CMAKE_BINARY_DIR}/picokeys_plugin_manual")
+    elseif(NOT ENABLE_EMULATION AND EXISTS "${CMAKE_SOURCE_DIR}/plugin/CMakeLists.txt")
+        add_subdirectory("${CMAKE_SOURCE_DIR}/plugin" "${CMAKE_BINARY_DIR}/picokeys_plugin")
+    endif()
 endif()
 set(INTERNAL_SOURCES ${PICOKEYS_SOURCES})
 

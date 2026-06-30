@@ -102,6 +102,11 @@ WEAK int picokey_init(void) {
     return 0;
 }
 
+
+#if defined(PICO_RP2350) || defined(ENABLE_EMULATION)
+void plugin_init(void);
+#endif
+
 void execute_tasks(void);
 void execute_tasks(void) {
 #if !defined(ENABLE_EMULATION) && !defined(ESP_PLATFORM)
@@ -213,6 +218,9 @@ int main(void) {
 
 #ifndef ENABLE_EMULATION
     picokey_init();
+#endif
+#if defined(PICO_RP2350) || defined(ENABLE_EMULATION)
+    plugin_init();
 #endif
 
 #ifdef ESP_PLATFORM

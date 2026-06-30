@@ -24,13 +24,13 @@
     {
       "name": "PicoKeys Data",
       "id": 1,
-      "start": "1032K",
-      "size": "3064K",
+      "start": "2096K",
+      "size": "2000K",
       "families": ["data"],
       "permissions": {
         "secure": "rw",
         "nonsecure": "",
-        "bootloader": "r"
+        "bootloader": ""
       },
       "link": ["owner", 0],
       "ignored_during_arm_boot": true,
@@ -44,6 +44,36 @@
       "families": ["data"],
       "permissions": {
         "secure": "r",
+        "nonsecure": "",
+        "bootloader": "w"
+      },
+      "link": ["owner", 0],
+      "ignored_during_arm_boot": true,
+      "ignored_during_riscv_boot": true
+    },
+    {
+      "name": "PicoKeys Static Region",
+      "id": 3,
+      "start": "1032K",
+      "size": "64K",
+      "families": ["data"],
+      "permissions": {
+        "secure": "rw",
+        "nonsecure": "",
+        "bootloader": ""
+      },
+      "link": ["owner", 0],
+      "ignored_during_arm_boot": true,
+      "ignored_during_riscv_boot": true
+    },
+    {
+      "name": "PicoKeys Plugin",
+      "id": 4,
+      "start": "1096K",
+      "size": "1000K",
+      "families": ["rp2350-arm-s"],
+      "permissions": {
+        "secure": "rw",
         "nonsecure": "",
         "bootloader": "w"
       },

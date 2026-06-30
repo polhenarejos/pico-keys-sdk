@@ -31,6 +31,7 @@
 #include "random.h"
 #include "crypto_utils.h"
 #include "usb.h"
+#include "audit.h"
 
 #ifdef PICO_PLATFORM
 extern char __flash_binary_start;
@@ -257,6 +258,7 @@ static int cmd_write(void) {
 #endif
     }
     else if (p1 == 0x2) { // SET TIME
+        audit_entry_set_current_event(AUDIT_EVT_SET_RTC);
         time_t tv_sec = 0;
         if (p2 != 0x1 && p2 != 0x2) {
             return SW_INCORRECT_P1P2();
@@ -405,16 +407,17 @@ static int cmd_reboot_bootsel(void) {
 #define INS_REBOOT_BOOTSEL   0x1F
 
 static const cmd_t cmds[] = {
-    { INS_KEYDEV_SIGN, cmd_keydev_sign },
-    { INS_WRITE, cmd_write },
+    { INS_KEYDEV_SIGN, cmd_keydev_sign, CMD_FLAG_AUDIT_LOG },
+    { INS_WRITE, cmd_write, CMD_FLAG_AUDIT_LOG | CMD_FLAG_CRITICAL },
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
-    { INS_SECURE, cmd_secure },
+    { INS_SECURE, cmd_secure, CMD_FLAG_AUDIT_LOG | CMD_FLAG_CRITICAL },
 #endif
-    { INS_READ, cmd_read },
+    { INS_READ, cmd_read, CMD_FLAG_NONE },
 #ifdef PICO_PLATFORM
-    { INS_REBOOT_BOOTSEL, cmd_reboot_bootsel },
+    { INS_REBOOT_BOOTSEL, cmd_reboot_bootsel, CMD_FLAG_NONE },
 #endif
-    { 0x00, 0x0 }
+
+    { 0x00, 0x00, CMD_FLAG_NONE } // End of table
 };
 
 static int rescue_process_apdu(void) {
@@ -423,7 +426,15 @@ static int rescue_process_apdu(void) {
     }
     for (const cmd_t *cmd = cmds; cmd->ins != 0x00; cmd++) {
         if (cmd->ins == INS(apdu)) {
+            audit_entry_set_current_event(AUDIT_EVT_APP_EVT | INS(apdu));
+            audit_entry_set_current_object(make_uint16_be(P1(apdu), P2(apdu)));
             int r = cmd->cmd_handler();
+            if (cmd->flags & CMD_FLAG_AUDIT_LOG) {
+                if (cmd->flags & CMD_FLAG_CRITICAL) {
+                    audit_entry_set_current_flags(AUDIT_EF_CRITICAL);
+                }
+                audit_log_current_entry_with_result(r);
+            }
             return r;
         }
     }

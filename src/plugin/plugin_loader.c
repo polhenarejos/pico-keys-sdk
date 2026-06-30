@@ -1,13 +1,22 @@
 /*
  * This file is part of the Pico Keys SDK distribution (https://github.com/polhenarejos/pico-keys-sdk).
- * Copyright (c) 2026 Pol Henarejos.
+ * Copyright (c) 2022 Pol Henarejos.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
  * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "picokeys_plugin_api.h"
+#include "signal.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -68,7 +77,7 @@ static const pk_plugin_header_t *pk_plugin_get_valid(void) {
            (unsigned long)plugin->abi_version,
            (unsigned long)plugin->header_size,
            (unsigned long)plugin->image_size,
-           (void *)plugin->hello);
+           (void *)plugin->init);
     if (plugin->magic != PICOKEYS_PLUGIN_MAGIC) {
         printf("Plugin rejected: bad magic\n");
         return NULL;
@@ -81,7 +90,7 @@ static const pk_plugin_header_t *pk_plugin_get_valid(void) {
         printf("Plugin rejected: short header\n");
         return NULL;
     }
-    if (!plugin->hello) {
+    if (!plugin->init) {
         printf("Plugin rejected: missing entry point\n");
         return NULL;
     }
@@ -108,7 +117,7 @@ static const pk_plugin_header_t *pk_plugin_get_valid(void) {
            (unsigned long)plugin->abi_version,
            (unsigned long)plugin->header_size,
            (unsigned long)plugin->image_size,
-           (unsigned long)(uintptr_t)plugin->hello);
+           (unsigned long)(uintptr_t)plugin->init);
     if (plugin->magic != PICOKEYS_PLUGIN_MAGIC) {
         printf("Plugin rejected: bad magic\n");
         return NULL;
@@ -126,8 +135,8 @@ static const pk_plugin_header_t *pk_plugin_get_valid(void) {
         printf("Plugin rejected: bad image size\n");
         return NULL;
     }
-    if (!plugin->hello || !pk_plugin_ptr_in_range((const void *)plugin->hello)) {
-        printf("Plugin rejected: hello pointer out of range\n");
+    if (!plugin->init || !pk_plugin_ptr_in_range((const void *)plugin->init)) {
+        printf("Plugin rejected: init pointer out of range\n");
         return NULL;
     }
     return plugin;
@@ -145,8 +154,7 @@ void plugin_init(void) {
         .abi_version = PICOKEYS_PLUGIN_ABI_VERSION,
         .struct_size = sizeof(imports),
         .printf = printf,
+        .signal_add = signal_add,
     };
-    printf("Calling plugin hello function\n");
-    plugin->hello(&imports);
-    printf("Plugin hello function returned\n");
+    plugin->init(&imports);
 }

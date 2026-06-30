@@ -42,6 +42,7 @@
 #include "pico_time.h"
 #include "serial.h"
 #include "mbedtls/sha256.h"
+#include "signal.h"
 
 app_t apps[16];
 uint8_t num_apps = 0;
@@ -222,6 +223,7 @@ int main(void) {
 #if defined(PICO_RP2350) || defined(ENABLE_EMULATION)
     plugin_init();
 #endif
+    signal_emit(SIGNAL_INIT);
 
 #ifdef ESP_PLATFORM
     xTaskCreatePinnedToCore(core0_loop, "core0", 4096*ITF_TOTAL*2, NULL, CONFIG_TINYUSB_TASK_PRIORITY - 1, &hcore0, ESP32_CORE0);

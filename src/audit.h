@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-static const uint8_t SIGNAL_AUDIT_EVT = 10;
+static const uint8_t SIGNAL_AUDIT_EVT = 11;
 #define AUDIT_EVT_APP_EVT   0x8000
 
 typedef enum {

@@ -21,6 +21,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#if !defined(PICO_PLATFORM)
+#define XIP_BASE                0
+ #ifdef ENABLE_EMULATION
+    #define FLASH_SECTOR_SIZE       0x4000
+ #else
+    #define FLASH_SECTOR_SIZE       0x1000
+ #endif
+#else
+#include "hardware/flash.h"
+#endif
+
 extern uint32_t flash_free_space(void);
 extern uint32_t flash_used_space(void);
 extern uint32_t flash_total_space(void);
@@ -43,5 +54,27 @@ extern void flash_task(void);
 extern void low_flash_init(void);
 extern void flash_commit(void);
 extern bool flash_commit_sync(uint32_t timeout_ms);
+
+extern uint32_t FLASH_SIZE_BYTES;
+
+#ifdef ESP_PLATFORM
+static const uintptr_t __phymarker_start = 0x000000;
+static const uintptr_t __staticmarker_start = 0x002000;
+#else
+static const uintptr_t __phymarker_start = 0x10100000;
+static const uintptr_t __staticmarker_start = 0x10102000;
+#endif
+
+/* Core flash APIs are declared in file.h / pico_keys.h */
+
+typedef struct page_flash {
+    uint8_t page[FLASH_SECTOR_SIZE];
+    uintptr_t address;
+    bool ready;
+    bool erase;
+    size_t page_size; //this param is for easy erase. It allows to erase with a single call. IT DOES NOT APPLY TO WRITE
+} page_flash_t;
+
+extern int flash_add_page(page_flash_t *page);
 
 #endif // _FLASH_H

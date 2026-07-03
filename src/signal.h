@@ -33,6 +33,7 @@ static const uint8_t SIGNAL_USER_PRESENCE_COMPLETED = 6;
 static const uint8_t SIGNAL_USER_PRESENCE_CANCELLED = 7;
 static const uint8_t SIGNAL_USER_PRESENCE_TIMEOUT = 8;
 static const uint8_t SIGNAL_INIT = 9;
+static const uint8_t SIGNAL_RESCUE_NOT_FOUND = 10;
 
 typedef enum {
     SIGNAL_FLAG_NONE = 0x0,

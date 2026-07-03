@@ -18,11 +18,73 @@
 #include "picokeys_plugin_api.h"
 #include "signal.h"
 
+#include "apdu.h"
+#include "crypto_utils.h"
+#include "file.h"
+#include "flash.h"
+#include "mbedtls/constant_time.h"
+#include "mbedtls/sha256.h"
+#include "pico_time.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
 static pk_plugin_imports_t plugin_imports;
+
+_Static_assert(sizeof(pk_plugin_sha256_context_t) >= sizeof(mbedtls_sha256_context),
+               "pk_plugin_sha256_context_t too small for mbedtls_sha256_context");
+
+static void pk_plugin_mbedtls_sha256_init(pk_plugin_sha256_context_t *ctx) {
+    mbedtls_sha256_init((mbedtls_sha256_context *)ctx);
+}
+
+static void pk_plugin_mbedtls_sha256_free(pk_plugin_sha256_context_t *ctx) {
+    mbedtls_sha256_free((mbedtls_sha256_context *)ctx);
+}
+
+static int pk_plugin_mbedtls_sha256_starts(pk_plugin_sha256_context_t *ctx, int is224) {
+    return mbedtls_sha256_starts((mbedtls_sha256_context *)ctx, is224);
+}
+
+static int pk_plugin_mbedtls_sha256_update(pk_plugin_sha256_context_t *ctx, const unsigned char *input, size_t ilen) {
+    return mbedtls_sha256_update((mbedtls_sha256_context *)ctx, input, ilen);
+}
+
+static int pk_plugin_mbedtls_sha256_finish(pk_plugin_sha256_context_t *ctx, unsigned char *output) {
+    return mbedtls_sha256_finish((mbedtls_sha256_context *)ctx, output);
+}
+
+static int pk_plugin_mbedtls_sha256(const unsigned char *input, size_t ilen, unsigned char output[32], int is224) {
+    return mbedtls_sha256(input, ilen, output, is224);
+}
+
+static int pk_plugin_mbedtls_ct_memcmp(const void *a, const void *b, size_t n) {
+    return mbedtls_ct_memcmp(a, b, n);
+}
+
+static int pk_plugin_flash_add_page(void *page) {
+    return flash_add_page((page_flash_t *)page);
+}
+
+static int pk_plugin_has_set_rtc(void) {
+    return has_set_rtc() ? 1 : 0;
+}
+
+static int64_t pk_plugin_get_rtc_time(void) {
+    return (int64_t)get_rtc_time();
+}
+
+static uint8_t *pk_plugin_get_res_apdu(void) {
+    return apdu.rdata;
+}
+
+static uint16_t pk_plugin_get_res_apdu_size(void) {
+    return apdu.rlen;
+}
+
+static void pk_plugin_set_res_apdu_size(uint16_t size) {
+    apdu.rlen = size;
+}
 
 #ifdef ENABLE_EMULATION
 #ifdef _WIN32
@@ -209,6 +271,24 @@ void plugin_init(void) {
         .struct_size = sizeof(plugin_imports),
         .printf = printf,
         .signal_add = signal_add,
+        .mbedtls_sha256_init = pk_plugin_mbedtls_sha256_init,
+        .mbedtls_sha256_free = pk_plugin_mbedtls_sha256_free,
+        .mbedtls_sha256_starts = pk_plugin_mbedtls_sha256_starts,
+        .mbedtls_sha256_update = pk_plugin_mbedtls_sha256_update,
+        .mbedtls_sha256_finish = pk_plugin_mbedtls_sha256_finish,
+        .mbedtls_sha256 = pk_plugin_mbedtls_sha256,
+        .mbedtls_ct_memcmp = pk_plugin_mbedtls_ct_memcmp,
+        .memcpy = memcpy,
+        .memset = memset,
+        .flash_add_page = pk_plugin_flash_add_page,
+        .flash_commit = flash_commit,
+        .flash_read = flash_read,
+        .has_set_rtc = pk_plugin_has_set_rtc,
+        .get_rtc_time = pk_plugin_get_rtc_time,
+        .pin_derive_verifier = pin_derive_verifier,
+        .get_res_apdu = pk_plugin_get_res_apdu,
+        .get_res_apdu_size = pk_plugin_get_res_apdu_size,
+        .set_res_apdu_size = pk_plugin_set_res_apdu_size,
     };
     plugin->init(&plugin_imports);
 }

@@ -18,6 +18,9 @@
 #ifndef _CCID_H_
 #define _CCID_H_
 
+#include <stdint.h>
+#include "compat/compat.h"
+
 extern const uint8_t historical_bytes[];
 
 #define MAX_CMD_APDU_DATA_SIZE (24 + 4 + 512 * 4)

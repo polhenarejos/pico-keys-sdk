@@ -1,8 +1,9 @@
 set(PICOKEYS_PLUGIN_SDK_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 
 function(picokeys_add_plugin TARGET)
-    set(oneValueArgs SOURCE LINKER OUTPUT_UF2)
-    cmake_parse_arguments(PK_PLUGIN "" "${oneValueArgs}" "" ${ARGN})
+    set(oneValueArgs LINKER OUTPUT_UF2)
+    set(multiValueArgs SOURCE)
+    cmake_parse_arguments(PK_PLUGIN "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if(NOT PK_PLUGIN_SOURCE)
         message(FATAL_ERROR "picokeys_add_plugin(${TARGET}) requires SOURCE")

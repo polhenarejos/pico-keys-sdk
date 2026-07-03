@@ -32,6 +32,7 @@
 #include "crypto_utils.h"
 #include "usb.h"
 #include "audit.h"
+#include "signal.h"
 
 #ifdef PICO_PLATFORM
 extern char __flash_binary_start;
@@ -438,5 +439,9 @@ static int rescue_process_apdu(void) {
             return r;
         }
     }
-    return SW_INS_NOT_SUPPORTED();
+    int ret = signal_emit(SIGNAL_RESCUE_NOT_FOUND);
+    if (ret != 0) {
+        return SW_INS_NOT_SUPPORTED();
+    }
+    return SW_OK();
 }

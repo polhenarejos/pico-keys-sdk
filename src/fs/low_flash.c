@@ -24,7 +24,6 @@
  #include "hardware/flash.h"
  #include "hardware/sync.h"
  #include "pico/mutex.h"
- #include "pico/sem.h"
  #include "pico/multicore.h"
  #include "pico/bootrom.h"
  #include "boot/picobin.h"
@@ -54,35 +53,16 @@
   #endif
   #include "compat/queue.h"
  #endif
- #ifdef ENABLE_EMULATION
-    #define FLASH_SECTOR_SIZE       0x4000
- #else
-    #define FLASH_SECTOR_SIZE       0x1000
- #endif
  #define XIP_BASE 0
  int fd_map = 0;
  uint8_t *map = NULL;
  #include <fcntl.h>
 #endif
-#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-extern uint32_t FLASH_SIZE_BYTES;
-#else
-#define FLASH_SIZE_BYTES   (8 * 1024 * 1024)
-#endif
+#include "flash.h"
 
 #define TOTAL_FLASH_PAGES 6
 
-extern const uintptr_t start_data_pool;
-extern const uintptr_t end_rom_pool;
-
-PACK(
-typedef struct page_flash {
-    uint8_t page[FLASH_SECTOR_SIZE];
-    uintptr_t address;
-    bool ready;
-    bool erase;
-    size_t page_size; //this param is for easy erase. It allows to erase with a single call. IT DOES NOT APPLY TO WRITE
-}) page_flash_t;
+extern uintptr_t end_flash, end_rom_pool, start_rom_pool, end_data_pool, start_data_pool;
 
 static page_flash_t flash_pages[TOTAL_FLASH_PAGES];
 
@@ -98,6 +78,58 @@ static uint8_t ready_pages = 0;
 
 bool flash_available = false;
 
+page_flash_t *ext_pages[TOTAL_FLASH_PAGES] = {0};
+
+int flash_add_page(page_flash_t *page) {
+    for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
+        if (ext_pages[r] == NULL) {
+            ext_pages[r] = page;
+            return PICOKEYS_OK;
+        }
+        else if (ext_pages[r] == page || ext_pages[r]->address == page->address) {
+            return PICOKEYS_OK;
+        }
+    }
+    return PICOKEYS_ERR_MEMORY_FATAL;
+}
+
+static int do_flash_write_page(page_flash_t *page) {
+    if (page->ready == true || page->erase == true) {
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+        //printf("WRITTING %X\n",page->address-XIP_BASE);
+        mutex_exit(&mtx_flash);
+        if (multicore_lockout_start_timeout_us(1000) == false) {
+            mutex_enter_blocking(&mtx_flash);
+            printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
+            return -1;
+        }
+        //printf("WRITTING %X\n",page->address-XIP_BASE);
+        uint32_t ints = save_and_disable_interrupts();
+        flash_range_erase(page->address - XIP_BASE, page->page_size ? ((int) (page->page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
+        if (page->ready == true) {
+            flash_range_program(page->address - XIP_BASE, page->page, FLASH_SECTOR_SIZE);
+        }
+        restore_interrupts(ints);
+        if (multicore_lockout_end_timeout_us(1000) == false) {
+            mutex_enter_blocking(&mtx_flash);
+            printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
+            return -2;
+        }
+        mutex_enter_blocking(&mtx_flash);
+        //printf("WRITTEN %X !\n",page->address-XIP_BASE);
+#else
+        if (page->ready == true) {
+            memcpy(map + page->address, page->page, FLASH_SECTOR_SIZE);
+        }
+        else {
+            memset(map + page->address, 0, FLASH_SECTOR_SIZE);
+        }
+#endif
+        page->ready = false;
+        page->erase = false;
+    }
+    return 0;
+}
 
 //this function has to be called from the core 0
 void low_flash_task(void);
@@ -106,67 +138,32 @@ bool low_flash_commit_sync(uint32_t timeout_ms);
 
 void low_flash_task(void){
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
-        if (locked_out == true && flash_available == true && ready_pages > 0) {
+        if (locked_out == true && flash_available == true) {
+            bool wrote_page = false;
             //printf(" DO_FLASH AVAILABLE\n");
-            for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
-                if (flash_pages[r].ready == true) {
-#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    mutex_exit(&mtx_flash);
-                    //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
-                    if (multicore_lockout_start_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
-                        mutex_enter_blocking(&mtx_flash);
-                        continue;
+            if (ready_pages > 0) {
+                for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
+                    if (flash_pages[r].ready == true || flash_pages[r].erase == true) {
+                        if (do_flash_write_page(&flash_pages[r]) == 0) {
+                            ready_pages--;
+                            wrote_page = true;
+                            break;
+                        }
                     }
-                    //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
-                    uint32_t ints = save_and_disable_interrupts();
-                    flash_range_erase(flash_pages[r].address - XIP_BASE, FLASH_SECTOR_SIZE);
-                    flash_range_program(flash_pages[r].address - XIP_BASE, flash_pages[r].page, FLASH_SECTOR_SIZE);
-                    restore_interrupts(ints);
-                    if (multicore_lockout_end_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
-                        mutex_enter_blocking(&mtx_flash);
-                        continue;
-                    }
-                    mutex_enter_blocking(&mtx_flash);
-                    //printf("WRITEN %X !\n",flash_pages[r].address);
-#else
-                    memcpy(map + flash_pages[r].address, flash_pages[r].page, FLASH_SECTOR_SIZE);
-#endif
-                    flash_pages[r].ready = false;
-                    ready_pages--;
                 }
-                else if (flash_pages[r].erase == true) {
-#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    mutex_exit(&mtx_flash);
-                    if (multicore_lockout_start_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
-                        mutex_enter_blocking(&mtx_flash);
-                        continue;
+            }
+            if (!wrote_page) {
+                for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
+                    if (ext_pages[r] != NULL) {
+                        if (do_flash_write_page(ext_pages[r]) == 0) {
+                            break;
+                        }
                     }
-                    //printf("WRITTING\n");
-                    uint32_t ints = save_and_disable_interrupts();
-                    flash_range_erase(flash_pages[r].address - XIP_BASE, flash_pages[r].page_size ? ((int) (flash_pages[r].page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
-                    restore_interrupts(ints);
-                    if (multicore_lockout_end_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
-                        mutex_enter_blocking(&mtx_flash);
-                        continue;
-                    }
-                    mutex_enter_blocking(&mtx_flash);
-#else
-                    memset(map + flash_pages[r].address, 0, FLASH_SECTOR_SIZE);
-#endif
-                    flash_pages[r].erase = false;
-                    ready_pages--;
                 }
             }
 #if !defined(PICO_PLATFORM) && !defined(ESP_PLATFORM)
             msync(map, FLASH_SIZE_BYTES, MS_SYNC);
 #endif
-            if (ready_pages != 0) {
-                printf("ERROR: DO FLASH DOES NOT HAVE ZERO PAGES\n");
-            }
         }
         if (ready_pages == 0) {
             flash_available = false;
@@ -228,7 +225,7 @@ void low_flash_init(void) {
     }
     data_end_addr -= 2 * FLASH_SECTOR_SIZE;
 #else
-    data_start_addr = (FLASH_SIZE_BYTES >> 1);
+    data_start_addr = (FLASH_SIZE_BYTES >> 1) + 2 * FLASH_SECTOR_SIZE + 16 * FLASH_SECTOR_SIZE;
     data_end_addr = FLASH_SIZE_BYTES;
 #endif
 
@@ -424,8 +421,6 @@ typedef struct {
     uint8_t  uid[PICO_UNIQUE_BOARD_ID_SIZE_BYTES];
     uint32_t crc32;
 } __attribute__ ((packed)) phymarker_t;
-
-uintptr_t __phymarker_start = (uintptr_t)0x10100000;
 
 const uint64_t PHYSICAL_MARKER_MAGIC = 0x5049434F4B455953ULL; // "PICOKEYS"
 

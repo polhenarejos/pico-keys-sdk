@@ -17,6 +17,7 @@
 
 #include "picokeys.h"
 #include "button.h"
+#include <stdio.h>
 #if !defined(ENABLE_EMULATION)
 #include "tusb.h"
 #endif
@@ -42,6 +43,8 @@
 #include "pico_time.h"
 #include "serial.h"
 #include "mbedtls/sha256.h"
+
+extern int rescue_migrate_keydev(void);
 
 app_t apps[16];
 uint8_t num_apps = 0;
@@ -172,6 +175,10 @@ int main(void) {
     low_flash_init();
 
     file_scan_flash();
+
+    if (rescue_migrate_keydev() != PICOKEYS_OK) {
+        printf("Device attestation key migration failed\n");
+    }
 
     init_rtc();
 

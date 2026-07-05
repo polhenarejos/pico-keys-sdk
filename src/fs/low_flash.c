@@ -266,6 +266,13 @@ static bool low_flash_available(void) {
 }
 
 bool low_flash_commit_sync(uint32_t timeout_ms) {
+#if defined(PICO_PLATFORM)
+    // Core 0 owns low_flash_task(). Waiting for it from core 0 would prevent
+    // the queued flash operation from ever being serviced.
+    if (get_core_num() != 1) {
+        return false;
+    }
+#endif
     low_flash_commit();
 
     uint32_t start = board_millis();

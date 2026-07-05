@@ -273,7 +273,11 @@ bool low_flash_commit_sync(uint32_t timeout_ms) {
         if (board_millis() - start >= timeout_ms) {
             return false;
         }
-#if defined(PICO_PLATFORM)
+#if defined(ENABLE_EMULATION)
+        // APDU handling and flash_task() share the emulation event loop, so
+        // waiting here without draining the queue can never make progress.
+        low_flash_task();
+#elif defined(PICO_PLATFORM)
         tight_loop_contents();
 #elif defined(ESP_PLATFORM)
         vTaskDelay(1);

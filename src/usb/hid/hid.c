@@ -283,9 +283,12 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
     if (!hid_set_report_cb || hid_set_report_cb(itf, report_id, report_type, buffer, bufsize) == 0) {
         //usb_rx(itf, buffer, bufsize);
         if (itf == ITF_HID_CTAP) {
+            if (bufsize != HID_RPT_SIZE) {
+                return;
+            }
             memcpy(hid_rx[itf].buffer + hid_rx[itf].w_ptr, buffer, bufsize);
             hid_rx[itf].w_ptr += bufsize;
-            int proc_pkt = driver_process_usb_packet_hid(64);
+            int proc_pkt = driver_process_usb_packet_hid(bufsize);
             if (proc_pkt == 0) {
                 driver_process_usb_nopacket_hid();
             }
@@ -333,15 +336,15 @@ uint16_t *get_send_buffer_size(uint8_t itf) {
 
 int driver_process_usb_packet_hid(uint16_t read) {
     int apdu_sent = 0;
-    if (read >= 5) {
+    if (read == HID_RPT_SIZE) {
         driver_init_hid();
 
-        hid_rx[ITF_HID_CTAP].r_ptr += 64;
+        hid_rx[ITF_HID_CTAP].r_ptr += HID_RPT_SIZE;
         if (hid_rx[ITF_HID_CTAP].r_ptr >= hid_rx[ITF_HID_CTAP].w_ptr) {
             hid_rx[ITF_HID_CTAP].r_ptr = hid_rx[ITF_HID_CTAP].w_ptr = 0;
         }
         last_packet_time = board_millis();
-        DEBUG_PAYLOAD((uint8_t *)ctap_req, 64);
+        DEBUG_PAYLOAD((uint8_t *)ctap_req, HID_RPT_SIZE);
         if (FRAME_TYPE(ctap_req) == TYPE_CONT && msg_packet.len == 0) {
             last_packet_time = 0;
             return 0;

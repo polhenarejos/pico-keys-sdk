@@ -319,13 +319,9 @@ static int cmd_keydev_sign(void) {
     return SW_OK();
 }
 
-// Blocking CORE1
 static void led_3_blinks(void) {
 #ifndef ENABLE_EMULATION
-    uint32_t mode = led_get_mode();
-    led_set_mode(MODE_PROCESSING);
-    sleep_ms(500);
-    led_set_mode(mode);
+    led_blink_n_times(3, LED_COLOR_GREEN, 100, 100);
 #endif
 }
 

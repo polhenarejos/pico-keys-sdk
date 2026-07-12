@@ -282,6 +282,10 @@ int sm_verify(void) {
     tlv_ctx_init(apdu.data, (uint16_t)apdu.nc, &ctxi);
     while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
         if (tag & 0x1) {
+            size_t encoded_len = 1 + tlv_format_len(tag_len, NULL) + tag_len;
+            if (encoded_len > sizeof(input) - input_len) {
+                return PICOKEYS_WRONG_LENGTH;
+            }
             input[input_len++] = (uint8_t)tag;
             uint8_t tlen = tlv_format_len(tag_len, input + input_len);
             input_len += tlen;
@@ -298,8 +302,12 @@ int sm_verify(void) {
         return PICOKEYS_WRONG_DATA;
     }
     if (some_added) {
+        size_t padding_len = sm_blocksize - (input_len % sm_blocksize);
+        if (padding_len > sizeof(input) - input_len) {
+            return PICOKEYS_WRONG_LENGTH;
+        }
         input[input_len++] = 0x80;
-        input_len += (sm_blocksize - (input_len % sm_blocksize));
+        input_len += padding_len - 1;
     }
     uint8_t signature[16];
     r = sm_sign(input, input_len, signature);

@@ -79,28 +79,46 @@ uint8_t tlv_format_len(uint16_t len, uint8_t *out) {
 }
 
 int tlv_walk(const tlv_ctx_t *ctxi, uint8_t **p, uint16_t *tag, uint16_t *tag_len, uint8_t **data) {
-    if (!p) {
+    if (!ctxi || !ctxi->data || !p) {
         return 0;
     }
     if (!*p) {
         *p = (uint8_t *) ctxi->data;
     }
-    if (*p - ctxi->data >= ctxi->len) {
+    if (*p < ctxi->data || (size_t)(*p - ctxi->data) >= ctxi->len) {
         return 0;
     }
     uint16_t tg = 0x0, tgl = 0;
     tg = *(*p)++;
     if ((tg & 0x1f) == 0x1f) {
+        if ((size_t)(*p - ctxi->data) >= ctxi->len) {
+            return 0;
+        }
         tg <<= 8;
         tg |= *(*p)++;
     }
-    tgl = *(*p)++;
+    if ((size_t)(*p - ctxi->data) >= ctxi->len) {
+        /* Some OATH commands use a trailing tag as a zero-length marker. */
+        tgl = 0;
+    }
+    else {
+        tgl = *(*p)++;
+    }
     if (tgl == 0x82) {
+        if (ctxi->len - (size_t)(*p - ctxi->data) < 2) {
+            return 0;
+        }
         tgl = *(*p)++ << 8;
         tgl |= *(*p)++;
     }
     else if (tgl == 0x81) {
+        if ((size_t)(*p - ctxi->data) >= ctxi->len) {
+            return 0;
+        }
         tgl = *(*p)++;
+    }
+    if (tgl > ctxi->len - (size_t)(*p - ctxi->data)) {
+        return 0;
     }
     if (tag) {
         *tag = tg;

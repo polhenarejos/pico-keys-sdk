@@ -52,6 +52,7 @@ typedef int socket_t;
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #endif
 #else
@@ -61,6 +62,8 @@ typedef int socket_t;
 
 #define REST_SESSION_TIMEOUT_INACTIVITY_MS (10 * 60 * 1000) // 10 minutes
 #define REST_SESSION_TIMEOUT_TOTAL_MS (2 * 60 * 60 * 1000) // 2 hours
+#define REST_CONN_TIMEOUT_MS (30 * 1000)
+#define REST_CONN_TOTAL_TIMEOUT_MS (60 * 1000)
 
 #ifndef ENABLE_EMULATION
 static struct tcp_pcb *listener_pcb = NULL;
@@ -287,6 +290,8 @@ static rest_conn_t *alloc_conn(
         if (!conns[i].in_use) {
             memset(&conns[i], 0, sizeof(conns[i]));
             conns[i].in_use = true;
+            conns[i].opened_ms = board_millis();
+            conns[i].last_progress_ms = board_millis();
 #ifdef ENABLE_EMULATION
             conns[i].sock = sock;
             struct sockaddr_in addr;
@@ -1214,6 +1219,7 @@ static err_t rest_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err
     }
     pbuf_copy_partial(p, buffer + *len, p->tot_len, 0);
     *len += p->tot_len;
+    conn->last_progress_ms = board_millis();
     tcp_recved(pcb, p->tot_len);
     pbuf_free(p);
     if (conn->conn_type == REST_CONN_TLS) {
@@ -1226,6 +1232,15 @@ static err_t rest_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err
 static err_t rest_poll(void *arg, struct tcp_pcb *pcb) {
     rest_conn_t *conn = (rest_conn_t *)arg;
     LWIP_UNUSED_ARG(pcb);
+    if (conn == NULL) {
+        return ERR_OK;
+    }
+    uint32_t now = board_millis();
+    if (now - conn->last_progress_ms >= REST_CONN_TIMEOUT_MS ||
+        (!conn->request_dispatched && now - conn->opened_ms >= REST_CONN_TOTAL_TIMEOUT_MS)) {
+        rest_close_conn(conn);
+        return ERR_ABRT;
+    }
     if (conn != NULL && conn->tx_pending) {
         return rest_lwip_continue_send(conn);
     }
@@ -1379,15 +1394,27 @@ static void *rest_emulation_thread(void *arg) {
             (void)close(accepted);
             continue;
         }
+#ifndef _MSC_VER
+        {
+            struct timeval timeout = { .tv_sec = REST_CONN_TIMEOUT_MS / 1000, .tv_usec = 0 };
+            (void)setsockopt(accepted, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        }
+#endif
         if (conn->conn_type == REST_CONN_TLS) {
             mbedtls_ssl_init(&conn->ssl);
             if (mbedtls_ssl_setup(&conn->ssl, &tls_conf) != 0) {
                 rest_close_conn(conn);
                 continue;
             }
-            mbedtls_ssl_set_bio(&conn->ssl, &conn->sock, tls_send_cb, tls_recv_cb, NULL);
+            mbedtls_ssl_set_bio(&conn->ssl, conn, tls_send_cb, tls_recv_cb, NULL);
         }
         while (conn->in_use) {
+            uint32_t now = board_millis();
+            if (now - conn->last_progress_ms >= REST_CONN_TIMEOUT_MS ||
+                (!conn->request_dispatched && now - conn->opened_ms >= REST_CONN_TOTAL_TIMEOUT_MS)) {
+                rest_close_conn(conn);
+                break;
+            }
             if (conn->conn_type == REST_CONN_TLS) {
                 /* TLS on emulation reads directly from socket through mbedtls BIO callbacks. */
                 if (tls_progress_conn(conn) != ERR_OK) {
@@ -1402,6 +1429,7 @@ static void *rest_emulation_thread(void *arg) {
                     break;
                 }
                 conn->request_len += (size_t)n;
+                conn->last_progress_ms = board_millis();
                 if (conn->request_len > REST_MAX_REQUEST_SIZE) {
                     send_json_error(conn, 413, "payload_too_large");
                     break;

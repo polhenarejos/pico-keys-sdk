@@ -57,6 +57,8 @@ typedef struct {
     struct tcp_pcb *pcb;
 #endif
     size_t request_len;
+    uint32_t opened_ms;
+    uint32_t last_progress_ms;
     rest_conn_type_t conn_type;
 #ifdef _MSC_VER
     char _padding[sizeof(void *) - sizeof(rest_conn_type_t)];

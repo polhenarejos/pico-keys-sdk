@@ -191,9 +191,11 @@ int emulation_rest_tls_port(void) {
 }
 
 int tls_send_cb(void *ctx, const unsigned char *buf, size_t len) {
-    const socket_t fd = (socket_t)(*(const intptr_t *)ctx);
+    rest_conn_t *conn = (rest_conn_t *)ctx;
+    const socket_t fd = conn->sock;
     ssize_t r = send(fd, (const char *)buf, (int)len, 0);
     if (r >= 0) {
+        conn->last_progress_ms = board_millis();
         return (int)r;
     }
 #ifdef _MSC_VER
@@ -212,9 +214,11 @@ int tls_send_cb(void *ctx, const unsigned char *buf, size_t len) {
 }
 
 int tls_recv_cb(void *ctx, unsigned char *buf, size_t len) {
-    const socket_t fd = (socket_t)(*(const intptr_t *)ctx);
+    rest_conn_t *conn = (rest_conn_t *)ctx;
+    const socket_t fd = conn->sock;
     ssize_t r = recv(fd, (char *)buf, (int)len, 0);
     if (r > 0) {
+        conn->last_progress_ms = board_millis();
         return (int)r;
     }
     if (r == 0) {
@@ -313,6 +317,7 @@ err_t tls_progress_conn(rest_conn_t *conn) {
             return ERR_ABRT;
         }
         conn->handshake_done = true;
+        conn->last_progress_ms = board_millis();
     }
 
     while (!conn->request_complete) {
@@ -326,6 +331,7 @@ err_t tls_progress_conn(rest_conn_t *conn) {
             return ERR_ABRT;
         }
         conn->request_len += (size_t)ret;
+        conn->last_progress_ms = board_millis();
         conn->request[conn->request_len] = '\0';
         ret = request_is_complete(conn->request, conn->request_len, &payload_offset, &payload_len);
         if (ret < 0) {

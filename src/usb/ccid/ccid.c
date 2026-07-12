@@ -57,6 +57,7 @@
 #define CCID_MSG_CHAIN_OFFSET   9
 #define CCID_MSG_DATA_OFFSET    10  /* == CCID_MSG_HEADER_SIZE */
 #define CCID_MAX_MSG_DATA_SIZE  USB_BUF_SIZE
+#define CCID_MAX_XFR_BLOCK_DATA_SIZE (USB_BUFFER_SIZE - CCID_MSG_DATA_OFFSET)
 
 #define CCID_STATUS_RUN     0x00
 #define CCID_STATUS_PRESENT 0x01
@@ -336,6 +337,12 @@ void driver_exec_finished_ccid(uint8_t itf, uint16_t size_next) {
 }
 
 void driver_exec_finished_cont_ccid(uint8_t itf, uint16_t size_next, uint16_t offset) {
+    if (offset == 0) {
+        size_next = apdu_limit_response(size_next, CCID_MAX_XFR_BLOCK_DATA_SIZE);
+    }
+    else if (size_next > CCID_MAX_XFR_BLOCK_DATA_SIZE) {
+        size_next = CCID_MAX_XFR_BLOCK_DATA_SIZE;
+    }
     ccid_response[itf] = (ccid_header_t *) (ccid_tx[itf].buffer + ccid_tx[itf].w_ptr + offset);
     ccid_response[itf]->bMessageType = CCID_DATA_BLOCK_RET;
     ccid_response[itf]->dwLength = size_next;

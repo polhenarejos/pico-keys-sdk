@@ -266,8 +266,8 @@ static int load_or_create_peer_p256_privkey(uint8_t out_priv32[32]) {
         fclose(fp);
         return -1;
     }
+    fchmod(fileno(fp), 0600);
     fclose(fp);
-    chmod(path, 0600);
 
     rc = 0;
     return rc;

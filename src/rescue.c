@@ -207,7 +207,7 @@ static bool rescue_require_user_presence(void) {
     return true;
 #else
     bool previous_force = force_button_wait;
-#ifdef FORCE_WAIT_BUTTON
+#ifdef FORCE_BUTTON_WAIT
     force_button_wait = true;
 #endif
     int ret = button_wait();

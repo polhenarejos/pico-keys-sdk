@@ -39,9 +39,9 @@ bool is_req_button_pending(void) {
     return req_button_pending;
 }
 
-bool cancel_button = false;
+volatile bool cancel_button = false;
 bool touch_accept_button = false;
-bool force_button_wait = false;
+volatile bool force_button_wait = false;
 
 #if !defined(ENABLE_EMULATION)
 #ifdef ESP_PLATFORM

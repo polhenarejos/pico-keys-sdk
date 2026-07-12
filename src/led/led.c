@@ -28,6 +28,12 @@ led_driver_t *led_driver = NULL;
 
 static uint32_t led_mode = MODE_NOT_MOUNTED;
 
+static volatile bool blink_pending = false;
+static volatile uint8_t blink_count = 0;
+static volatile uint8_t blink_color = LED_COLOR_GREEN;
+static volatile uint32_t blink_on_ms = 0;
+static volatile uint32_t blink_off_ms = 0;
+
 void led_set_mode(uint32_t mode) {
     led_mode = mode;
 }
@@ -36,12 +42,64 @@ uint32_t led_get_mode(void) {
     return led_mode;
 }
 
+void led_blink_n_times(uint8_t count, uint8_t color, uint32_t on_ms, uint32_t off_ms) {
+    if (count == 0 || on_ms == 0 || off_ms == 0) {
+        return;
+    }
+    blink_count = count;
+    blink_color = color;
+    blink_on_ms = on_ms;
+    blink_off_ms = off_ms;
+    blink_pending = true;
+}
+
 void led_blinking_task(void) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
     static uint32_t start_ms = 0;
     static uint32_t stop_ms = 0;
     static uint32_t last_led_update_ms = 0;
     static uint8_t led_state = false;
+    static bool blink_active = false;
+    static bool blink_on = false;
+    static uint8_t blinks_remaining = 0;
+    static uint8_t active_blink_color = LED_COLOR_GREEN;
+    static uint32_t active_blink_on_ms = 0;
+    static uint32_t active_blink_off_ms = 0;
+    static uint32_t blink_deadline_ms = 0;
+
+    uint32_t now = board_millis();
+    if (blink_pending) {
+        blink_pending = false;
+        blink_active = true;
+        blink_on = true;
+        blinks_remaining = blink_count;
+        active_blink_color = blink_color;
+        active_blink_on_ms = blink_on_ms;
+        active_blink_off_ms = blink_off_ms;
+        blink_deadline_ms = now + active_blink_on_ms;
+        led_driver->set_color(active_blink_color, MAX_BTNESS, 1.0f);
+        return;
+    }
+    if (blink_active) {
+        if (now < blink_deadline_ms) {
+            return;
+        }
+        if (blink_on) {
+            blink_on = false;
+            blink_deadline_ms = now + active_blink_off_ms;
+            led_driver->set_color(LED_COLOR_OFF, 0, 0.0f);
+            return;
+        }
+        if (--blinks_remaining == 0) {
+            blink_active = false;
+        }
+        else {
+            blink_on = true;
+            blink_deadline_ms = now + active_blink_on_ms;
+            led_driver->set_color(active_blink_color, MAX_BTNESS, 1.0f);
+            return;
+        }
+    }
     uint8_t state = led_state;
 #ifdef PICO_DEFAULT_LED_PIN_INVERTED
     state = !state;
@@ -54,7 +112,7 @@ void led_blinking_task(void) {
     float progress = 0;
 
     if (stop_ms > start_ms) {
-        progress = (float)(board_millis() - start_ms) / (stop_ms - start_ms);
+        progress = (float)(now - start_ms) / (stop_ms - start_ms);
     }
 
     if (!state) {
@@ -65,12 +123,12 @@ void led_blinking_task(void) {
     }
 
     // limit the frequency of LED status updates
-    if (board_millis() - last_led_update_ms > 2) {
+    if (now - last_led_update_ms > 2) {
         led_driver->set_color(led_color, led_brightness, progress);
-        last_led_update_ms = board_millis();
+        last_led_update_ms = now;
     }
 
-    if (board_millis() >= stop_ms){
+    if (now >= stop_ms){
         start_ms = stop_ms;
         led_state ^= 1; // toggle
         stop_ms = start_ms + (led_state ? led_on : led_off);

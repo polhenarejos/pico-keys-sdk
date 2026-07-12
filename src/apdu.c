@@ -78,6 +78,11 @@ int process_apdu(void) {
 }
 
 uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
+    uint16_t expected_size;
+
+    if (buffer_size < 4) {
+        return 0;
+    }
     apdu.header = (uint8_t *) buffer;
     apdu.nc = apdu.ne = 0;
     if (buffer_size == 4) {
@@ -104,7 +109,11 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
             apdu.ne = 0;
             apdu.nc = get_uint16_be(apdu.header + 5);
             apdu.data = apdu.header + 7;
-            if (apdu.nc + 7 + 2 == buffer_size) {
+            expected_size = (uint16_t)(apdu.nc + 7);
+            if (buffer_size != expected_size && buffer_size != expected_size + 2) {
+                return 0;
+            }
+            if (buffer_size == expected_size + 2) {
                 apdu.ne = get_uint16_be(apdu.header + buffer_size - 2);
                 if (apdu.ne == 0) {
                     apdu.ne = 65536;
@@ -116,7 +125,11 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
         apdu.nc = apdu.header[4];
         apdu.data = apdu.header + 5;
         apdu.ne = 0;
-        if (apdu.nc + 5 + 1 == buffer_size) {
+        expected_size = (uint16_t)(apdu.nc + 5);
+        if (buffer_size != expected_size && buffer_size != expected_size + 1) {
+            return 0;
+        }
+        if (buffer_size == expected_size + 1) {
             apdu.ne = apdu.header[buffer_size - 1];
             if (apdu.ne == 0) {
                 apdu.ne = 256;

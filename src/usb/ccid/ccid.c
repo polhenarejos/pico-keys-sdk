@@ -162,16 +162,18 @@ void tud_vendor_rx_cb(uint8_t itf, const uint8_t *buffer, uint16_t bufsize) {
     (void)bufsize;
     uint32_t len = tud_vendor_n_available(itf);
     do {
-        uint16_t tlen = 0;
-        if (len > 0xFFFF) {
-            tlen = 0xFFFF;
+        uint16_t remaining = (uint16_t)(sizeof(ccid_rx[itf].buffer) - ccid_rx[itf].w_ptr);
+        if (remaining == 0) {
+            ccid_rx[itf].r_ptr = ccid_rx[itf].w_ptr = 0;
+            remaining = sizeof(ccid_rx[itf].buffer);
         }
-        else {
-            tlen = (uint16_t)len;
-        }
+        uint16_t tlen = len > remaining ? remaining : (uint16_t)len;
         tlen = (uint16_t)tud_vendor_n_read(itf, ccid_rx[itf].buffer + ccid_rx[itf].w_ptr, tlen);
         ccid_rx[itf].w_ptr += tlen;
         driver_process_usb_packet_ccid(itf, tlen);
+        if (ccid_rx[itf].w_ptr == sizeof(ccid_rx[itf].buffer) && ccid_rx[itf].r_ptr == 0) {
+            ccid_rx[itf].r_ptr = ccid_rx[itf].w_ptr = 0;
+        }
         len -= tlen;
     } while (len > 0);
 }

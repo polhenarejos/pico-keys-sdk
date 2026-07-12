@@ -291,14 +291,14 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
         random_fill_buffer(mkek, sizeof(mkek));
         ret = esp_efuse_write_key(OTP_KEY_1, ESP_EFUSE_KEY_PURPOSE_USER, mkek, sizeof(mkek));
         if (ret != 0) {
-            printf("Error writing OTP key 1 [%d]\n", ret);
+            printf("Error writing OTP key 1 [%ld]\n", ret);
         }
         mbedtls_platform_zeroize(mkek, sizeof(mkek));
         write_otp[0] = OTP_KEY_1;
     }
     ret = read_key_from_efuse(OTP_KEY_1, _otp_key_1, sizeof(_otp_key_1));
     if (ret != ESP_OK) {
-        printf("Error reading OTP key 1 [%d]\n", ret);
+        printf("Error reading OTP key 1 [%ld]\n", ret);
     }
     *otp_key_1_out = _otp_key_1;
 
@@ -315,14 +315,14 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
         }
         ret = esp_efuse_write_key(OTP_KEY_2, ESP_EFUSE_KEY_PURPOSE_USER, pkey, olen);
         if (ret != 0) {
-            printf("Error writing OTP key 2 [%d]\n", ret);
+            printf("Error writing OTP key 2 [%ld]\n", ret);
         }
         mbedtls_platform_zeroize(pkey, sizeof(pkey));
         write_otp[1] = OTP_KEY_2;
     }
     ret = read_key_from_efuse(OTP_KEY_2, _otp_key_2, sizeof(_otp_key_2));
     if (ret != ESP_OK) {
-        printf("Error reading OTP key 2 [%d]\n", ret);
+        printf("Error reading OTP key 2 [%ld]\n", ret);
     }
     *otp_key_2_out = _otp_key_2;
 
@@ -330,11 +330,11 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
         if (write_otp[i] != 0xFFFF) {
             ret = esp_efuse_set_key_dis_write(write_otp[i]);
             if (ret != ESP_OK) {
-                printf("Error setting OTP key %d to read only [%d]\n", i, ret);
+                printf("Error setting OTP key %d to read only [%ld]\n", i, ret);
             }
             ret = esp_efuse_set_keypurpose_dis_write(write_otp[i]);
             if (ret != ESP_OK) {
-                printf("Error setting OTP key %d purpose to read only [%d]\n", i, ret);
+                printf("Error setting OTP key %d purpose to read only [%ld]\n", i, ret);
             }
         }
     }

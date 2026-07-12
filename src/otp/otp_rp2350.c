@@ -50,7 +50,7 @@ static int otp_write_data_mode(uint16_t row, const uint8_t *data, uint16_t len, 
     otp_cmd_t cmd = { .flags = row | (is_ecc ? OTP_CMD_ECC_BITS : 0) | OTP_CMD_WRITE_BITS };
     uint32_t ret = rom_func_otp_access((uint8_t *)data, len, cmd);
     if (ret) {
-        printf("OTP Write failed with error: %ld\n", ret);
+        printf("OTP Write failed with error: %lu\n", ret);
     }
     return ret;
 }

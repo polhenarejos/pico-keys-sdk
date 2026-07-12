@@ -278,6 +278,29 @@ uint16_t apdu_next(void) {
     return 0;
 }
 
+uint16_t apdu_limit_response(uint16_t size_next, uint16_t max_size) {
+    if (apdu.sw == 0 || max_size < 2 || size_next <= max_size) {
+        return size_next;
+    }
+
+    uint16_t ne = (uint16_t)(max_size - 2);
+    if (apdu.rlen <= ne) {
+        return size_next;
+    }
+
+    rdata_gr = apdu.rdata + ne;
+    rdata_bk = (rdata_gr[0] << 8) | rdata_gr[1];
+    rdata_gr[0] = 0x61;
+    if (apdu.rlen - ne >= 256) {
+        rdata_gr[1] = 0;
+    }
+    else {
+        rdata_gr[1] = (uint8_t)(apdu.rlen - ne);
+    }
+    apdu.rlen -= ne;
+    return max_size;
+}
+
 int bulk_cmd(int (*cmd)(void)) {
     uint8_t *p = apdu.data;
     uint8_t *rapdu = apdu.rdata;

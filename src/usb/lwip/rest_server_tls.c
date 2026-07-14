@@ -17,6 +17,9 @@
 
 #include "picokeys.h"
 #include "rest_server_tls.h"
+#ifdef ENABLE_EMULATION
+#include "compat/board.h"
+#endif
 
 #ifdef _MSC_VER
 #include <string.h>

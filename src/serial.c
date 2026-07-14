@@ -21,6 +21,7 @@
 #if defined(ESP_PLATFORM)
 #include "esp_efuse.h"
 #endif
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #ifndef ESP_PLATFORM
@@ -129,7 +130,7 @@ static int get_system_uuid(char *out) {
     }
     return serial[0] ? 0 : -8;
 }
-#elif defined(__linux__)
+#elif defined(__linux__) && !(defined(ENABLE_EMULATION) && defined(__FOR_CI))
 #include <string.h>
 #include <ctype.h>
 
@@ -206,6 +207,18 @@ char pico_serial_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
 uint8_t pico_serial_hash[32];
 picokey_serial_t pico_serial;
 
+#if defined(ENABLE_EMULATION) && defined(__FOR_CI)
+static int get_ci_device_id(uint8_t *out) {
+    const char *device_id = getenv("PICO_HSM_CI_DEVICE_ID");
+    if (!out || !device_id || !device_id[0]) {
+        return -1;
+    }
+    mbedtls_sha256((const unsigned char *)device_id, strlen(device_id), pico_serial_hash, false);
+    memcpy(out, pico_serial_hash, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);
+    return 0;
+}
+#endif
+
 static int serial_id_is_zero(const uint8_t *id, size_t len) {
     for (size_t i = 0; i < len; i++) {
         if (id[i] != 0) {
@@ -221,14 +234,16 @@ static int serial_id_is_zero(const uint8_t *id, size_t len) {
 #define pico_get_unique_board_id(a) get_macos_serial((uint8_t *)(a))
 #elif defined(_MSC_VER)
 #define pico_get_unique_board_id(a) get_system_uuid((char *)(a))
-#elif defined(__linux__)
+#elif defined(__linux__) && !(defined(ENABLE_EMULATION) && defined(__FOR_CI))
 #define pico_get_unique_board_id(a) get_linux_hardware_id((char *)(a))
 #endif
 
 void serial_init(void) {
     int serial_rc = 0;
 
-#if defined(__APPLE__) || defined(_MSC_VER) || defined(__linux__)
+#if defined(ENABLE_EMULATION) && defined(__FOR_CI)
+    serial_rc = get_ci_device_id(pico_serial.id);
+#elif defined(__APPLE__) || defined(_MSC_VER) || defined(__linux__)
     serial_rc = pico_get_unique_board_id(&pico_serial);
 #else
     pico_get_unique_board_id(&pico_serial);

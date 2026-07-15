@@ -126,6 +126,9 @@ int sm_unwrap(void) {
             body = tag_data;
             body_size = tag_len;
             if (tag == 0x87) {
+                if (body_size == 0) {
+                    return PICOKEYS_WRONG_LENGTH;
+                }
                 is87 = true;
                 body_size--;
             }
@@ -137,6 +140,9 @@ int sm_unwrap(void) {
     }
     if (is87 && *body++ != 0x1) {
         return PICOKEYS_WRONG_PADDING;
+    }
+    if (body_size == 0 || body_size % sm_blocksize != 0) {
+        return PICOKEYS_WRONG_LENGTH;
     }
     sm_update_iv();
     aes_decrypt(sm_kenc, sm_iv, 128, PICOKEYS_AES_MODE_CBC, body, body_size);
@@ -154,6 +160,22 @@ int sm_wrap(void) {
     if (!sm_active || sm_blocksize == 0) {
         return PICOKEYS_EXEC_ERROR;
     }
+    size_t encrypted_size = 0;
+    size_t response_size = 4 + 10; // DO99 and DO8E
+    if (res_APDU_size > 0) {
+        encrypted_size = res_APDU_size + 1;
+        encrypted_size += sm_blocksize - (encrypted_size % sm_blocksize);
+        response_size += 1 + tlv_format_len((uint16_t)(encrypted_size + 1), NULL) + encrypted_size + 1;
+    }
+    if (response_size > USB_BUFFER_SIZE - 20) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+    size_t mac_input_size = sm_blocksize + response_size - 10;
+    mac_input_size += sm_blocksize - (mac_input_size % sm_blocksize);
+    if (mac_input_size > USB_BUFFER_SIZE) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+
     uint8_t input[USB_BUFFER_SIZE];
     size_t input_len = 0;
     memset(input, 0, sizeof(input));

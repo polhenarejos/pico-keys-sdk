@@ -453,6 +453,9 @@ static int cmd_secure(void) {
     }
 
     uint8_t bootkey = P1(apdu);
+    if (bootkey >= 6) {
+        return SW_INCORRECT_P1P2();
+    }
     bool secure_lock = P2(apdu) == 0x1;
 
     if (!rescue_require_user_presence()) {

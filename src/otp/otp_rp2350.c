@@ -197,6 +197,10 @@ bool otp_platform_is_secure_boot_locked(void) {
 int otp_platform_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
     int ret = 0;
 
+    if (bootkey >= 6) {
+        return PICOKEYS_WRONG_DATA;
+    }
+
     alignas(2) uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
     if (is_empty_otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, 32)) {
         PICOKEYS_CHECK(otp_write_data(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, BOOTKEY, sizeof(BOOTKEY)));

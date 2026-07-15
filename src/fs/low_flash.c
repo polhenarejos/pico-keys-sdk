@@ -111,11 +111,9 @@ void low_flash_task(void){
             for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
                 if (flash_pages[r].ready == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    mutex_exit(&mtx_flash);
                     //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
                     if (multicore_lockout_start_timeout_us(1000) == false) {
                         printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
-                        mutex_enter_blocking(&mtx_flash);
                         continue;
                     }
                     //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
@@ -125,10 +123,8 @@ void low_flash_task(void){
                     restore_interrupts(ints);
                     if (multicore_lockout_end_timeout_us(1000) == false) {
                         printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
-                        mutex_enter_blocking(&mtx_flash);
                         continue;
                     }
-                    mutex_enter_blocking(&mtx_flash);
                     //printf("WRITEN %X !\n",flash_pages[r].address);
 #else
                     memcpy(map + flash_pages[r].address, flash_pages[r].page, FLASH_SECTOR_SIZE);
@@ -138,10 +134,8 @@ void low_flash_task(void){
                 }
                 else if (flash_pages[r].erase == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    mutex_exit(&mtx_flash);
                     if (multicore_lockout_start_timeout_us(1000) == false) {
                         printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
-                        mutex_enter_blocking(&mtx_flash);
                         continue;
                     }
                     //printf("WRITTING\n");
@@ -150,10 +144,8 @@ void low_flash_task(void){
                     restore_interrupts(ints);
                     if (multicore_lockout_end_timeout_us(1000) == false) {
                         printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
-                        mutex_enter_blocking(&mtx_flash);
                         continue;
                     }
-                    mutex_enter_blocking(&mtx_flash);
 #else
                     memset(map + flash_pages[r].address, 0, FLASH_SECTOR_SIZE);
 #endif

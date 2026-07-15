@@ -29,6 +29,7 @@
 
 uint8_t *rdata_gr = NULL;
 uint16_t rdata_bk = 0x0;
+static bool response_pending = false;
 extern uint32_t timeout;
 bool is_chaining = false;
 uint8_t chain_buf[2038];
@@ -57,9 +58,16 @@ int process_apdu(void) {
     }
     else {
         if (is_chaining) {
-            memmove(apdu.data + (chain_ptr - chain_buf), apdu.data, apdu.nc);
-            memcpy(apdu.data, chain_buf, chain_ptr - chain_buf);
-            apdu.nc += (uint16_t)(chain_ptr - chain_buf);
+            size_t chain_used = (size_t)(chain_ptr - chain_buf);
+            if (chain_used + apdu.nc >= sizeof(chain_buf)) {
+                memset(chain_buf, 0, sizeof(chain_buf));
+                chain_ptr = NULL;
+                is_chaining = false;
+                return SW_CLA_NOT_SUPPORTED();
+            }
+            memmove(apdu.data + chain_used, apdu.data, apdu.nc);
+            memcpy(apdu.data, chain_buf, chain_used);
+            apdu.nc += (uint16_t)chain_used;
             memset(chain_buf, 0, sizeof(chain_buf));
             chain_ptr = NULL;
             is_chaining = false;
@@ -78,7 +86,7 @@ int process_apdu(void) {
 }
 
 uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
-    uint16_t expected_size;
+    uint32_t expected_size;
 
     if (buffer_size < 4) {
         return 0;
@@ -109,7 +117,7 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
             apdu.ne = 0;
             apdu.nc = get_uint16_be(apdu.header + 5);
             apdu.data = apdu.header + 7;
-            expected_size = (uint16_t)(apdu.nc + 7);
+            expected_size = apdu.nc + 7;
             if (buffer_size != expected_size && buffer_size != expected_size + 2) {
                 return 0;
             }
@@ -125,7 +133,7 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
         apdu.nc = apdu.header[4];
         apdu.data = apdu.header + 5;
         apdu.ne = 0;
-        expected_size = (uint16_t)(apdu.nc + 5);
+        expected_size = apdu.nc + 5;
         if (buffer_size != expected_size && buffer_size != expected_size + 1) {
             return 0;
         }
@@ -139,6 +147,10 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
     //printf("apdu.nc %u, apdu.ne %u\n",apdu.nc,apdu.ne);
     if (apdu.header[1] == 0xc0) {
         //printf("apdu.ne %u, apdu.rlen %d, bk %x\n",apdu.ne,apdu.rlen,rdata_bk);
+        if (!response_pending || !rdata_gr) {
+            rdata_gr = apdu.rdata;
+            return 1;
+        }
         timeout_stop();
         rdata_gr[0] = rdata_bk >> 8;
         rdata_gr[1] = rdata_bk & 0xff;
@@ -161,6 +173,7 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
             apdu.sw = 0;
             apdu.rlen = 0;
             rdata_gr = apdu.rdata;
+            response_pending = false;
         }
         else {
             rdata_gr += apdu.ne;
@@ -187,12 +200,14 @@ uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) 
             driver_exec_finished_cont_emul(itf, (uint16_t)(apdu.ne + 2), (uint16_t)(rdata_gr - apdu.ne - apdu.rdata));
 #endif
             apdu.rlen -= (uint16_t)apdu.ne;
+            response_pending = true;
         }
     }
     else {
         apdu.sw = 0;
         apdu.rlen = 0;
         rdata_gr = apdu.rdata;
+        response_pending = false;
         return 1;
     }
     return 0;
@@ -259,6 +274,7 @@ void apdu_finish(void) {
 uint16_t apdu_next(void) {
     if (apdu.sw != 0) {
         if (apdu.rlen <= apdu.ne) {
+            response_pending = false;
             return apdu.rlen + 2;
         }
         else {
@@ -272,9 +288,11 @@ uint16_t apdu_next(void) {
                 rdata_gr[1] = (uint8_t)(apdu.rlen - apdu.ne);
             }
             apdu.rlen -= (uint16_t)apdu.ne;
+            response_pending = true;
         }
         return (uint16_t)(apdu.ne + 2);
     }
+    response_pending = false;
     return 0;
 }
 
@@ -298,6 +316,7 @@ uint16_t apdu_limit_response(uint16_t size_next, uint16_t max_size) {
         rdata_gr[1] = (uint8_t)(apdu.rlen - ne);
     }
     apdu.rlen -= ne;
+    response_pending = true;
     return max_size;
 }
 

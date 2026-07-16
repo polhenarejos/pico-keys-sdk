@@ -138,13 +138,16 @@ extern file_entry_t file_entries[];
 
 extern uint8_t *file_read(const uint8_t *addr);
 extern uint16_t file_read_uint16(const uint8_t *addr);
+extern uint32_t file_read_uint32(const uint8_t *addr);
 extern uint8_t file_read_uint8(const file_t *ef);
 extern uint8_t file_read_uint8_offset(const file_t *ef, const uint16_t offset);
 extern bool file_has_data(const file_t *);
 extern uint8_t *file_get_data(const file_t *tf);
-extern uint16_t file_get_size(const file_t *tf);
+extern uint32_t file_get_size(const file_t *tf);
+extern int file_read_at(const file_t *tf, uint32_t offset, uint8_t *data, size_t len);
 extern uint8_t file_get_type(const file_t *tf);
-extern int file_put_data(file_t *file, const uint8_t *data, uint16_t len);
+extern int file_put_data(file_t *file, const uint8_t *data, uint32_t len);
+extern int file_put_data_offset(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset);
 extern file_t *file_new(uint16_t);
 extern int flash_clear_file(file_t *file);
 typedef bool (*file_iter_cb)(file_t *file, void *ctx);

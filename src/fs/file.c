@@ -85,8 +85,8 @@ void file_process_fci(const file_t *pe, int fmd) {
             res_APDU_size += put_uint16_be(len, res_APDU + res_APDU_size);
         }
         else {
-            uint16_t v = file_get_size(pe);
-            res_APDU_size += put_uint16_be(v, res_APDU + res_APDU_size);
+            uint32_t v = file_get_size(pe);
+            res_APDU_size += put_uint16_be(v > (uint32_t)UINT16_MAX ? UINT16_MAX : (uint16_t)v, res_APDU + res_APDU_size);
         }
     }
     else {
@@ -340,7 +340,10 @@ static void scan_region(bool persistent) {
         }
 
         uint16_t fid = flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t));
-        printf("[%x] scan fid %x, len %d\n", (unsigned int) base, fid, flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t)));
+        uintptr_t length_addr = base + 2 * sizeof(uintptr_t) + sizeof(uint16_t);
+        uint16_t stored_length = flash_read_uint16(length_addr);
+        uint32_t length = stored_length == FLASH_FILE_EXTENDED_LENGTH ? flash_read_uint32(length_addr + sizeof(uint16_t)) : stored_length;
+        printf("[%x] scan fid %x, len %lu\n", (unsigned int)base, fid, (unsigned long)length);
         file_t *file = (file_t *) file_search_by_fid(fid, NULL, SPECIFY_EF);
         if (!file) {
             file = file_new(fid);
@@ -382,8 +385,15 @@ uint8_t *file_read(const uint8_t *addr) {
 uint16_t file_read_uint16(const uint8_t *addr) {
     return flash_read_uint16((uintptr_t) addr);
 }
+
+uint32_t file_read_uint32(const uint8_t *addr) {
+    return flash_read_uint32((uintptr_t)addr);
+}
+
 uint8_t file_read_uint8_offset(const file_t *ef, const uint16_t offset) {
-    return flash_read_uint8((uintptr_t) (file_get_data(ef) + offset));
+    uint8_t value = 0;
+    file_read_at(ef, offset, &value, sizeof(value));
+    return value;
 }
 uint8_t file_read_uint8(const file_t *ef) {
     return file_read_uint8_offset(ef, 0);
@@ -393,18 +403,44 @@ uint8_t *file_get_data(const file_t *tf) {
     if (!tf || !tf->data) {
         return NULL;
     }
-    return file_read(tf->data + sizeof(uint16_t));
+
+    size_t length_size = file_read_uint16(tf->data) == FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
+    return file_read(tf->data + length_size);
 }
 
-uint16_t file_get_size(const file_t *tf) {
+uint32_t file_get_size(const file_t *tf) {
     if (!tf || !tf->data) {
         return 0;
     }
-    return file_read_uint16(tf->data);
+
+    uint16_t length = file_read_uint16(tf->data);
+    return length == FLASH_FILE_EXTENDED_LENGTH ? file_read_uint32(tf->data + sizeof(uint16_t)) : length;
 }
 
-int file_put_data(file_t *file, const uint8_t *data, uint16_t len) {
+int file_read_at(const file_t *tf, uint32_t offset, uint8_t *data, size_t len) {
+    if (!tf || !tf->data || (!data && len > 0)) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+
+    uint32_t size = file_get_size(tf);
+    if (offset > size || len > size - offset) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    if (len == 0) {
+        return PICOKEYS_OK;
+    }
+
+    uint16_t stored_length = file_read_uint16(tf->data);
+    size_t length_size = stored_length == FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
+    return flash_read_block((uintptr_t)tf->data + length_size + offset, data, len);
+}
+
+int file_put_data(file_t *file, const uint8_t *data, uint32_t len) {
     return flash_write_data_to_file(file, data, len);
+}
+
+int file_put_data_offset(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset) {
+    return flash_write_data_to_file_offset(file, data, len, offset);
 }
 
 static int delete_dynamic_file(file_t *f) {
@@ -617,17 +653,24 @@ int flash_clear_file(file_t *file) {
     if (file == NULL || file->data == NULL) {
         return PICOKEYS_OK;
     }
+
+    uint32_t len = file_get_size(file);
+    uint16_t stored_length = file_read_uint16(file->data);
+    size_t length_size = stored_length == FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
+    uintptr_t payload_addr = (uintptr_t)file->data + length_size;
     uintptr_t base_addr = (uintptr_t)(file->data - sizeof(uintptr_t) - sizeof(uint16_t) - sizeof(uintptr_t));
     uintptr_t prev_addr = flash_read_uintptr(base_addr + sizeof(uintptr_t));
     uintptr_t next_addr = flash_read_uintptr(base_addr);
     //printf("nc %lx->%lx   %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);
     flash_program_uintptr(prev_addr, next_addr);
     flash_program_halfword((uintptr_t) file->data, 0);
-    uint16_t len = file_get_size(file);
-    if (len > 0) {
-        uint8_t *zr = (uint8_t *)calloc(1, len);
-        flash_program_block((uintptr_t) file->data + sizeof(uint16_t), zr, len);
-        free(zr);
+    const uint8_t zeros[256] = {0};
+    for (uint32_t offset = 0; offset < len;) {
+        size_t chunk = MIN(sizeof(zeros), len - offset);
+        if (flash_program_block(payload_addr + offset, zeros, chunk) != PICOKEYS_OK) {
+            return PICOKEYS_EXEC_ERROR;
+        }
+        offset += chunk;
     }
     if (next_addr > 0) {
         flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);
@@ -635,7 +678,9 @@ int flash_clear_file(file_t *file) {
     flash_program_uintptr(base_addr, 0);
     flash_program_uintptr(base_addr + sizeof(uintptr_t), 0);
     file->data = NULL;
-    num_files--;
+    if (num_files > 0) {
+        num_files--;
+    }
     //printf("na %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr));
     return PICOKEYS_OK;
 }

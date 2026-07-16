@@ -71,6 +71,7 @@ extern uint32_t FLASH_SIZE_BYTES;
 #endif
 
 #define TOTAL_FLASH_PAGES 6
+#define FLASH_CACHE_FLUSH_TIMEOUT_MS 5000u
 
 extern const uintptr_t start_data_pool;
 extern const uintptr_t end_rom_pool;
@@ -273,8 +274,7 @@ bool low_flash_commit_sync(uint32_t timeout_ms) {
             return false;
         }
 #if defined(ENABLE_EMULATION)
-        // APDU handling and flash_task() share the emulation event loop, so
-        // waiting here without draining the queue can never make progress.
+        // APDU handling and flash_task() share the emulation event loop, so waiting here without draining the queue can never make progress.
         low_flash_task();
 #elif defined(PICO_PLATFORM)
         tight_loop_contents();
@@ -287,21 +287,32 @@ bool low_flash_commit_sync(uint32_t timeout_ms) {
 
 static page_flash_t *find_free_page(uintptr_t addr) {
     uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
-    page_flash_t *p = NULL;
+
+    /* Reuse an existing cached sector before taking an empty slot. */
     for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
-        if ((!flash_pages[r].ready && !flash_pages[r].erase) ||
-            flash_pages[r].address == addr_alg) {                                                   //first available
-            p = &flash_pages[r];
-            if (!flash_pages[r].ready && !flash_pages[r].erase) {
-#ifdef PICO_PLATFORM
-                memcpy(p->page, (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
-#else
-                memcpy(p->page, (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *) (map + addr_alg) : (uint8_t *) addr_alg, FLASH_SECTOR_SIZE);
-#endif
-                ready_pages++;
-                p->address = addr_alg;
-                p->ready = true;
+        if ((flash_pages[r].ready || flash_pages[r].erase) && flash_pages[r].address == addr_alg) {
+            if (flash_pages[r].erase) {
+                flash_pages[r].erase = false;
+                flash_pages[r].ready = true;
+                flash_pages[r].page_size = 0;
             }
+            return &flash_pages[r];
+        }
+    }
+
+    for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
+        if (!flash_pages[r].ready && !flash_pages[r].erase) {
+            page_flash_t *p = &flash_pages[r];
+#ifdef PICO_PLATFORM
+            memcpy(p->page, (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
+#else
+            memcpy(p->page, (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *)(map + addr_alg) : (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
+#endif
+            ready_pages++;
+            p->address = addr_alg;
+            p->ready = true;
+            p->erase = false;
+            p->page_size = 0;
             return p;
         }
     }
@@ -309,26 +320,33 @@ static page_flash_t *find_free_page(uintptr_t addr) {
 }
 
 int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
-    page_flash_t *p = NULL;
-
     if (!data || len == 0) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
 
-    mutex_enter_blocking(&mtx_flash);
-    if (ready_pages == TOTAL_FLASH_PAGES) {
+    while (len > 0) {
+        size_t page_offset = addr & (FLASH_SECTOR_SIZE - 1);
+        size_t chunk = MIN(len, FLASH_SECTOR_SIZE - page_offset);
+        page_flash_t *p = NULL;
+
+        mutex_enter_blocking(&mtx_flash);
+        p = find_free_page(addr);
+        if (p) {
+            memcpy(&p->page[page_offset], data, chunk);
+            mutex_exit(&mtx_flash);
+            addr += chunk;
+            data += chunk;
+            len -= chunk;
+            continue;
+        }
         mutex_exit(&mtx_flash);
-        printf("ERROR: ALL FLASH PAGES CACHED\n");
-        return PICOKEYS_ERR_NO_MEMORY;
+
+        /* Core 0 drains the six dirty sectors, then they can be reused. */
+        if (!low_flash_commit_sync(FLASH_CACHE_FLUSH_TIMEOUT_MS)) {
+            printf("ERROR: FLASH CACHE CANNOT BE DRAINED\n");
+            return PICOKEYS_ERR_NO_MEMORY;
+        }
     }
-    if (!(p = find_free_page(addr))) {
-        mutex_exit(&mtx_flash);
-        printf("ERROR: FLASH CANNOT FIND A PAGE (rare error)\n");
-        return PICOKEYS_ERR_MEMORY_FATAL;
-    }
-    memcpy(&p->page[addr & (FLASH_SECTOR_SIZE - 1)], data, len);
-    //printf("Flash: modified page %X with data %x at [%x]\n",(uintptr_t)addr,(uintptr_t)data,addr&(FLASH_SECTOR_SIZE-1));
-    mutex_exit(&mtx_flash);
     return PICOKEYS_OK;
 }
 
@@ -366,22 +384,74 @@ uint8_t *flash_read(uintptr_t addr) {
     return v;
 }
 
+int flash_read_block(uintptr_t addr, uint8_t *data, size_t len) {
+    if (!data || len == 0) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+
+    while (len > 0) {
+        uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
+        size_t page_offset = addr & (FLASH_SECTOR_SIZE - 1);
+        size_t chunk = MIN(len, FLASH_SECTOR_SIZE - page_offset);
+        const uint8_t *source = NULL;
+
+        mutex_enter_blocking(&mtx_flash);
+        for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
+            if (flash_pages[r].ready && flash_pages[r].address == addr_alg) {
+                source = &flash_pages[r].page[page_offset];
+                break;
+            }
+        }
+        if (!source) {
+#ifdef PICO_PLATFORM
+            source = (const uint8_t *)addr;
+#else
+            source = (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (const uint8_t *)(map + addr) : (const uint8_t *)addr;
+#endif
+        }
+        memcpy(data, source, chunk);
+        mutex_exit(&mtx_flash);
+
+        addr += chunk;
+        data += chunk;
+        len -= chunk;
+    }
+    return PICOKEYS_OK;
+}
+
 uintptr_t flash_read_uintptr(uintptr_t addr) {
-    uint8_t *p = flash_read(addr);
+    uint8_t p[sizeof(uintptr_t)];
     uintptr_t v = 0x0;
+
+    flash_read_block(addr, p, sizeof(p));
     for (size_t i = 0; i < sizeof(uintptr_t); i++) {
         v |= (uintptr_t) p[i] << (8 * i);
     }
     return v;
 }
+
 uint16_t flash_read_uint16(uintptr_t addr) {
-    uint8_t *p = flash_read(addr);
+    uint8_t p[sizeof(uint16_t)];
     uint16_t v = 0x0;
+
+    flash_read_block(addr, p, sizeof(p));
     for (size_t i = 0; i < sizeof(uint16_t); i++) {
         v |= p[i] << (8 * i);
     }
     return v;
 }
+
+uint32_t flash_read_uint32(uintptr_t addr) {
+    uint8_t p[sizeof(uint32_t)];
+    uint32_t v = 0x0;
+
+    flash_read_block(addr, p, sizeof(p));
+    for (size_t i = 0; i < sizeof(uint32_t); i++) {
+        v |= (uint32_t)p[i] << (8 * i);
+    }
+    return v;
+}
+
 uint8_t flash_read_uint8(uintptr_t addr) {
     return *flash_read(addr);
 }

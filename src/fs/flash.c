@@ -42,7 +42,8 @@ extern bool low_flash_commit_sync(uint32_t timeout_ms);
 /*
  * ------------------------------------------------------
  * |                                                    |
- * | next_addr | prev_addr | fid | data (len + payload) |
+ * | next_addr | prev_addr | fid | len16 | payload       | legacy
+ * | next_addr | prev_addr | fid | FFFF  | len32 | data | extended
  * |                                                    |
  * ------------------------------------------------------
  */
@@ -66,105 +67,194 @@ void flash_set_bounds(uintptr_t start, uintptr_t end) {
     last_base = end_data_pool;
 }
 
-static uintptr_t allocate_free_addr(uint16_t size, bool persistent) {
-    if (size > FLASH_SECTOR_SIZE) {
-        return 0x0; //ERROR
-    }
-    size_t real_size = size + sizeof(uint16_t) + sizeof(uintptr_t) + sizeof(uint16_t) + sizeof(uintptr_t); //len+len size+next address+fid+prev_addr size
+static size_t flash_record_length_size(uintptr_t base) {
+    uintptr_t length_addr = base + 2 * sizeof(uintptr_t) + sizeof(uint16_t);
+    return flash_read_uint16(length_addr) == FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
+}
+
+static uint32_t flash_record_payload_size(uintptr_t base) {
+    uintptr_t length_addr = base + 2 * sizeof(uintptr_t) + sizeof(uint16_t);
+    uint16_t length = flash_read_uint16(length_addr);
+    return length == FLASH_FILE_EXTENDED_LENGTH ? flash_read_uint32(length_addr + sizeof(uint16_t)) : length;
+}
+
+static size_t flash_record_size(uintptr_t base) {
+    return 2 * sizeof(uintptr_t) + sizeof(uint16_t) + flash_record_length_size(base) + flash_record_payload_size(base);
+}
+
+static uintptr_t allocate_free_addr(uint32_t size, bool persistent) {
+    size_t length_size = size >= FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
+    size_t overhead = 2 * sizeof(uintptr_t) + sizeof(uint16_t) + length_size;
+    size_t real_size = 0;
     uintptr_t next_base = 0x0, endp = end_data_pool, startp = start_data_pool;
+
+    if (size > SIZE_MAX - overhead) {
+        return 0x0;
+    }
+    real_size = overhead + size;
     if (persistent) {
         endp = end_rom_pool;
         startp = start_rom_pool;
     }
+    if (real_size > endp - startp) {
+        return 0x0;
+    }
     for (uintptr_t base = endp; base >= startp; base = next_base) {
-        uintptr_t addr_alg = base & -FLASH_SECTOR_SIZE; //start address of sector
-        uintptr_t potential_addr = base - real_size;
-        next_base = flash_read_uintptr(base);
-        //printf("nb %x %x %x %x\n",base,next_base,addr_alg,potential_addr);
-        //printf("fid %x\n",flash_read_uint16(next_base+sizeof(uintptr_t)));
-        if (next_base == 0x0) { //we are at the end
-            //now we check if we fit in the current sector
-            if (addr_alg <= potential_addr) { //it fits in the current sector
-                flash_program_uintptr(potential_addr, 0x0);
-                flash_program_uintptr(potential_addr + sizeof(uintptr_t), base);
-                flash_program_uintptr(base, potential_addr);
-                return potential_addr;
-            }
-            else if (addr_alg - FLASH_SECTOR_SIZE >= startp) {   //check whether it fits in the next sector, so we take addr_aligned as the base
-                potential_addr = addr_alg - real_size;
-                flash_program_uintptr(potential_addr, 0x0);
-                flash_program_uintptr(potential_addr + sizeof(uintptr_t), base);
-                flash_program_uintptr(base, potential_addr);
-                return potential_addr;
-            }
+        if (base < real_size) {
             return 0x0;
         }
-        //we check if |base-(next_addr+size_next_addr)| > |base-potential_addr| only if fid != 1xxx (not size blocked)
-        else if (addr_alg <= potential_addr
-            && base - (next_base + flash_read_uint16(next_base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t)) + 2 * sizeof(uint16_t) + 2 * sizeof(uintptr_t)) > base - potential_addr
-            && (flash_read_uint16(next_base + 2 * sizeof(uintptr_t)) & 0x1000) != 0x1000) {
+        uintptr_t potential_addr = base - real_size;
+        next_base = flash_read_uintptr(base);
+
+        uintptr_t gap_start = startp;
+        bool gap_reusable = true;
+        if (next_base != 0x0) {
+            if (next_base >= base) {
+                return 0x0;
+            }
+            size_t next_size = flash_record_size(next_base);
+            if (next_size > base - next_base) {
+                return 0x0;
+            }
+            gap_start = next_base + next_size;
+            gap_reusable = (flash_read_uint16(next_base + 2 * sizeof(uintptr_t)) & 0x1000) != 0x1000;
+        }
+
+        if (gap_reusable && potential_addr >= gap_start && potential_addr >= startp) {
             flash_program_uintptr(potential_addr, next_base);
-            flash_program_uintptr(next_base + sizeof(uintptr_t), potential_addr);
             flash_program_uintptr(potential_addr + sizeof(uintptr_t), base);
+            if (next_base != 0x0) {
+                flash_program_uintptr(next_base + sizeof(uintptr_t), potential_addr);
+            }
             flash_program_uintptr(base, potential_addr);
             return potential_addr;
         }
+        if (next_base == 0x0) {
+            break;
+        }
     }
-    return 0x0; //probably never reached
+    return 0x0;
 }
 
-static int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint16_t len, uint16_t offset) {
-    if (!file) {
+static size_t file_length_size(const file_t *file) {
+    return flash_read_uint16((uintptr_t)file->data) == FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
+}
+
+static int write_file_length(const file_t *file, uint32_t len) {
+    if (len >= FLASH_FILE_EXTENDED_LENGTH) {
+        int r = flash_program_halfword((uintptr_t)file->data, FLASH_FILE_EXTENDED_LENGTH);
+        if (r != PICOKEYS_OK) {
+            return r;
+        }
+        return flash_program_word((uintptr_t)file->data + sizeof(uint16_t), len);
+    }
+    return flash_program_halfword((uintptr_t)file->data, (uint16_t)len);
+}
+
+static int copy_file_range(const file_t *source, uint32_t source_offset, uintptr_t destination, uint32_t len) {
+    uint8_t buffer[256];
+
+    while (len > 0) {
+        size_t chunk = MIN(sizeof(buffer), len);
+        int r = file_read_at(source, source_offset, buffer, chunk);
+        if (r != PICOKEYS_OK) {
+            return r;
+        }
+        r = flash_program_block(destination, buffer, chunk);
+        if (r != PICOKEYS_OK) {
+            return r;
+        }
+        source_offset += chunk;
+        destination += chunk;
+        len -= chunk;
+    }
+    return PICOKEYS_OK;
+}
+
+static int flash_write_data_to_file_internal(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset, bool partial) {
+    if (!file || (!data && len > 0)) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    uint16_t size_file_flash = file->data ? flash_read_uint16((uintptr_t) file->data) : 0;
-    uint8_t *old_data = NULL;
-    if (offset + len > FLASH_SECTOR_SIZE || offset > size_file_flash) {
+
+    uint32_t old_size = file_get_size(file);
+    if (offset > UINT32_MAX - len || (partial && offset > old_size)) {
         return PICOKEYS_ERR_NO_MEMORY;
     }
-    if (file->data) { //already in flash
-        if (offset + len <= size_file_flash) { //it fits, no need to move it
-            flash_program_halfword((uintptr_t) file->data, offset + len);
-            if (data) {
-                flash_program_block((uintptr_t) file->data + sizeof(uint16_t) + offset, data, len);
-            }
-            return PICOKEYS_OK;
+    uint32_t write_end = offset + len;
+    uint32_t new_size = partial ? MAX(old_size, write_end) : len;
+    bool extended_size = file->data && flash_read_uint16((uintptr_t)file->data) == FLASH_FILE_EXTENDED_LENGTH;
+
+    if (file->data && ((partial && write_end <= old_size) || (!partial && len <= old_size && (extended_size || len < FLASH_FILE_EXTENDED_LENGTH)))) {
+        size_t length_size = file_length_size(file);
+        int r = PICOKEYS_OK;
+        if (!partial) {
+            r = extended_size ? flash_program_word((uintptr_t)file->data + sizeof(uint16_t), len) : flash_program_halfword((uintptr_t)file->data, (uint16_t)len);
         }
-        else {   //we clear the old file
-            flash_clear_file(file);
-            if (offset > 0) {
-                old_data = (uint8_t *) calloc(1, offset + len);
-                memcpy(old_data, flash_read((uintptr_t) (file->data + sizeof(uint16_t))), offset);
-                memcpy(old_data + offset, data, len);
-                len = offset + len;
-                data = old_data;
-            }
+        if (r == PICOKEYS_OK && len > 0) {
+            r = flash_program_block((uintptr_t)file->data + length_size + offset, data, len);
         }
+        if (r == PICOKEYS_OK && old_size > FLASH_SECTOR_SIZE && !flash_commit_sync(5000u)) {
+            return PICOKEYS_ERR_MEMORY_FATAL;
+        }
+        return r;
     }
 
-    uintptr_t new_addr = allocate_free_addr(len, (file_get_type(file) & FILE_PERSISTENT) == FILE_PERSISTENT);
-    //printf("na %x\n",new_addr);
+    file_t old_file = *file;
+    bool replacing = old_file.data != NULL;
+    uintptr_t new_addr = allocate_free_addr(new_size, (file_get_type(file) & FILE_PERSISTENT) == FILE_PERSISTENT);
     if (new_addr == 0x0) {
         return PICOKEYS_ERR_NO_MEMORY;
     }
     if (new_addr < last_base) {
         last_base = new_addr;
     }
-    file->data = (uint8_t *) new_addr + sizeof(uintptr_t) + sizeof(uint16_t) + sizeof(uintptr_t); //next addr+fid+prev addr
-    flash_program_halfword(new_addr + sizeof(uintptr_t) + sizeof(uintptr_t), file->fid);
-    flash_program_halfword((uintptr_t) file->data, len);
-    if (data) {
-        flash_program_block((uintptr_t) file->data + sizeof(uint16_t), data, len);
-    }
-    if (old_data) {
-        free(old_data);
+
+    file_t new_file = {
+        .data = (uint8_t *)new_addr + 2 * sizeof(uintptr_t) + sizeof(uint16_t),
+        .fid = file->fid
+    };
+    size_t length_size = new_size >= FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
+    uintptr_t payload = (uintptr_t)new_file.data + length_size;
+    int r = flash_program_halfword(new_addr + 2 * sizeof(uintptr_t), new_file.fid);
+
+    if (r == PICOKEYS_OK) {
+        r = write_file_length(&new_file, new_size);
     }
     num_files++;
+
+    if (r == PICOKEYS_OK && partial && replacing && offset > 0) {
+        r = copy_file_range(&old_file, 0, payload, offset);
+    }
+    if (r == PICOKEYS_OK && len > 0) {
+        r = flash_program_block(payload + offset, data, len);
+    }
+    if (r == PICOKEYS_OK && partial && replacing && write_end < old_size) {
+        r = copy_file_range(&old_file, write_end, payload + write_end, old_size - write_end);
+    }
+    if (r == PICOKEYS_OK && 2 * sizeof(uintptr_t) + sizeof(uint16_t) + length_size + new_size > FLASH_SECTOR_SIZE && !flash_commit_sync(5000u)) {
+        r = PICOKEYS_ERR_MEMORY_FATAL;
+    }
+    if (r != PICOKEYS_OK) {
+        flash_clear_file(&new_file);
+        return r;
+    }
+    if (replacing && flash_clear_file(&old_file) != PICOKEYS_OK) {
+        flash_clear_file(&new_file);
+        return PICOKEYS_ERR_MEMORY_FATAL;
+    }
+    if (replacing && 2 * sizeof(uintptr_t) + sizeof(uint16_t) + length_size + new_size > FLASH_SECTOR_SIZE && !flash_commit_sync(5000u)) {
+        return PICOKEYS_ERR_MEMORY_FATAL;
+    }
+    *file = new_file;
     return PICOKEYS_OK;
 }
 
-int flash_write_data_to_file(file_t *file, const uint8_t *data, uint16_t len) {
-    return flash_write_data_to_file_offset(file, data, len, 0);
+int flash_write_data_to_file(file_t *file, const uint8_t *data, uint32_t len) {
+    return flash_write_data_to_file_internal(file, data, len, 0, false);
+}
+
+int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset) {
+    return flash_write_data_to_file_internal(file, data, len, offset, true);
 }
 
 uint32_t flash_free_space(void) {

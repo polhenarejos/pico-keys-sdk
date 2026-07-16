@@ -37,7 +37,7 @@ file_entry_t sef_phy = {.fid = EF_PHY, .parent = 5, .name = NULL, .type = FILE_T
 file_t *ef_phy = &sef_phy.file;
 #endif
 
-static const file_entry_t *file_metadata(const file_t *file) {
+static const file_entry_t *file_static_entry(const file_t *file) {
     if (!file) {
         return NULL;
     }
@@ -56,13 +56,13 @@ static const file_entry_t *file_metadata(const file_t *file) {
 }
 
 uint8_t file_get_type(const file_t *file) {
-    const file_entry_t *entry = file_metadata(file);
+    const file_entry_t *entry = file_static_entry(file);
     return entry ? entry->type : FILE_TYPE_WORKING_EF;
 }
 
 //puts FCI in the RAPDU
 void file_process_fci(const file_t *pe, int fmd) {
-    const file_entry_t *entry = file_metadata(pe);
+    const file_entry_t *entry = file_static_entry(pe);
     uint8_t type = file_get_type(pe);
     uint8_t structure = entry ? entry->ef_structure : FILE_EF_TRANSPARENT;
     const uint8_t *name = entry ? entry->name : NULL;
@@ -152,7 +152,7 @@ static bool is_parent(const file_entry_t *child, const file_t *parent) {
 }
 
 file_t *get_parent(file_t *f) {
-    const file_entry_t *entry = file_metadata(f);
+    const file_entry_t *entry = file_static_entry(f);
     uint8_t parent = entry ? entry->parent : 5;
     return &file_entries[parent].file;
 }
@@ -287,7 +287,7 @@ const file_t *selected_applet = NULL;
 bool isUserAuthenticated = false;
 
 bool file_authenticate_action(const file_t *ef, uint8_t op) {
-    const file_entry_t *entry = file_metadata(ef);
+    const file_entry_t *entry = file_static_entry(ef);
     uint8_t acl = entry ? entry->acl[op] : 0x00;
     if (acl == 0x0) {
         return true;

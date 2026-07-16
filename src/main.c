@@ -43,6 +43,9 @@
 #include "serial.h"
 #include "mbedtls/sha256.h"
 #include "signal.h"
+#if defined(PICO_RP2350) || defined(ENABLE_EMULATION)
+#include "picokeys_plugin_api.h"
+#endif
 
 app_t apps[16];
 uint8_t num_apps = 0;
@@ -103,10 +106,6 @@ WEAK int picokey_init(void) {
     return 0;
 }
 
-
-#if defined(PICO_RP2350) || defined(ENABLE_EMULATION)
-void plugin_init(void);
-#endif
 
 void execute_tasks(void);
 void execute_tasks(void) {

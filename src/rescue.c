@@ -31,7 +31,7 @@
 #include "random.h"
 #include "crypto_utils.h"
 #include "usb.h"
-#include "audit.h"
+#include "picokeys_plugin_api.h"
 #include "signal.h"
 
 #ifdef PICO_PLATFORM
@@ -259,7 +259,6 @@ static int cmd_write(void) {
 #endif
     }
     else if (p1 == 0x2) { // SET TIME
-        audit_entry_set_current_event(AUDIT_EVT_SET_RTC);
         time_t tv_sec = 0;
         if (p2 != 0x1 && p2 != 0x2) {
             return SW_INCORRECT_P1P2();
@@ -408,10 +407,10 @@ static int cmd_reboot_bootsel(void) {
 #define INS_REBOOT_BOOTSEL   0x1F
 
 static const cmd_t cmds[] = {
-    { INS_KEYDEV_SIGN, cmd_keydev_sign, CMD_FLAG_AUDIT_LOG },
-    { INS_WRITE, cmd_write, CMD_FLAG_AUDIT_LOG | CMD_FLAG_CRITICAL },
+    { INS_KEYDEV_SIGN, cmd_keydev_sign, CMD_FLAG_NOTIFY_PLUGIN },
+    { INS_WRITE, cmd_write, CMD_FLAG_NOTIFY_PLUGIN | CMD_FLAG_SECURITY_SENSITIVE },
 #if defined(PICO_RP2350) || defined(ESP_PLATFORM)
-    { INS_SECURE, cmd_secure, CMD_FLAG_AUDIT_LOG | CMD_FLAG_CRITICAL },
+    { INS_SECURE, cmd_secure, CMD_FLAG_NOTIFY_PLUGIN | CMD_FLAG_SECURITY_SENSITIVE },
 #endif
     { INS_READ, cmd_read, CMD_FLAG_NONE },
 #ifdef PICO_PLATFORM
@@ -427,21 +426,26 @@ static int rescue_process_apdu(void) {
     }
     for (const cmd_t *cmd = cmds; cmd->ins != 0x00; cmd++) {
         if (cmd->ins == INS(apdu)) {
-            audit_entry_set_current_event(AUDIT_EVT_APP_EVT | INS(apdu));
-            audit_entry_set_current_object(make_uint16_be(P1(apdu), P2(apdu)));
             int r = cmd->cmd_handler();
-            if (cmd->flags & CMD_FLAG_AUDIT_LOG) {
-                if (cmd->flags & CMD_FLAG_CRITICAL) {
-                    audit_entry_set_current_flags(AUDIT_EF_CRITICAL);
-                }
-                audit_log_current_entry_with_result(r);
+            if (cmd->flags & CMD_FLAG_NOTIFY_PLUGIN) {
+                pk_plugin_notify_command(
+                    PK_PLUGIN_EVENT_SOURCE_CORE,
+                    INS(apdu),
+                    make_uint16_be(P1(apdu), P2(apdu)),
+                    (cmd->flags & CMD_FLAG_SECURITY_SENSITIVE)
+                        ? PK_PLUGIN_EVENT_FLAG_SECURITY_SENSITIVE
+                        : PK_PLUGIN_EVENT_FLAG_NONE,
+                    r);
             }
             return r;
         }
     }
     int ret = signal_emit(SIGNAL_RESCUE_NOT_FOUND);
-    if (ret != 0) {
+    if (ret == PICOKEYS_ERR_FILE_NOT_FOUND) {
         return SW_INS_NOT_SUPPORTED();
+    }
+    if (ret != PICOKEYS_OK) {
+        return ret;
     }
     return SW_OK();
 }

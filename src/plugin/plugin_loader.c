@@ -30,6 +30,7 @@
 #include <string.h>
 
 static pk_plugin_imports_t plugin_imports;
+static const pk_plugin_header_t *active_plugin;
 
 _Static_assert(sizeof(pk_plugin_sha256_context_t) >= sizeof(mbedtls_sha256_context),
                "pk_plugin_sha256_context_t too small for mbedtls_sha256_context");
@@ -84,6 +85,77 @@ static uint16_t pk_plugin_get_res_apdu_size(void) {
 
 static void pk_plugin_set_res_apdu_size(uint16_t size) {
     apdu.rlen = size;
+}
+
+static uint8_t pk_plugin_get_apdu_cla(void) {
+    return apdu.header ? CLA(apdu) : 0;
+}
+
+static uint8_t pk_plugin_get_apdu_ins(void) {
+    return apdu.header ? INS(apdu) : 0;
+}
+
+static uint8_t pk_plugin_get_apdu_p1(void) {
+    return apdu.header ? P1(apdu) : 0;
+}
+
+static uint8_t pk_plugin_get_apdu_p2(void) {
+    return apdu.header ? P2(apdu) : 0;
+}
+
+static const uint8_t *pk_plugin_get_apdu_data(void) {
+    return apdu.data;
+}
+
+static size_t pk_plugin_get_apdu_data_size(void) {
+    return apdu.nc;
+}
+
+static void *pk_plugin_file_search(uint16_t fid) {
+    return file_search(fid);
+}
+
+static void *pk_plugin_file_new(uint16_t fid) {
+    return file_new(fid);
+}
+
+static int pk_plugin_file_has_data(const void *file) {
+    return file_has_data((const file_t *)file) ? 1 : 0;
+}
+
+static const uint8_t *pk_plugin_file_get_data(const void *file) {
+    return file_get_data((const file_t *)file);
+}
+
+static uint16_t pk_plugin_file_get_size(const void *file) {
+    return file_get_size((const file_t *)file);
+}
+
+static int pk_plugin_file_put_data(void *file, const uint8_t *data, uint16_t len) {
+    return file_put_data((file_t *)file, data, len);
+}
+
+static int pk_plugin_file_delete(void *file) {
+    return file_delete((file_t *)file);
+}
+
+static int pk_plugin_has_call(const pk_plugin_header_t *plugin) {
+    return plugin &&
+           plugin->header_size >= offsetof(pk_plugin_header_t, call) + sizeof(plugin->call) &&
+           plugin->call;
+}
+
+void pk_plugin_dispatch_event(const pk_plugin_event_t *event) {
+    if (event) {
+        signal_emit_param(PICOKEYS_PLUGIN_SIGNAL_EVENT, (void *)event);
+    }
+}
+
+int pk_plugin_call(uint32_t hook, void *data) {
+    if (!pk_plugin_has_call(active_plugin)) {
+        return PK_PLUGIN_CALL_UNHANDLED;
+    }
+    return active_plugin->call(hook, data);
 }
 
 #ifdef ENABLE_EMULATION
@@ -249,6 +321,11 @@ static const pk_plugin_header_t *pk_plugin_get_valid(void) {
         printf("Plugin rejected: init pointer out of range\n");
         return NULL;
     }
+    if (plugin->header_size >= offsetof(pk_plugin_header_t, call) + sizeof(plugin->call) &&
+        plugin->call && !pk_plugin_ptr_in_range((const void *)plugin->call)) {
+        printf("Plugin rejected: call pointer out of range\n");
+        return NULL;
+    }
     return plugin;
 }
 #endif
@@ -266,6 +343,7 @@ void plugin_init(void) {
     }
 #endif
 
+    active_plugin = plugin;
     plugin_imports = (pk_plugin_imports_t){
         .abi_version = PICOKEYS_PLUGIN_ABI_VERSION,
         .struct_size = sizeof(plugin_imports),
@@ -289,6 +367,20 @@ void plugin_init(void) {
         .get_res_apdu = pk_plugin_get_res_apdu,
         .get_res_apdu_size = pk_plugin_get_res_apdu_size,
         .set_res_apdu_size = pk_plugin_set_res_apdu_size,
+        .get_apdu_cla = pk_plugin_get_apdu_cla,
+        .get_apdu_ins = pk_plugin_get_apdu_ins,
+        .get_apdu_p1 = pk_plugin_get_apdu_p1,
+        .get_apdu_p2 = pk_plugin_get_apdu_p2,
+        .get_apdu_data = pk_plugin_get_apdu_data,
+        .get_apdu_data_size = pk_plugin_get_apdu_data_size,
+        .set_res_sw = set_res_sw,
+        .file_search = pk_plugin_file_search,
+        .file_new = pk_plugin_file_new,
+        .file_has_data = pk_plugin_file_has_data,
+        .file_get_data = pk_plugin_file_get_data,
+        .file_get_size = pk_plugin_file_get_size,
+        .file_put_data = pk_plugin_file_put_data,
+        .file_delete = pk_plugin_file_delete,
     };
     plugin->init(&plugin_imports);
 }

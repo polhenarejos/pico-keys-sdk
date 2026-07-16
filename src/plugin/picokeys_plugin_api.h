@@ -43,7 +43,9 @@
 #endif
 
 #define PICOKEYS_PLUGIN_MAGIC 0x504b504cUL /* PKPL */
-#define PICOKEYS_PLUGIN_ABI_VERSION 5u
+#define PICOKEYS_PLUGIN_ABI_VERSION 1u
+
+#define PICOKEYS_PLUGIN_SIGNAL_EVENT 11u
 
 #ifndef PICOKEYS_PLUGIN_FLASH_BASE
 #define PICOKEYS_PLUGIN_FLASH_BASE 0x10112000UL
@@ -88,9 +90,47 @@ typedef struct pk_plugin_imports {
     uint8_t *(*get_res_apdu)(void);
     uint16_t (*get_res_apdu_size)(void);
     void (*set_res_apdu_size)(uint16_t size);
+    uint8_t (*get_apdu_cla)(void);
+    uint8_t (*get_apdu_ins)(void);
+    uint8_t (*get_apdu_p1)(void);
+    uint8_t (*get_apdu_p2)(void);
+    const uint8_t *(*get_apdu_data)(void);
+    size_t (*get_apdu_data_size)(void);
+    uint16_t (*set_res_sw)(uint8_t sw1, uint8_t sw2);
+    void *(*file_search)(uint16_t fid);
+    void *(*file_new)(uint16_t fid);
+    int (*file_has_data)(const void *file);
+    const uint8_t *(*file_get_data)(const void *file);
+    uint16_t (*file_get_size)(const void *file);
+    int (*file_put_data)(void *file, const uint8_t *data, uint16_t len);
+    int (*file_delete)(void *file);
 } pk_plugin_imports_t;
 
-typedef void (*pk_plugin_init_fn)(pk_plugin_imports_t *imports);
+typedef enum pk_plugin_event_type {
+    PK_PLUGIN_EVENT_COMMAND_COMPLETED = 1,
+} pk_plugin_event_type_t;
+
+#define PK_PLUGIN_EVENT_SOURCE_CORE 0x0000u
+
+typedef enum pk_plugin_event_flags {
+    PK_PLUGIN_EVENT_FLAG_NONE = 0,
+    PK_PLUGIN_EVENT_FLAG_SECURITY_SENSITIVE = 1u << 0,
+} pk_plugin_event_flags_t;
+
+typedef struct pk_plugin_event {
+    uint16_t type;
+    uint16_t source;
+    uint16_t command;
+    uint16_t object;
+    uint16_t flags;
+    uint16_t struct_size;
+    int32_t result;
+} pk_plugin_event_t;
+
+typedef void (*pk_plugin_init_fn)(const pk_plugin_imports_t *imports);
+typedef int (*pk_plugin_call_fn)(uint32_t hook, void *data);
+
+#define PK_PLUGIN_CALL_UNHANDLED (-1)
 
 typedef struct pk_plugin_header {
     uint32_t magic;
@@ -103,8 +143,39 @@ typedef struct pk_plugin_header {
     uintptr_t bss_start;
     uint32_t bss_size;
     pk_plugin_init_fn init;
+    pk_plugin_call_fn call;
 } pk_plugin_header_t;
 
+#if defined(PICO_RP2350) || defined(ENABLE_EMULATION)
 void plugin_init(void);
+void pk_plugin_dispatch_event(const pk_plugin_event_t *event);
+int pk_plugin_call(uint32_t hook, void *data);
+#else
+static inline void pk_plugin_dispatch_event(const pk_plugin_event_t *event) {
+    (void)event;
+}
+static inline int pk_plugin_call(uint32_t hook, void *data) {
+    (void)hook;
+    (void)data;
+    return PK_PLUGIN_CALL_UNHANDLED;
+}
+#endif
+
+static inline void pk_plugin_notify_command(uint16_t source,
+                                            uint16_t command,
+                                            uint16_t object,
+                                            pk_plugin_event_flags_t flags,
+                                            int32_t result) {
+    const pk_plugin_event_t event = {
+        .type = PK_PLUGIN_EVENT_COMMAND_COMPLETED,
+        .source = source,
+        .command = command,
+        .object = object,
+        .flags = (uint16_t)flags,
+        .struct_size = sizeof(event),
+        .result = result,
+    };
+    pk_plugin_dispatch_event(&event);
+}
 
 #endif

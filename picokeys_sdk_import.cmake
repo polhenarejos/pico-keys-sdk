@@ -116,10 +116,10 @@ else()
 endif()
 
 if(PICO_RP2350 OR ENABLE_EMULATION)
-    set(PICOKEYS_PLUGIN_FLASH_BASE "0x10112000" CACHE STRING "XIP address where the premium plugin UF2 starts" FORCE)
-    set(PICOKEYS_PLUGIN_FLASH_SIZE "0x000fa000" CACHE STRING "Maximum premium plugin size in bytes" FORCE)
-    set(PICOKEYS_PLUGIN_RAM_BASE "0x2007c000" CACHE STRING "RAM base reserved for premium plugin mutable state" FORCE)
-    set(PICOKEYS_PLUGIN_RAM_SIZE "0x00004000" CACHE STRING "Maximum premium plugin RAM usage in bytes" FORCE)
+    set(PICOKEYS_PLUGIN_FLASH_BASE "0x10112000" CACHE STRING "XIP address where the plugin UF2 starts" FORCE)
+    set(PICOKEYS_PLUGIN_FLASH_SIZE "0x000fa000" CACHE STRING "Maximum plugin size in bytes" FORCE)
+    set(PICOKEYS_PLUGIN_RAM_BASE "0x2007c000" CACHE STRING "RAM base reserved for plugin mutable state" FORCE)
+    set(PICOKEYS_PLUGIN_RAM_SIZE "0x00004000" CACHE STRING "Maximum plugin RAM usage in bytes" FORCE)
     set(PICOKEYS_PLUGIN_DIR "" CACHE PATH "Optional external PicoKeys plugin source directory")
     include(${CMAKE_CURRENT_LIST_DIR}/cmake/plugin.cmake)
 endif()
@@ -344,7 +344,6 @@ list(APPEND PICOKEYS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/button.c
     ${CMAKE_CURRENT_LIST_DIR}/src/led/led.c
     ${CMAKE_CURRENT_LIST_DIR}/src/signal.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/audit.c
 )
 
 if(ESP_PLATFORM)

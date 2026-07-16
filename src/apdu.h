@@ -35,9 +35,9 @@ extern int register_app(int (*)(app_t *, uint8_t), const uint8_t *);
 extern int select_app(const uint8_t *aid, size_t aid_len);
 
 typedef enum {
-    CMD_FLAG_NONE        = 0x00,
-    CMD_FLAG_AUDIT_LOG   = 0x01,
-    CMD_FLAG_CRITICAL    = 0x02,
+    CMD_FLAG_NONE               = 0x00,
+    CMD_FLAG_NOTIFY_PLUGIN      = 0x01,
+    CMD_FLAG_SECURITY_SENSITIVE = 0x02,
 } cmd_flags_t;
 
 typedef struct cmd {

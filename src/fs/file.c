@@ -23,19 +23,50 @@
 
 #define MAX_DEPTH 4
 
-#define MAX_DYNAMIC_FILES 256
+#define DYNAMIC_FILE_SLOTS 2309u
+#define MAX_DYNAMIC_FILES 2048u
+#define DYNAMIC_FID_EMPTY 0x0000u
+#define DYNAMIC_FID_DELETED 0xffffu
 
 extern const uintptr_t end_data_pool;
 extern const uintptr_t start_data_pool;
 extern const uintptr_t end_rom_pool;
 extern const uintptr_t start_rom_pool;
 #ifndef ENABLE_EMULATION
-file_t sef_phy = {.fid = EF_PHY, .parent = 5, .name = NULL, .type = FILE_TYPE_INTERNAL_EF | FILE_DATA_FLASH | FILE_PERSISTENT, .data = NULL, .ef_structure = FILE_EF_TRANSPARENT, .acl = {0xff}};
-file_t *ef_phy = &sef_phy;
+file_entry_t sef_phy = {.fid = EF_PHY, .parent = 5, .name = NULL, .type = FILE_TYPE_INTERNAL_EF | FILE_DATA_FLASH | FILE_PERSISTENT, .data = NULL, .ef_structure = FILE_EF_TRANSPARENT, .acl = {0xff}};
+file_t *ef_phy = &sef_phy.file;
 #endif
+
+static const file_entry_t *file_metadata(const file_t *file) {
+    if (!file) {
+        return NULL;
+    }
+#ifndef ENABLE_EMULATION
+    if (file == ef_phy) {
+        return &sef_phy;
+    }
+#endif
+    uintptr_t addr = (uintptr_t)file - offsetof(file_entry_t, file);
+    uintptr_t first = (uintptr_t)&file_entries[0];
+    uintptr_t last = (uintptr_t)file_last;
+    if (addr < first || addr > last || (addr - first) % sizeof(file_entry_t) != 0) {
+        return NULL;
+    }
+    return (const file_entry_t *)addr;
+}
+
+uint8_t file_get_type(const file_t *file) {
+    const file_entry_t *entry = file_metadata(file);
+    return entry ? entry->type : FILE_TYPE_WORKING_EF;
+}
 
 //puts FCI in the RAPDU
 void file_process_fci(const file_t *pe, int fmd) {
+    const file_entry_t *entry = file_metadata(pe);
+    uint8_t type = file_get_type(pe);
+    uint8_t structure = entry ? entry->ef_structure : FILE_EF_TRANSPARENT;
+    const uint8_t *name = entry ? entry->name : NULL;
+
     res_APDU_size = 0;
     if (fmd) {
         res_APDU[res_APDU_size++] = 0x6f;
@@ -48,7 +79,7 @@ void file_process_fci(const file_t *pe, int fmd) {
     res_APDU[res_APDU_size++] = 0x81;
     res_APDU[res_APDU_size++] = 2;
     if (pe->data) {
-        if ((pe->type & FILE_DATA_FUNC) == FILE_DATA_FUNC) {
+        if ((type & FILE_DATA_FUNC) == FILE_DATA_FUNC) {
             int (*data_fn)(const file_t *, int) = (int (*)(const file_t *, int))(uintptr_t)pe->data;
             uint16_t len = (uint16_t)data_fn(pe, 0);
             res_APDU_size += put_uint16_be(len, res_APDU + res_APDU_size);
@@ -66,13 +97,13 @@ void file_process_fci(const file_t *pe, int fmd) {
     res_APDU[res_APDU_size++] = 0x82;
     res_APDU[res_APDU_size++] = 1;
     res_APDU[res_APDU_size] = 0;
-    if (pe->type & FILE_TYPE_INTERNAL_EF) {
+    if (type & FILE_TYPE_INTERNAL_EF) {
         res_APDU[res_APDU_size++] |= 0x08;
     }
-    else if (pe->type & FILE_TYPE_WORKING_EF) {
-        res_APDU[res_APDU_size++] |= pe->ef_structure & 0x7;
+    else if (type & FILE_TYPE_WORKING_EF) {
+        res_APDU[res_APDU_size++] |= structure & 0x7;
     }
-    else if (pe->type & FILE_TYPE_DF) {
+    else if (type & FILE_TYPE_DF) {
         res_APDU[res_APDU_size++] |= 0x38;
     }
     else {
@@ -82,11 +113,11 @@ void file_process_fci(const file_t *pe, int fmd) {
     res_APDU[res_APDU_size++] = 0x83;
     res_APDU[res_APDU_size++] = 2;
     res_APDU_size += put_uint16_be(pe->fid, res_APDU + res_APDU_size);
-    if (pe->name) {
+    if (name) {
         res_APDU[res_APDU_size++] = 0x84;
-        res_APDU[res_APDU_size++] = MIN(pe->name[0], 16);
-        memcpy(res_APDU + res_APDU_size, pe->name + 2, MIN(pe->name[0], 16));
-        res_APDU_size += MIN(pe->name[0], 16);
+        res_APDU[res_APDU_size++] = MIN(name[0], 16);
+        memcpy(res_APDU + res_APDU_size, name + 2, MIN(name[0], 16));
+        res_APDU_size += MIN(name[0], 16);
     }
     memcpy(res_APDU + res_APDU_size, "\x8A\x01\x05", 3); //life-cycle (5 -> activated)
     res_APDU_size += 3;
@@ -105,29 +136,31 @@ void file_process_fci(const file_t *pe, int fmd) {
     }
 }
 
-uint16_t dynamic_files = 0;
-file_t dynamic_file[MAX_DYNAMIC_FILES];
+static uint16_t dynamic_files = 0;
+static file_t dynamic_file[DYNAMIC_FILE_SLOTS];
 
 bool card_terminated = false;
 
-static bool is_parent(const file_t *child, const file_t *parent) {
-    if (child == parent) {
+static bool is_parent(const file_entry_t *child, const file_t *parent) {
+    if (&child->file == parent) {
         return true;
     }
-    if (child == MF) {
+    if (&child->file == MF) {
         return false;
     }
     return is_parent(&file_entries[child->parent], parent);
 }
 
 file_t *get_parent(file_t *f) {
-    return &file_entries[f->parent];
+    const file_entry_t *entry = file_metadata(f);
+    uint8_t parent = entry ? entry->parent : 5;
+    return &file_entries[parent].file;
 }
 
 file_t *file_search_by_name(uint8_t *name, uint16_t namelen) {
-    for (file_t *p = file_entries; p != file_last; p++) {
+    for (file_entry_t *p = file_entries; p != file_last; p++) {
         if (p->name && *p->name == apdu.nc && memcmp(p->name + 1, name, namelen) == 0) {
-            return p;
+            return &p->file;
         }
     }
     return NULL;
@@ -139,13 +172,13 @@ file_t *file_search_by_fid(const uint16_t fid, const file_t *parent, const uint8
         return ef_phy;
     }
 #endif
-    for (file_t *p = file_entries; p != file_last; p++) {
+    for (file_entry_t *p = file_entries; p != file_last; p++) {
         if (p->fid != 0x0000 && p->fid == fid) {
             if (!parent || (parent && is_parent(p, parent))) {
                 if (!sp || sp == SPECIFY_ANY ||
                     (((sp & SPECIFY_EF) && (p->type & (FILE_TYPE_INTERNAL_EF|FILE_TYPE_WORKING_EF))) ||
                      ((sp & SPECIFY_DF) && p->type == FILE_TYPE_DF))) {
-                    return p;
+                    return &p->file;
                 }
             }
         }
@@ -153,18 +186,52 @@ file_t *file_search_by_fid(const uint16_t fid, const file_t *parent, const uint8
     return NULL;
 }
 
+static size_t dynamic_hash(uint16_t fid) {
+    return ((uint32_t)fid * 40503u) % DYNAMIC_FILE_SLOTS;
+}
+
+static size_t dynamic_hash_step(uint16_t fid) {
+    return 1u + (((uint32_t)fid * 97u) % (DYNAMIC_FILE_SLOTS - 1u));
+}
+
 static file_t *search_dynamic_file(uint16_t fid) {
-    for (int i = 0; i < dynamic_files; i++) {
-        if (dynamic_file[i].fid == fid) {
-            return &dynamic_file[i];
+    size_t slot = dynamic_hash(fid);
+    size_t step = dynamic_hash_step(fid);
+    for (size_t probes = 0; probes < DYNAMIC_FILE_SLOTS; probes++) {
+        file_t *file = &dynamic_file[slot];
+        if (file->fid == DYNAMIC_FID_EMPTY) {
+            return NULL;
         }
+        if (file->fid == fid) {
+            return file;
+        }
+        slot = (slot + step) % DYNAMIC_FILE_SLOTS;
     }
     return NULL;
 }
 
+static file_t *find_dynamic_slot(uint16_t fid) {
+    file_t *deleted = NULL;
+    size_t slot = dynamic_hash(fid);
+    size_t step = dynamic_hash_step(fid);
+    for (size_t probes = 0; probes < DYNAMIC_FILE_SLOTS; probes++) {
+        file_t *file = &dynamic_file[slot];
+        if (file->fid == DYNAMIC_FID_EMPTY) {
+            return deleted ? deleted : file;
+        }
+        if (file->fid == DYNAMIC_FID_DELETED && !deleted) {
+            deleted = file;
+        }
+        slot = (slot + step) % DYNAMIC_FILE_SLOTS;
+    }
+    return deleted;
+}
+
 void file_for_each_dynamic(file_iter_cb cb, void *ctx) {
-    for (int i = 0; i < dynamic_files; i++) {
-        if (file_has_data(&dynamic_file[i]) && !cb(&dynamic_file[i], ctx)) {
+    for (size_t i = 0; i < DYNAMIC_FILE_SLOTS; i++) {
+        if (dynamic_file[i].fid != DYNAMIC_FID_EMPTY &&
+            dynamic_file[i].fid != DYNAMIC_FID_DELETED &&
+            file_has_data(&dynamic_file[i]) && !cb(&dynamic_file[i], ctx)) {
             break;
         }
     }
@@ -186,13 +253,13 @@ static uint8_t make_path_buf(const file_t *pe, uint8_t *buf, uint8_t buflen, con
         return 0;
     }
     put_uint16_be(pe->fid, buf);
-    return make_path_buf(&file_entries[pe->parent], buf + 2, buflen - 2, top) + 2;
+    return make_path_buf(get_parent((file_t *)pe), buf + 2, buflen - 2, top) + 2;
 }
 
 static uint8_t make_path(const file_t *pe, const file_t *top, uint8_t *path) {
     uint8_t buf[MAX_DEPTH * 2], *p = path;
     put_uint16_be(pe->fid, buf);
-    uint8_t depth = make_path_buf(&file_entries[pe->parent], buf + 2, sizeof(buf) - 2, top) + 2;
+    uint8_t depth = make_path_buf(get_parent((file_t *)pe), buf + 2, sizeof(buf) - 2, top) + 2;
     for (int d = depth - 2; d >= 0; d -= 2) {
         memcpy(p, buf + d, 2);
         p += 2;
@@ -205,10 +272,10 @@ file_t *file_search_by_path(const uint8_t *pe_path, uint8_t pathlen, const file_
     if (pathlen > sizeof(path)) {
         return NULL;
     }
-    for (file_t *p = file_entries; p != file_last; p++) {
-        uint8_t depth = make_path(p, parent, path);
+    for (file_entry_t *p = file_entries; p != file_last; p++) {
+        uint8_t depth = make_path(&p->file, parent, path);
         if (pathlen == depth && memcmp(path, pe_path, depth) == 0) {
-            return p;
+            return &p->file;
         }
     }
     return NULL;
@@ -220,7 +287,8 @@ const file_t *selected_applet = NULL;
 bool isUserAuthenticated = false;
 
 bool file_authenticate_action(const file_t *ef, uint8_t op) {
-    uint8_t acl = ef->acl[op];
+    const file_entry_t *entry = file_metadata(ef);
+    uint8_t acl = entry ? entry->acl[op] : 0x00;
     if (acl == 0x0) {
         return true;
     }
@@ -245,11 +313,12 @@ void file_initialize_flash(bool hard) {
         flash_program_block(end_data_pool, empty, sizeof(empty));
         flash_commit();
     }
-    for (file_t *f = file_entries; f != file_last; f++) {
+    for (file_entry_t *f = file_entries; f != file_last; f++) {
         if ((f->type & FILE_DATA_FLASH) == FILE_DATA_FLASH) {
             f->data = NULL;
         }
     }
+    memset(dynamic_file, 0, sizeof(dynamic_file));
     dynamic_files = 0;
 }
 
@@ -342,16 +411,17 @@ static int delete_dynamic_file(file_t *f) {
     if (f == NULL) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
-    for (int i = 0; i < dynamic_files; i++) {
-        if (dynamic_file[i].fid == f->fid) {
-            for (int j = i + 1; j < dynamic_files; j++) {
-                memcpy(&dynamic_file[j - 1], &dynamic_file[j], sizeof(file_t));
-            }
-            dynamic_files--;
-            return PICOKEYS_OK;
-        }
+    uintptr_t addr = (uintptr_t)f;
+    uintptr_t first = (uintptr_t)&dynamic_file[0];
+    uintptr_t end = (uintptr_t)&dynamic_file[DYNAMIC_FILE_SLOTS];
+    if (addr < first || addr >= end || (addr - first) % sizeof(file_t) != 0 ||
+        f->fid == DYNAMIC_FID_EMPTY || f->fid == DYNAMIC_FID_DELETED) {
+        return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
-    return PICOKEYS_ERR_FILE_NOT_FOUND;
+    f->data = NULL;
+    f->fid = DYNAMIC_FID_DELETED;
+    dynamic_files--;
+    return PICOKEYS_OK;
 }
 
 file_t *file_new(uint16_t fid) {
@@ -359,22 +429,16 @@ file_t *file_new(uint16_t fid) {
     if ((f = file_search(fid))) {
         return f;
     }
-    if (dynamic_files == MAX_DYNAMIC_FILES) {
+    if (fid == DYNAMIC_FID_EMPTY || fid == DYNAMIC_FID_DELETED || dynamic_files >= MAX_DYNAMIC_FILES) {
         return NULL;
     }
-    f = &dynamic_file[dynamic_files];
+    f = find_dynamic_slot(fid);
+    if (!f) {
+        return NULL;
+    }
+    f->data = NULL;
+    f->fid = fid;
     dynamic_files++;
-    file_t file = {
-        .fid = fid,
-        .parent = 5,
-        .name = NULL,
-        .type = FILE_TYPE_WORKING_EF,
-        .ef_structure = FILE_EF_TRANSPARENT,
-        .data = NULL,
-        .acl = { 0 }
-    };
-    memcpy(f, &file, sizeof(file_t));
-    //memset((uint8_t *)f->acl, 0x90, sizeof(f->acl));
     return f;
 }
 uint16_t meta_find(uint16_t fid, uint8_t **out) {

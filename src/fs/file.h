@@ -68,13 +68,44 @@
 __pragma( pack(push, 1) )
 #endif
 typedef struct file {
-    const uint8_t *name;
     uint8_t *data;              //should include 2 bytes len at begining
-    const uint16_t fid;
+    uint16_t fid;
+}
+#ifndef _MSC_VER
+__attribute__ ((packed))
+#endif
+file_t;
+
+/*
+ * Static files need ISO/CCID metadata. Dynamic files only need the flash
+ * address and FID, so keeping this metadata out of file_t allows the dynamic
+ * index to grow without increasing its historical RAM budget.
+ *
+ * The anonymous union preserves the existing designated initializers for
+ * file_entries[] while making &entry.file a compact file_t handle.
+ */
+typedef struct file_entry {
+#ifdef ENABLE_EMULATION
+    const uint8_t *name;
+#endif
+    union {
+        file_t file;
+        struct {
+            uint8_t *data;
+            uint16_t fid;
+        }
+#ifndef _MSC_VER
+        __attribute__ ((packed))
+#endif
+        ;
+    };
+#ifndef ENABLE_EMULATION
+    const uint8_t *name;
+#endif
     uint8_t acl[7];
-    const uint8_t parent;       //entry number in the whole table!!
-    const uint8_t type;
-    const uint8_t ef_structure;
+    uint8_t parent;             //entry number in the whole table!!
+    uint8_t type;
+    uint8_t ef_structure;
 #ifdef ENABLE_EMULATION
     uint32_t _padding;
 #endif
@@ -84,14 +115,14 @@ __pragma( pack(pop) )
 #else
 __attribute__ ((packed))
 #endif
-file_t;
+file_entry_t;
 
 extern file_t *currentEF;
 extern file_t *currentDF;
 extern const file_t *selected_applet;
 
 extern const file_t *MF;
-extern const file_t *file_last;
+extern const file_entry_t *file_last;
 extern bool card_terminated;
 
 extern file_t *file_search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp);
@@ -103,7 +134,7 @@ extern void file_process_fci(const file_t *pe, int fmd);
 extern void file_scan_flash(void);
 extern void file_initialize_flash(bool);
 
-extern file_t file_entries[];
+extern file_entry_t file_entries[];
 
 extern uint8_t *file_read(const uint8_t *addr);
 extern uint16_t file_read_uint16(const uint8_t *addr);
@@ -112,6 +143,7 @@ extern uint8_t file_read_uint8_offset(const file_t *ef, const uint16_t offset);
 extern bool file_has_data(const file_t *);
 extern uint8_t *file_get_data(const file_t *tf);
 extern uint16_t file_get_size(const file_t *tf);
+extern uint8_t file_get_type(const file_t *tf);
 extern int file_put_data(file_t *file, const uint8_t *data, uint16_t len);
 extern file_t *file_new(uint16_t);
 extern int flash_clear_file(file_t *file);

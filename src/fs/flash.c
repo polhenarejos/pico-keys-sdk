@@ -142,7 +142,7 @@ static int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, ui
         }
     }
 
-    uintptr_t new_addr = allocate_free_addr(len, (file->type & FILE_PERSISTENT) == FILE_PERSISTENT);
+    uintptr_t new_addr = allocate_free_addr(len, (file_get_type(file) & FILE_PERSISTENT) == FILE_PERSISTENT);
     //printf("na %x\n",new_addr);
     if (new_addr == 0x0) {
         return PICOKEYS_ERR_NO_MEMORY;

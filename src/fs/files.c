@@ -17,12 +17,12 @@
 
 #include "file.h"
 
-file_t file_entries[] = {
+file_entry_t file_entries[] = {
     /*  0 */ { .fid = 0x3f00, .parent = 0xff, .name = NULL, .type = FILE_TYPE_DF, .data = NULL,
                .ef_structure = 0, .acl = { 0 } },                                                                                    // MF
     /*  1 */ { .fid = 0x0000, .parent = 0xff, .name = NULL, .type = FILE_TYPE_NOT_KNOWN, .data = NULL,
                .ef_structure = 0, .acl = { 0 } }                                                                                     //end
 };
 
-const file_t *MF = &file_entries[0];
-const file_t *file_last = &file_entries[sizeof(file_entries) / sizeof(file_t) - 1];
+const file_t *MF = &file_entries[0].file;
+const file_entry_t *file_last = &file_entries[sizeof(file_entries) / sizeof(file_entry_t) - 1];

@@ -317,6 +317,7 @@ list(APPEND PICOKEYS_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/file.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/object_store.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/object_store_txn.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/fs/object_container.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/flash.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/low_flash.c
     ${CMAKE_CURRENT_LIST_DIR}/src/fs/phy.c

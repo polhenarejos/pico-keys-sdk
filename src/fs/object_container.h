@@ -29,6 +29,9 @@
 
 #define FILE_OBJECT_RECORD_FORMAT_VERSION 1u
 #define FILE_OBJECT_RECORD_HEADER_SIZE 40u
+#define FILE_OBJECT_RECORD_NONCE_SIZE 12u
+#define FILE_OBJECT_RECORD_AAD_SIZE 55u
+#define FILE_OBJECT_POLICY_HASH_SIZE 16u
 
 #define FILE_OBJECT_PROTECTION_AUTHENTICATED_PUBLIC 1u
 #define FILE_OBJECT_PROTECTION_AEAD_SECRET 2u
@@ -82,6 +85,29 @@ typedef struct file_object_record_info {
     uint32_t tag_offset;
 } file_object_record_info_t;
 
+typedef struct file_object_record_identity {
+    uint16_t namespace_id;
+    uint16_t container_kind;
+    uint32_t container_id;
+    uint16_t object_type;
+    uint16_t object_tag;
+    uint32_t generation;
+    uint32_t logical_size;
+    uint16_t policy_id;
+    uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE];
+    uint8_t key_domain;
+    uint8_t protection;
+    uint16_t flags;
+    uint64_t record_id;
+} file_object_record_identity_t;
+
+/* Providers must cryptographically bind the supplied AAD, nonce and stored bytes. */
+typedef struct file_object_record_protector {
+    void *ctx;
+    int (*seal)(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const uint8_t *plaintext, size_t len, uint8_t *stored, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]);
+    int (*unseal)(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const uint8_t *stored, size_t len, const uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE], uint8_t *plaintext);
+} file_object_record_protector_t;
+
 typedef bool (*file_object_extension_supported_t)(void *ctx, uint8_t kind);
 
 int file_object_manifest_build(const file_object_manifest_t *manifest, const uint8_t *extensions, uint16_t extensions_size, const file_object_authenticator_t *auth, uint8_t *data, size_t capacity, size_t *written);
@@ -90,5 +116,9 @@ int file_object_manifest_parse(const uint8_t *data, size_t len, const file_objec
 /* This validates record framing and descriptor binding, not the record authentication tag. */
 int file_object_record_header_build(const file_object_descriptor_t *object, uint8_t header[FILE_OBJECT_RECORD_HEADER_SIZE]);
 int file_object_record_header_parse(const uint8_t *record, size_t len, const file_object_descriptor_t *object, file_object_record_info_t *info);
+int file_object_record_seal(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], const file_object_record_protector_t *protector, const uint8_t *plaintext, uint32_t plaintext_size, uint8_t *record, size_t capacity, size_t *written);
+int file_object_record_unseal(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], const file_object_record_protector_t *protector, const uint8_t *record, size_t record_size, uint8_t *plaintext, size_t capacity, size_t *written);
+
+int file_object_record_id_allocate(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, uint64_t *record_id);
 
 #endif // _OBJECT_CONTAINER_H_

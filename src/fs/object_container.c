@@ -52,11 +52,35 @@
 #define FILE_OBJECT_RECORD_GENERATION_OFFSET 24u
 #define FILE_OBJECT_RECORD_NONCE_OFFSET 28u
 
+#define FILE_OBJECT_RECORD_AAD_NAMESPACE_OFFSET 5u
+#define FILE_OBJECT_RECORD_AAD_KIND_OFFSET 7u
+#define FILE_OBJECT_RECORD_AAD_CONTAINER_ID_OFFSET 9u
+#define FILE_OBJECT_RECORD_AAD_TYPE_OFFSET 13u
+#define FILE_OBJECT_RECORD_AAD_TAG_OFFSET 15u
+#define FILE_OBJECT_RECORD_AAD_GENERATION_OFFSET 17u
+#define FILE_OBJECT_RECORD_AAD_LOGICAL_SIZE_OFFSET 21u
+#define FILE_OBJECT_RECORD_AAD_POLICY_ID_OFFSET 25u
+#define FILE_OBJECT_RECORD_AAD_POLICY_HASH_OFFSET 27u
+#define FILE_OBJECT_RECORD_AAD_KEY_DOMAIN_OFFSET 43u
+#define FILE_OBJECT_RECORD_AAD_PROTECTION_OFFSET 44u
+#define FILE_OBJECT_RECORD_AAD_FLAGS_OFFSET 45u
+#define FILE_OBJECT_RECORD_AAD_RECORD_ID_OFFSET 47u
+
+#define FILE_OBJECT_RECORD_ID_STATE_SIZE 16u
+#define FILE_OBJECT_RECORD_ID_FORMAT_VERSION 1u
+#define FILE_OBJECT_RECORD_ID_VERSION_OFFSET 4u
+#define FILE_OBJECT_RECORD_ID_VALUE_OFFSET 8u
+
 static const uint8_t file_object_manifest_magic[4] = { 'P', 'K', 'O', 'C' };
 static const uint8_t file_object_record_magic[4] = { 'P', 'K', 'O', 'R' };
+static const uint8_t file_object_record_id_magic[4] = { 'P', 'K', 'R', 'I' };
 
 static bool file_object_manifest_auth_valid(const file_object_authenticator_t *auth) {
     return auth && auth->start && auth->update && auth->finish;
+}
+
+static bool file_object_record_protector_valid(const file_object_record_protector_t *protector) {
+    return protector && protector->seal && protector->unseal;
 }
 
 static void file_object_manifest_auth_abort(const file_object_authenticator_t *auth) {
@@ -347,5 +371,170 @@ int file_object_record_header_parse(const uint8_t *record, size_t len, const fil
         return PICOKEYS_WRONG_DATA;
     }
     *info = (file_object_record_info_t) { .record_id = record_id, .stored_size = stored_size, .logical_size = logical_size, .generation = generation, .protection = record[FILE_OBJECT_RECORD_PROTECTION_OFFSET], .payload_offset = FILE_OBJECT_RECORD_HEADER_SIZE, .tag_offset = FILE_OBJECT_RECORD_HEADER_SIZE + stored_size };
+    return PICOKEYS_OK;
+}
+
+static int file_object_record_identity_build(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], file_object_record_identity_t *identity, uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE]) {
+    if (!manifest || !manifest->has_object || !policy_hash || !identity || !aad || !file_object_descriptor_core_valid(&manifest->object)) {
+        return PICOKEYS_WRONG_DATA;
+    }
+
+    const file_object_descriptor_t *object = &manifest->object;
+    *identity = (file_object_record_identity_t) {
+        .namespace_id = manifest->namespace_id,
+        .container_kind = manifest->container_kind,
+        .container_id = manifest->container_id,
+        .object_type = object->object_type,
+        .object_tag = object->object_tag,
+        .generation = object->generation,
+        .logical_size = object->logical_size,
+        .policy_id = object->policy_id,
+        .key_domain = object->key_domain,
+        .protection = object->protection,
+        .flags = object->flags,
+        .record_id = object->record_id
+    };
+    memcpy(identity->policy_hash, policy_hash, FILE_OBJECT_POLICY_HASH_SIZE);
+
+    memset(aad, 0, FILE_OBJECT_RECORD_AAD_SIZE);
+    memcpy(aad, file_object_record_magic, sizeof(file_object_record_magic));
+    aad[4] = FILE_OBJECT_RECORD_FORMAT_VERSION;
+    put_uint16_be(identity->namespace_id, aad + FILE_OBJECT_RECORD_AAD_NAMESPACE_OFFSET);
+    put_uint16_be(identity->container_kind, aad + FILE_OBJECT_RECORD_AAD_KIND_OFFSET);
+    put_uint32_be(identity->container_id, aad + FILE_OBJECT_RECORD_AAD_CONTAINER_ID_OFFSET);
+    put_uint16_be(identity->object_type, aad + FILE_OBJECT_RECORD_AAD_TYPE_OFFSET);
+    put_uint16_be(identity->object_tag, aad + FILE_OBJECT_RECORD_AAD_TAG_OFFSET);
+    put_uint32_be(identity->generation, aad + FILE_OBJECT_RECORD_AAD_GENERATION_OFFSET);
+    put_uint32_be(identity->logical_size, aad + FILE_OBJECT_RECORD_AAD_LOGICAL_SIZE_OFFSET);
+    put_uint16_be(identity->policy_id, aad + FILE_OBJECT_RECORD_AAD_POLICY_ID_OFFSET);
+    memcpy(aad + FILE_OBJECT_RECORD_AAD_POLICY_HASH_OFFSET, identity->policy_hash, FILE_OBJECT_POLICY_HASH_SIZE);
+    aad[FILE_OBJECT_RECORD_AAD_KEY_DOMAIN_OFFSET] = identity->key_domain;
+    aad[FILE_OBJECT_RECORD_AAD_PROTECTION_OFFSET] = identity->protection;
+    put_uint16_be(identity->flags, aad + FILE_OBJECT_RECORD_AAD_FLAGS_OFFSET);
+    put_uint64_be(identity->record_id, aad + FILE_OBJECT_RECORD_AAD_RECORD_ID_OFFSET);
+    return PICOKEYS_OK;
+}
+
+int file_object_record_seal(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], const file_object_record_protector_t *protector, const uint8_t *plaintext, uint32_t plaintext_size, uint8_t *record, size_t capacity, size_t *written) {
+    if (!manifest || !policy_hash || !file_object_record_protector_valid(protector) || (!plaintext && plaintext_size > 0) || !record || !written) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    *written = 0;
+    if (!manifest->has_object || plaintext_size != manifest->object.logical_size || plaintext_size != manifest->object.stored_size) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+    uint64_t required_size = (uint64_t)FILE_OBJECT_RECORD_HEADER_SIZE + plaintext_size + FILE_OBJECT_AUTH_TAG_SIZE;
+    if (required_size > SIZE_MAX || capacity < (size_t)required_size) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+
+    file_object_record_identity_t identity;
+    uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE];
+    int r = file_object_record_identity_build(manifest, policy_hash, &identity, aad);
+    if (r == PICOKEYS_OK) {
+        r = file_object_record_header_build(&manifest->object, record);
+    }
+    if (r == PICOKEYS_OK) {
+        r = protector->seal(protector->ctx, &identity, record + FILE_OBJECT_RECORD_NONCE_OFFSET, aad, plaintext, plaintext_size, record + FILE_OBJECT_RECORD_HEADER_SIZE, record + FILE_OBJECT_RECORD_HEADER_SIZE + plaintext_size);
+    }
+    memset(&identity, 0, sizeof(identity));
+    memset(aad, 0, sizeof(aad));
+    if (r != PICOKEYS_OK) {
+        memset(record, 0, (size_t)required_size);
+        return r;
+    }
+    *written = (size_t)required_size;
+    return PICOKEYS_OK;
+}
+
+int file_object_record_unseal(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], const file_object_record_protector_t *protector, const uint8_t *record, size_t record_size, uint8_t *plaintext, size_t capacity, size_t *written) {
+    if (!manifest || !policy_hash || !file_object_record_protector_valid(protector) || !record || (!plaintext && capacity > 0) || !written) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    *written = 0;
+    if (!manifest->has_object || capacity < manifest->object.logical_size || manifest->object.logical_size != manifest->object.stored_size) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+
+    file_object_record_info_t info;
+    int r = file_object_record_header_parse(record, record_size, &manifest->object, &info);
+    file_object_record_identity_t identity;
+    uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE];
+    if (r == PICOKEYS_OK) {
+        r = file_object_record_identity_build(manifest, policy_hash, &identity, aad);
+    }
+    if (r == PICOKEYS_OK) {
+        r = protector->unseal(protector->ctx, &identity, record + FILE_OBJECT_RECORD_NONCE_OFFSET, aad, record + info.payload_offset, info.stored_size, record + info.tag_offset, plaintext);
+    }
+    memset(&identity, 0, sizeof(identity));
+    memset(aad, 0, sizeof(aad));
+    if (r != PICOKEYS_OK) {
+        if (plaintext && capacity > 0) {
+            memset(plaintext, 0, MIN(capacity, manifest->object.logical_size));
+        }
+        return r;
+    }
+    *written = info.logical_size;
+    return PICOKEYS_OK;
+}
+
+int file_object_record_id_allocate(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, uint64_t *record_id) {
+    if (!layout || !auth || !record_id) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    *record_id = 0;
+
+    uint64_t next_id = 1;
+    file_object_txn_handle_t handle = FILE_OBJECT_TXN_INVALID_HANDLE;
+    int r = file_object_txn_open(layout, auth, &handle);
+    if (r == PICOKEYS_OK) {
+        file_object_info_t info;
+        uint8_t state[FILE_OBJECT_RECORD_ID_STATE_SIZE];
+        r = file_object_txn_get_info(handle, auth, &info);
+        if (r == PICOKEYS_OK && info.payload_size != sizeof(state)) {
+            r = PICOKEYS_WRONG_DATA;
+        }
+        if (r == PICOKEYS_OK) {
+            r = file_object_txn_read_at(handle, auth, 0, state, sizeof(state));
+        }
+        if (r == PICOKEYS_OK && (memcmp(state, file_object_record_id_magic, sizeof(file_object_record_id_magic)) != 0 || state[FILE_OBJECT_RECORD_ID_VERSION_OFFSET] != FILE_OBJECT_RECORD_ID_FORMAT_VERSION || state[5] != 0 || state[6] != 0 || state[7] != 0)) {
+            r = PICOKEYS_WRONG_DATA;
+        }
+        if (r == PICOKEYS_OK) {
+            uint64_t previous_id = get_uint64_be(state + FILE_OBJECT_RECORD_ID_VALUE_OFFSET);
+            if (previous_id == 0 || previous_id == UINT64_MAX) {
+                r = PICOKEYS_WRONG_DATA;
+            }
+            else {
+                next_id = previous_id + 1;
+            }
+        }
+        memset(state, 0, sizeof(state));
+        int close_result = file_object_txn_close(handle);
+        if (r == PICOKEYS_OK) {
+            r = close_result;
+        }
+    }
+    else if (r == PICOKEYS_ERR_FILE_NOT_FOUND) {
+        r = PICOKEYS_OK;
+    }
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
+
+    uint8_t state[FILE_OBJECT_RECORD_ID_STATE_SIZE] = { 0 };
+    memcpy(state, file_object_record_id_magic, sizeof(file_object_record_id_magic));
+    state[FILE_OBJECT_RECORD_ID_VERSION_OFFSET] = FILE_OBJECT_RECORD_ID_FORMAT_VERSION;
+    put_uint64_be(next_id, state + FILE_OBJECT_RECORD_ID_VALUE_OFFSET);
+    r = file_object_txn_put(layout, auth, state, sizeof(state));
+    if (r == PICOKEYS_OK) {
+        /* Return an ID only after both recovery slots contain the high-water mark. */
+        r = file_object_txn_put(layout, auth, state, sizeof(state));
+    }
+    memset(state, 0, sizeof(state));
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
+    *record_id = next_id;
     return PICOKEYS_OK;
 }

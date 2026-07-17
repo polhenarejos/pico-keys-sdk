@@ -167,6 +167,7 @@ extern bool is_req_button_pending(void);
 #define PICOKEYS_WRONG_SIGNATURE                 -1010
 #define PICOKEYS_WRONG_PADDING                   -1011
 #define PICOKEYS_VERIFICATION_FAILED             -1012
+#define PICOKEYS_ERR_STALE_HANDLE                 -1013
 
 #define PICOKEYS_CHECK(x) do { ret = (x); if (ret != PICOKEYS_OK) goto err; } while (0)
 

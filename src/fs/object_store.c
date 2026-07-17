@@ -29,30 +29,32 @@
 
 static const uint8_t file_object_magic[FILE_OBJECT_MAGIC_SIZE] = { 'P', 'K', 'O', '1' };
 
-int file_object_open(file_t *file, uint16_t namespace_id, uint16_t object_type, bool allow_legacy, file_object_t *object) {
-    if (!file || !object || !file_has_data(file)) {
+typedef struct file_object_record {
+    uint32_t payload_offset;
+    uint32_t payload_size;
+    uint32_t generation;
+} file_object_record_t;
+
+typedef struct file_object_handle_entry {
+    file_object_id_t object_id;
+    uint32_t generation;
+    uint32_t payload_size;
+    file_object_handle_t token;
+} file_object_handle_entry_t;
+
+static file_object_handle_entry_t file_object_handles[FILE_OBJECT_MAX_HANDLES];
+static file_object_handle_t file_object_next_handle = 1u;
+
+static bool file_object_id_valid(const file_object_id_t *object_id) {
+    return object_id && object_id->fid != 0 && object_id->fid != UINT16_MAX;
+}
+
+static int file_object_parse(file_t *file, const file_object_id_t *object_id, file_object_record_t *record) {
+    if (!file || !file_object_id_valid(object_id) || !record || !file_has_data(file)) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
 
     uint32_t file_size = file_get_size(file);
-    uint8_t magic[FILE_OBJECT_MAGIC_SIZE];
-    if (file_size < sizeof(magic)) {
-        if (!allow_legacy) {
-            return PICOKEYS_WRONG_DATA;
-        }
-        *object = (file_object_t) { .file = file, .payload_offset = 0, .payload_size = file_size, .generation = 0, .namespace_id = namespace_id, .object_type = object_type, .legacy = true };
-        return PICOKEYS_OK;
-    }
-    if (file_read_at(file, 0, magic, sizeof(magic)) != PICOKEYS_OK) {
-        return PICOKEYS_EXEC_ERROR;
-    }
-    if (memcmp(magic, file_object_magic, sizeof(magic)) != 0) {
-        if (!allow_legacy) {
-            return PICOKEYS_WRONG_DATA;
-        }
-        *object = (file_object_t) { .file = file, .payload_offset = 0, .payload_size = file_size, .generation = 0, .namespace_id = namespace_id, .object_type = object_type, .legacy = true };
-        return PICOKEYS_OK;
-    }
     if (file_size < FILE_OBJECT_HEADER_SIZE) {
         return PICOKEYS_WRONG_DATA;
     }
@@ -63,30 +65,135 @@ int file_object_open(file_t *file, uint16_t namespace_id, uint16_t object_type, 
     }
     uint32_t payload_size = get_uint32_be(header + FILE_OBJECT_PAYLOAD_SIZE_OFFSET);
     uint32_t generation = get_uint32_be(header + FILE_OBJECT_GENERATION_OFFSET);
-    if (header[FILE_OBJECT_VERSION_OFFSET] != FILE_OBJECT_FORMAT_VERSION || header[FILE_OBJECT_HEADER_SIZE_OFFSET] != FILE_OBJECT_HEADER_SIZE || get_uint16_be(header + FILE_OBJECT_NAMESPACE_OFFSET) != namespace_id || get_uint16_be(header + FILE_OBJECT_TYPE_OFFSET) != object_type || get_uint16_be(header + FILE_OBJECT_FID_OFFSET) != file->fid || generation == 0 || payload_size != file_size - FILE_OBJECT_HEADER_SIZE) {
+    if (memcmp(header, file_object_magic, sizeof(file_object_magic)) != 0 || header[FILE_OBJECT_VERSION_OFFSET] != FILE_OBJECT_FORMAT_VERSION || header[FILE_OBJECT_HEADER_SIZE_OFFSET] != FILE_OBJECT_HEADER_SIZE || get_uint16_be(header + FILE_OBJECT_NAMESPACE_OFFSET) != object_id->namespace_id || get_uint16_be(header + FILE_OBJECT_TYPE_OFFSET) != object_id->object_type || get_uint16_be(header + FILE_OBJECT_FID_OFFSET) != object_id->fid || file->fid != object_id->fid || generation == 0 || payload_size != file_size - FILE_OBJECT_HEADER_SIZE) {
         return PICOKEYS_WRONG_DATA;
     }
 
-    *object = (file_object_t) { .file = file, .payload_offset = FILE_OBJECT_HEADER_SIZE, .payload_size = payload_size, .generation = generation, .namespace_id = namespace_id, .object_type = object_type, .legacy = false };
+    *record = (file_object_record_t) { .payload_offset = FILE_OBJECT_HEADER_SIZE, .payload_size = payload_size, .generation = generation };
     return PICOKEYS_OK;
 }
 
-int file_object_read_at(const file_object_t *object, uint32_t offset, uint8_t *data, size_t len) {
-    if (!object || !object->file || (!data && len > 0) || offset > object->payload_size || len > object->payload_size - offset) {
-        return PICOKEYS_ERR_NULL_PARAM;
+static file_object_handle_entry_t *file_object_find_handle(file_object_handle_t handle) {
+    if (handle == FILE_OBJECT_INVALID_HANDLE) {
+        return NULL;
     }
-    return file_read_at(object->file, object->payload_offset + offset, data, len);
+    for (size_t i = 0; i < FILE_OBJECT_MAX_HANDLES; i++) {
+        if (file_object_handles[i].token == handle) {
+            return &file_object_handles[i];
+        }
+    }
+    return NULL;
 }
 
-int file_object_put(file_t *file, uint16_t namespace_id, uint16_t object_type, const uint8_t *data, uint32_t len) {
-    if (!file || (!data && len > 0)) {
+static bool file_object_handle_in_use(file_object_handle_t handle) {
+    return file_object_find_handle(handle) != NULL;
+}
+
+static file_object_handle_t file_object_allocate_token(void) {
+    do {
+        file_object_handle_t handle = file_object_next_handle++;
+        if (handle != FILE_OBJECT_INVALID_HANDLE && !file_object_handle_in_use(handle)) {
+            return handle;
+        }
+    } while (true);
+}
+
+static int file_object_resolve(file_object_handle_t handle, file_t **file, file_object_record_t *record) {
+    file_object_handle_entry_t *current = file_object_find_handle(handle);
+    if (!current) {
+        return PICOKEYS_ERR_STALE_HANDLE;
+    }
+
+    file_t *current_file = file_search(current->object_id.fid);
+    int r = file_object_parse(current_file, &current->object_id, record);
+    if (r == PICOKEYS_ERR_FILE_NOT_FOUND || r == PICOKEYS_WRONG_DATA) {
+        return PICOKEYS_ERR_STALE_HANDLE;
+    }
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
+    if (record->generation != current->generation || record->payload_size != current->payload_size) {
+        return PICOKEYS_ERR_STALE_HANDLE;
+    }
+
+    if (file) {
+        *file = current_file;
+    }
+    return PICOKEYS_OK;
+}
+
+int file_object_open(const file_object_id_t *object_id, file_object_handle_t *handle) {
+    if (!file_object_id_valid(object_id) || !handle) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    *handle = FILE_OBJECT_INVALID_HANDLE;
+
+    file_object_record_t record;
+    int r = file_object_parse(file_search(object_id->fid), object_id, &record);
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
+
+    for (size_t i = 0; i < FILE_OBJECT_MAX_HANDLES; i++) {
+        if (file_object_handles[i].token == FILE_OBJECT_INVALID_HANDLE) {
+            file_object_handles[i] = (file_object_handle_entry_t) { .object_id = *object_id, .generation = record.generation, .payload_size = record.payload_size, .token = file_object_allocate_token() };
+            *handle = file_object_handles[i].token;
+            return PICOKEYS_OK;
+        }
+    }
+    return PICOKEYS_ERR_NO_MEMORY;
+}
+
+int file_object_get_info(file_object_handle_t handle, file_object_info_t *info) {
+    if (!info) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
 
+    file_object_record_t record;
+    int r = file_object_resolve(handle, NULL, &record);
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
+    *info = (file_object_info_t) { .payload_size = record.payload_size, .generation = record.generation };
+    return PICOKEYS_OK;
+}
+
+int file_object_read_at(file_object_handle_t handle, uint32_t offset, uint8_t *data, size_t len) {
+    if (!data && len > 0) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+
+    file_t *file = NULL;
+    file_object_record_t record;
+    int r = file_object_resolve(handle, &file, &record);
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
+    if (offset > record.payload_size || len > record.payload_size - offset) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+    return file_read_at(file, record.payload_offset + offset, data, len);
+}
+
+int file_object_close(file_object_handle_t handle) {
+    file_object_handle_entry_t *entry = file_object_find_handle(handle);
+    if (!entry) {
+        return PICOKEYS_ERR_STALE_HANDLE;
+    }
+    memset(entry, 0, sizeof(*entry));
+    return PICOKEYS_OK;
+}
+
+int file_object_put(const file_object_id_t *object_id, const uint8_t *data, uint32_t len) {
+    if (!file_object_id_valid(object_id) || (!data && len > 0)) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+
+    file_t *file = file_search(object_id->fid);
     uint32_t generation = 1;
     if (file_has_data(file)) {
-        file_object_t current;
-        int r = file_object_open(file, namespace_id, object_type, false, &current);
+        file_object_record_t current;
+        int r = file_object_parse(file, object_id, &current);
         if (r != PICOKEYS_OK) {
             return r;
         }
@@ -94,6 +201,12 @@ int file_object_put(file_t *file, uint16_t namespace_id, uint16_t object_type, c
             return PICOKEYS_WRONG_DATA;
         }
         generation = current.generation + 1;
+    }
+    else if (!file) {
+        file = file_new(object_id->fid);
+        if (!file) {
+            return PICOKEYS_ERR_NO_MEMORY;
+        }
     }
     if (len > UINT32_MAX - FILE_OBJECT_HEADER_SIZE) {
         return PICOKEYS_ERR_NO_MEMORY;
@@ -107,9 +220,9 @@ int file_object_put(file_t *file, uint16_t namespace_id, uint16_t object_type, c
     memcpy(record, file_object_magic, sizeof(file_object_magic));
     record[FILE_OBJECT_VERSION_OFFSET] = FILE_OBJECT_FORMAT_VERSION;
     record[FILE_OBJECT_HEADER_SIZE_OFFSET] = FILE_OBJECT_HEADER_SIZE;
-    put_uint16_be(namespace_id, record + FILE_OBJECT_NAMESPACE_OFFSET);
-    put_uint16_be(object_type, record + FILE_OBJECT_TYPE_OFFSET);
-    put_uint16_be(file->fid, record + FILE_OBJECT_FID_OFFSET);
+    put_uint16_be(object_id->namespace_id, record + FILE_OBJECT_NAMESPACE_OFFSET);
+    put_uint16_be(object_id->object_type, record + FILE_OBJECT_TYPE_OFFSET);
+    put_uint16_be(object_id->fid, record + FILE_OBJECT_FID_OFFSET);
     put_uint32_be(generation, record + FILE_OBJECT_GENERATION_OFFSET);
     put_uint32_be(len, record + FILE_OBJECT_PAYLOAD_SIZE_OFFSET);
     if (len > 0) {
@@ -120,4 +233,26 @@ int file_object_put(file_t *file, uint16_t namespace_id, uint16_t object_type, c
     memset(record, 0, record_size);
     free(record);
     return r;
+}
+
+static int file_object_delete_internal(const file_object_id_t *object_id, bool commit) {
+    if (!file_object_id_valid(object_id)) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+
+    file_t *file = file_search(object_id->fid);
+    file_object_record_t record;
+    int r = file_object_parse(file, object_id, &record);
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
+    return commit ? file_delete(file) : file_delete_no_commit(file);
+}
+
+int file_object_delete_no_commit(const file_object_id_t *object_id) {
+    return file_object_delete_internal(object_id, false);
+}
+
+int file_object_delete(const file_object_id_t *object_id) {
+    return file_object_delete_internal(object_id, true);
 }

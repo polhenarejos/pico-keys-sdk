@@ -22,23 +22,30 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "file.h"
-
 #define FILE_OBJECT_FORMAT_VERSION 1u
 #define FILE_OBJECT_HEADER_SIZE 20u
+#define FILE_OBJECT_INVALID_HANDLE 0u
+#define FILE_OBJECT_MAX_HANDLES 8u
 
-typedef struct file_object {
-    file_t *file;
-    uint32_t payload_offset;
-    uint32_t payload_size;
-    uint32_t generation;
+typedef uint32_t file_object_handle_t;
+
+typedef struct file_object_id {
     uint16_t namespace_id;
     uint16_t object_type;
-    bool legacy;
-} file_object_t;
+    uint16_t fid;
+} file_object_id_t;
 
-int file_object_open(file_t *file, uint16_t namespace_id, uint16_t object_type, bool allow_legacy, file_object_t *object);
-int file_object_read_at(const file_object_t *object, uint32_t offset, uint8_t *data, size_t len);
-int file_object_put(file_t *file, uint16_t namespace_id, uint16_t object_type, const uint8_t *data, uint32_t len);
+typedef struct file_object_info {
+    uint32_t payload_size;
+    uint32_t generation;
+} file_object_info_t;
+
+int file_object_open(const file_object_id_t *object_id, file_object_handle_t *handle);
+int file_object_get_info(file_object_handle_t handle, file_object_info_t *info);
+int file_object_read_at(file_object_handle_t handle, uint32_t offset, uint8_t *data, size_t len);
+int file_object_close(file_object_handle_t handle);
+int file_object_put(const file_object_id_t *object_id, const uint8_t *data, uint32_t len);
+int file_object_delete_no_commit(const file_object_id_t *object_id);
+int file_object_delete(const file_object_id_t *object_id);
 
 #endif // _OBJECT_STORE_H_

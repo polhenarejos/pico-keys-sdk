@@ -549,6 +549,11 @@ static int meta_delete_internal(uint16_t fid, bool commit) {
 int meta_delete(uint16_t fid) {
     return meta_delete_internal(fid, true);
 }
+
+int meta_delete_no_commit(uint16_t fid) {
+    return meta_delete_internal(fid, false);
+}
+
 int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     int r;
     file_t *ef = file_search(EF_META);

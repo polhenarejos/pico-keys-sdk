@@ -159,6 +159,7 @@ file_t *get_parent(file_t *f);
 extern bool isUserAuthenticated;
 
 extern uint16_t meta_find(uint16_t, uint8_t **out);
+extern int meta_delete_no_commit(uint16_t fid);
 extern int meta_delete(uint16_t fid);
 extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
 

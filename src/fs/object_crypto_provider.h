@@ -33,6 +33,8 @@ typedef struct file_object_crypto_provider_config {
     void *ctx;
     uint16_t namespace_id;
     file_object_crypto_root_load_t load_root;
+    /* Optional device-bound root for manifests and authenticated-public records. Falls back to load_root. */
+    file_object_crypto_root_load_t load_public_root;
     file_object_crypto_identity_valid_t identity_valid;
 } file_object_crypto_provider_config_t;
 

@@ -23,7 +23,7 @@
 #define FILE_OBJECT_MANIFEST_FORMAT_VERSION 1u
 #define FILE_OBJECT_MANIFEST_HEADER_SIZE 32u
 #define FILE_OBJECT_DESCRIPTOR_SIZE 36u
-#define FILE_OBJECT_MANIFEST_MAX_OBJECTS 1u
+#define FILE_OBJECT_MANIFEST_MAX_OBJECTS 8u
 #define FILE_OBJECT_EXTENSION_HEADER_SIZE 4u
 #define FILE_OBJECT_EXTENSION_FLAG_CRITICAL 0x01u
 
@@ -71,8 +71,12 @@ typedef struct file_object_manifest {
     uint16_t extension_offset;
     uint16_t extension_size;
     uint16_t total_size;
+    uint16_t object_count;
     bool has_object;
-    file_object_descriptor_t object;
+    union {
+        file_object_descriptor_t object;
+        file_object_descriptor_t objects[FILE_OBJECT_MANIFEST_MAX_OBJECTS];
+    };
 } file_object_manifest_t;
 
 typedef struct file_object_record_info {

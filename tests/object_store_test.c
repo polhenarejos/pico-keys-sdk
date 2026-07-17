@@ -585,6 +585,7 @@ static void test_manifest_round_trip(void) {
     assert(parsed.generation == source.generation);
     assert(parsed.previous_generation == source.previous_generation);
     assert(parsed.has_object);
+    assert(parsed.object_count == 1);
     assert(parsed.object.object_type == source.object.object_type);
     assert(parsed.object.object_tag == source.object.object_tag);
     assert(parsed.object.record_id == source.object.record_id);
@@ -600,6 +601,40 @@ static void test_manifest_round_trip(void) {
     data[8] ^= 0x01;
     assert(file_object_manifest_build(&source, extensions, sizeof(extensions), &test_auth, data, written - 1, &written) == PICOKEYS_WRONG_LENGTH);
     assert(written == 0);
+}
+
+static void test_multi_object_manifest_round_trip(void) {
+    file_object_manifest_t source = test_manifest_value();
+    file_object_manifest_t parsed;
+    uint8_t data[256];
+    size_t written = 0;
+
+    source.object_count = 3;
+    source.objects[1] = source.objects[0];
+    source.objects[1].object_type++;
+    source.objects[1].object_tag = 0;
+    source.objects[1].record_id++;
+    source.objects[2] = source.objects[1];
+    source.objects[2].object_tag = 1;
+    source.objects[2].record_id++;
+
+    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_OK);
+    assert(written == FILE_OBJECT_MANIFEST_HEADER_SIZE + 3 * FILE_OBJECT_DESCRIPTOR_SIZE + FILE_OBJECT_AUTH_TAG_SIZE);
+    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_OK);
+    assert(parsed.object_count == 3);
+    assert(parsed.has_object);
+    assert(parsed.objects[0].record_id == source.objects[0].record_id);
+    assert(parsed.objects[1].record_id == source.objects[1].record_id);
+    assert(parsed.objects[2].record_id == source.objects[2].record_id);
+
+    file_object_descriptor_t unordered = source.objects[0];
+    source.objects[0] = source.objects[1];
+    source.objects[1] = unordered;
+    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
+
+    source.objects[0] = source.objects[1];
+    source.objects[0].record_id--;
+    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
 }
 
 static void test_manifest_extension_compatibility(void) {
@@ -795,6 +830,8 @@ int main(void) {
     test_transaction_identity_isolation();
     test_files_reset();
     test_manifest_round_trip();
+    test_files_reset();
+    test_multi_object_manifest_round_trip();
     test_files_reset();
     test_manifest_extension_compatibility();
     test_files_reset();

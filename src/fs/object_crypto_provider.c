@@ -51,8 +51,9 @@ static bool file_object_crypto_provider_valid(const file_object_crypto_provider_
     return provider && provider->initialized && provider->config.namespace_id != 0 && provider->config.load_root;
 }
 
-static int file_object_crypto_load_root(file_object_crypto_provider_t *provider, uint8_t root[FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE]) {
-    int r = provider->config.load_root(provider->config.ctx, root);
+static int file_object_crypto_load_root(file_object_crypto_provider_t *provider, bool public_root, uint8_t root[FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE]) {
+    file_object_crypto_root_load_t load_root = public_root && provider->config.load_public_root ? provider->config.load_public_root : provider->config.load_root;
+    int r = load_root(provider->config.ctx, root);
     if (r != PICOKEYS_OK) {
         mbedtls_platform_zeroize(root, FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE);
     }
@@ -65,7 +66,7 @@ static int file_object_crypto_derive_manifest_key(file_object_crypto_provider_t 
     put_uint16_be(provider->config.namespace_id, info);
     memcpy(info + sizeof(uint16_t), file_object_crypto_manifest_label, sizeof(file_object_crypto_manifest_label) - 1);
 
-    int r = file_object_crypto_load_root(provider, root);
+    int r = file_object_crypto_load_root(provider, true, root);
     if (r == PICOKEYS_OK && mbedtls_hkdf(file_object_crypto_sha256(), NULL, 0, root, sizeof(root), info, sizeof(info), key, FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE) != 0) {
         r = PICOKEYS_EXEC_ERROR;
     }
@@ -86,7 +87,7 @@ static int file_object_crypto_derive_record_key(file_object_crypto_provider_t *p
     memcpy(object_info, file_object_crypto_key_label, sizeof(file_object_crypto_key_label) - 1);
     memcpy(object_info + sizeof(file_object_crypto_key_label) - 1, aad, FILE_OBJECT_RECORD_AAD_SIZE);
 
-    int r = file_object_crypto_load_root(provider, root);
+    int r = file_object_crypto_load_root(provider, identity->protection == FILE_OBJECT_PROTECTION_AUTHENTICATED_PUBLIC, root);
     if (r == PICOKEYS_OK && mbedtls_hkdf(file_object_crypto_sha256(), NULL, 0, root, sizeof(root), domain_info, sizeof(domain_info), domain_key, sizeof(domain_key)) != 0) {
         r = PICOKEYS_EXEC_ERROR;
     }

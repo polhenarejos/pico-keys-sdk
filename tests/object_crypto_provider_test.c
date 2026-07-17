@@ -41,15 +41,28 @@
 
 typedef struct test_root_context {
     uint8_t root[FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE];
+    uint8_t public_root[FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE];
     bool available;
+    bool public_available;
 } test_root_context_t;
 
 static void test_root_reset(test_root_context_t *ctx, uint8_t offset) {
     memset(ctx, 0, sizeof(*ctx));
     for (size_t i = 0; i < sizeof(ctx->root); i++) {
         ctx->root[i] = (uint8_t)(offset + i);
+        ctx->public_root[i] = (uint8_t)(offset + 0x40u + i);
     }
     ctx->available = true;
+    ctx->public_available = true;
+}
+
+static int test_public_root_load(void *ctx, uint8_t root[FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE]) {
+    test_root_context_t *root_ctx = (test_root_context_t *)ctx;
+    if (!root_ctx->public_available) {
+        return PICOKEYS_NO_LOGIN;
+    }
+    memcpy(root, root_ctx->public_root, FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE);
+    return PICOKEYS_OK;
 }
 
 static int test_root_load(void *ctx, uint8_t root[FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE]) {
@@ -71,6 +84,7 @@ static void test_provider_init(file_object_crypto_provider_t *provider, test_roo
         .ctx = root,
         .namespace_id = namespace_id,
         .load_root = test_root_load,
+        .load_public_root = test_public_root_load,
         .identity_valid = test_identity_valid
     };
     assert(file_object_crypto_provider_init(provider, &config) == PICOKEYS_OK);
@@ -162,7 +176,7 @@ static void test_manifest_authentication(void) {
     assert(memcmp(first, second, sizeof(first)) == 0);
     assert(memcmp(first, other_namespace, sizeof(first)) != 0);
 
-    root.available = false;
+    root.public_available = false;
     const file_object_authenticator_t *auth = file_object_crypto_manifest_authenticator(&provider_a);
     assert(auth->start(auth->ctx) == PICOKEYS_NO_LOGIN);
 
@@ -190,6 +204,9 @@ static void test_authenticated_public_record(void) {
     assert(memcmp(stored, plaintext, sizeof(plaintext)) == 0);
     assert(protector->unseal(protector->ctx, &identity, nonce, aad, stored, sizeof(stored), tag, output) == PICOKEYS_OK);
     assert(memcmp(output, plaintext, sizeof(plaintext)) == 0);
+
+    root.available = false;
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, stored, sizeof(stored), tag, output) == PICOKEYS_OK);
 
     stored[0] ^= 0x01;
     assert(protector->unseal(protector->ctx, &identity, nonce, aad, stored, sizeof(stored), tag, output) == PICOKEYS_WRONG_SIGNATURE);

@@ -367,10 +367,27 @@ int file_object_record_header_parse(const uint8_t *record, size_t len, const fil
     uint32_t generation = get_uint32_be(record + FILE_OBJECT_RECORD_GENERATION_OFFSET);
     uint64_t nonce_record_id = get_uint64_be(record + FILE_OBJECT_RECORD_NONCE_OFFSET);
     uint32_t nonce_generation = get_uint32_be(record + FILE_OBJECT_RECORD_NONCE_OFFSET + sizeof(uint64_t));
-    if (memcmp(record, file_object_record_magic, sizeof(file_object_record_magic)) != 0 || record[4] != FILE_OBJECT_RECORD_FORMAT_VERSION || record[FILE_OBJECT_RECORD_PROTECTION_OFFSET] != object->protection || get_uint16_be(record + FILE_OBJECT_RECORD_HEADER_SIZE_OFFSET) != FILE_OBJECT_RECORD_HEADER_SIZE || record_id != object->record_id || stored_size != object->stored_size || logical_size != object->logical_size || generation != object->generation || nonce_record_id != record_id || nonce_generation != generation) {
+    if (memcmp(record, file_object_record_magic, sizeof(file_object_record_magic)) != 0
+        || record[4] != FILE_OBJECT_RECORD_FORMAT_VERSION
+        || record[FILE_OBJECT_RECORD_PROTECTION_OFFSET] != object->protection
+        || get_uint16_be(record + FILE_OBJECT_RECORD_HEADER_SIZE_OFFSET) != FILE_OBJECT_RECORD_HEADER_SIZE
+        || record_id != object->record_id
+        || stored_size != object->stored_size
+        || logical_size != object->logical_size
+        || generation != object->generation
+        || nonce_record_id != record_id
+        || nonce_generation != generation) {
         return PICOKEYS_WRONG_DATA;
     }
-    *info = (file_object_record_info_t) { .record_id = record_id, .stored_size = stored_size, .logical_size = logical_size, .generation = generation, .protection = record[FILE_OBJECT_RECORD_PROTECTION_OFFSET], .payload_offset = FILE_OBJECT_RECORD_HEADER_SIZE, .tag_offset = FILE_OBJECT_RECORD_HEADER_SIZE + stored_size };
+    *info = (file_object_record_info_t) {
+        .record_id = record_id,
+        .stored_size = stored_size,
+        .logical_size = logical_size,
+        .generation = generation,
+        .protection = record[FILE_OBJECT_RECORD_PROTECTION_OFFSET],
+        .payload_offset = FILE_OBJECT_RECORD_HEADER_SIZE,
+        .tag_offset = FILE_OBJECT_RECORD_HEADER_SIZE + stored_size
+    };
     return PICOKEYS_OK;
 }
 

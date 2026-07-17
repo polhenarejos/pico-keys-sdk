@@ -172,7 +172,19 @@ static int file_object_txn_validate_record(const file_object_txn_layout_t *layou
     if (r != PICOKEYS_OK) {
         return r;
     }
-    if (memcmp(header, file_object_txn_record_magic, sizeof(file_object_txn_record_magic)) != 0 || header[FILE_OBJECT_TXN_VERSION_OFFSET] != FILE_OBJECT_TXN_FORMAT_VERSION || header[FILE_OBJECT_TXN_HEADER_SIZE_OFFSET] != FILE_OBJECT_TXN_RECORD_HEADER_SIZE || header[FILE_OBJECT_TXN_SLOT_OFFSET] != slot || header[FILE_OBJECT_TXN_RECORD_RESERVED_OFFSET] != 0 || get_uint16_be(header + FILE_OBJECT_TXN_NAMESPACE_OFFSET) != layout->namespace_id || get_uint16_be(header + FILE_OBJECT_TXN_TYPE_OFFSET) != layout->object_type || get_uint32_be(header + FILE_OBJECT_TXN_OBJECT_ID_OFFSET) != layout->object_id || get_uint32_be(header + FILE_OBJECT_TXN_GENERATION_OFFSET) != generation || get_uint32_be(header + FILE_OBJECT_TXN_RECORD_ID_OFFSET) != record_id || get_uint32_be(header + FILE_OBJECT_TXN_PAYLOAD_SIZE_OFFSET) != payload_size || get_uint16_be(header + FILE_OBJECT_TXN_RECORD_FID_OFFSET) != layout->record_fid[slot] || get_uint16_be(header + FILE_OBJECT_TXN_RECORD_RESERVED_2_OFFSET) != 0) {
+    if (memcmp(header, file_object_txn_record_magic, sizeof(file_object_txn_record_magic)) != 0
+        || header[FILE_OBJECT_TXN_VERSION_OFFSET] != FILE_OBJECT_TXN_FORMAT_VERSION
+        || header[FILE_OBJECT_TXN_HEADER_SIZE_OFFSET] != FILE_OBJECT_TXN_RECORD_HEADER_SIZE
+        || header[FILE_OBJECT_TXN_SLOT_OFFSET] != slot
+        || header[FILE_OBJECT_TXN_RECORD_RESERVED_OFFSET] != 0
+        || get_uint16_be(header + FILE_OBJECT_TXN_NAMESPACE_OFFSET) != layout->namespace_id
+        || get_uint16_be(header + FILE_OBJECT_TXN_TYPE_OFFSET) != layout->object_type
+        || get_uint32_be(header + FILE_OBJECT_TXN_OBJECT_ID_OFFSET) != layout->object_id
+        || get_uint32_be(header + FILE_OBJECT_TXN_GENERATION_OFFSET) != generation
+        || get_uint32_be(header + FILE_OBJECT_TXN_RECORD_ID_OFFSET) != record_id
+        || get_uint32_be(header + FILE_OBJECT_TXN_PAYLOAD_SIZE_OFFSET) != payload_size
+        || get_uint16_be(header + FILE_OBJECT_TXN_RECORD_FID_OFFSET) != layout->record_fid[slot]
+        || get_uint16_be(header + FILE_OBJECT_TXN_RECORD_RESERVED_2_OFFSET) != 0) {
         return PICOKEYS_WRONG_DATA;
     }
 
@@ -210,7 +222,16 @@ static int file_object_txn_parse_commit(const file_object_txn_layout_t *layout, 
     uint32_t payload_size = get_uint32_be(commit + FILE_OBJECT_TXN_COMMIT_PAYLOAD_SIZE_OFFSET);
     uint16_t record_fid = get_uint16_be(commit + FILE_OBJECT_TXN_COMMIT_RECORD_FID_OFFSET);
     uint8_t record_slot = commit[FILE_OBJECT_TXN_COMMIT_RECORD_SLOT_OFFSET];
-    if (memcmp(commit, file_object_txn_commit_magic, sizeof(file_object_txn_commit_magic)) != 0 || commit[FILE_OBJECT_TXN_VERSION_OFFSET] != FILE_OBJECT_TXN_FORMAT_VERSION || commit[FILE_OBJECT_TXN_HEADER_SIZE_OFFSET] != FILE_OBJECT_TXN_COMMIT_HEADER_SIZE || commit[FILE_OBJECT_TXN_SLOT_OFFSET] != slot || commit[FILE_OBJECT_TXN_COMMIT_MARKER_OFFSET] != FILE_OBJECT_TXN_COMMIT_MARKER || get_uint16_be(commit + FILE_OBJECT_TXN_NAMESPACE_OFFSET) != layout->namespace_id || get_uint16_be(commit + FILE_OBJECT_TXN_TYPE_OFFSET) != layout->object_type || get_uint32_be(commit + FILE_OBJECT_TXN_OBJECT_ID_OFFSET) != layout->object_id || generation == 0 || (flags & ~FILE_OBJECT_TXN_FLAG_DELETED) != 0) {
+    if (memcmp(commit, file_object_txn_commit_magic, sizeof(file_object_txn_commit_magic)) != 0
+        || commit[FILE_OBJECT_TXN_VERSION_OFFSET] != FILE_OBJECT_TXN_FORMAT_VERSION
+        || commit[FILE_OBJECT_TXN_HEADER_SIZE_OFFSET] != FILE_OBJECT_TXN_COMMIT_HEADER_SIZE
+        || commit[FILE_OBJECT_TXN_SLOT_OFFSET] != slot
+        || commit[FILE_OBJECT_TXN_COMMIT_MARKER_OFFSET] != FILE_OBJECT_TXN_COMMIT_MARKER
+        || get_uint16_be(commit + FILE_OBJECT_TXN_NAMESPACE_OFFSET) != layout->namespace_id
+        || get_uint16_be(commit + FILE_OBJECT_TXN_TYPE_OFFSET) != layout->object_type
+        || get_uint32_be(commit + FILE_OBJECT_TXN_OBJECT_ID_OFFSET) != layout->object_id
+        || generation == 0
+        || (flags & ~FILE_OBJECT_TXN_FLAG_DELETED) != 0) {
         return PICOKEYS_WRONG_DATA;
     }
 
@@ -241,7 +262,14 @@ static int file_object_txn_parse_commit(const file_object_txn_layout_t *layout, 
         }
     }
 
-    *state = (file_object_txn_state_t) { .generation = generation, .record_id = record_id, .payload_size = payload_size, .commit_slot = slot, .record_slot = record_slot, .deleted = deleted };
+    *state = (file_object_txn_state_t) {
+        .generation = generation,
+        .record_id = record_id,
+        .payload_size = payload_size,
+        .commit_slot = slot,
+        .record_slot = record_slot,
+        .deleted = deleted
+    };
     return PICOKEYS_OK;
 }
 
@@ -448,7 +476,11 @@ int file_object_txn_open(const file_object_txn_layout_t *layout, const file_obje
 
     for (size_t i = 0; i < FILE_OBJECT_TXN_MAX_HANDLES; i++) {
         if (file_object_txn_handles[i].token == FILE_OBJECT_TXN_INVALID_HANDLE) {
-            file_object_txn_handles[i] = (file_object_txn_handle_entry_t) { .layout = *layout, .state = state, .token = file_object_txn_allocate_token() };
+            file_object_txn_handles[i] = (file_object_txn_handle_entry_t) {
+                .layout = *layout,
+                .state = state,
+                .token = file_object_txn_allocate_token()
+            };
             *handle = file_object_txn_handles[i].token;
             return PICOKEYS_OK;
         }
@@ -466,7 +498,10 @@ int file_object_txn_get_info(file_object_txn_handle_t handle, const file_object_
     if (r != PICOKEYS_OK) {
         return r;
     }
-    *info = (file_object_info_t) { .payload_size = state.payload_size, .generation = state.generation };
+    *info = (file_object_info_t) {
+        .payload_size = state.payload_size,
+        .generation = state.generation
+    };
     return PICOKEYS_OK;
 }
 

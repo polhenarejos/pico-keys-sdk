@@ -69,7 +69,11 @@ static int file_object_parse(file_t *file, const file_object_id_t *object_id, fi
         return PICOKEYS_WRONG_DATA;
     }
 
-    *record = (file_object_record_t) { .payload_offset = FILE_OBJECT_HEADER_SIZE, .payload_size = payload_size, .generation = generation };
+    *record = (file_object_record_t) {
+        .payload_offset = FILE_OBJECT_HEADER_SIZE,
+        .payload_size = payload_size,
+        .generation = generation
+    };
     return PICOKEYS_OK;
 }
 
@@ -136,7 +140,12 @@ int file_object_open(const file_object_id_t *object_id, file_object_handle_t *ha
 
     for (size_t i = 0; i < FILE_OBJECT_MAX_HANDLES; i++) {
         if (file_object_handles[i].token == FILE_OBJECT_INVALID_HANDLE) {
-            file_object_handles[i] = (file_object_handle_entry_t) { .object_id = *object_id, .generation = record.generation, .payload_size = record.payload_size, .token = file_object_allocate_token() };
+            file_object_handles[i] = (file_object_handle_entry_t) {
+                .object_id = *object_id,
+                .generation = record.generation,
+                .payload_size = record.payload_size,
+                .token = file_object_allocate_token()
+            };
             *handle = file_object_handles[i].token;
             return PICOKEYS_OK;
         }
@@ -154,7 +163,10 @@ int file_object_get_info(file_object_handle_t handle, file_object_info_t *info) 
     if (r != PICOKEYS_OK) {
         return r;
     }
-    *info = (file_object_info_t) { .payload_size = record.payload_size, .generation = record.generation };
+    *info = (file_object_info_t) {
+        .payload_size = record.payload_size,
+        .generation = record.generation
+    };
     return PICOKEYS_OK;
 }
 

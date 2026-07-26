@@ -51,6 +51,7 @@ add_executable(object_store_test
     ${CMAKE_CURRENT_LIST_DIR}/../src/fs/object_store.c
     ${CMAKE_CURRENT_LIST_DIR}/../src/fs/object_store_txn.c
     ${CMAKE_CURRENT_LIST_DIR}/../src/fs/object_container.c
+    ${CMAKE_CURRENT_LIST_DIR}/../src/fs/object_container_store.c
     ${CMAKE_CURRENT_LIST_DIR}/object_store_test.c
 )
 target_compile_definitions(object_store_test PRIVATE ENABLE_EMULATION)

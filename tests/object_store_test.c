@@ -17,12 +17,13 @@
 
 #include "picokeys.h"
 #include "fs/object_container.h"
+#include "fs/object_container_store.h"
 #include "fs/object_store.h"
 
 #include <assert.h>
 #include <stdio.h>
 
-#define TEST_FILE_COUNT 4u
+#define TEST_FILE_COUNT 16u
 #define TEST_FILE_CAPACITY 256u
 #define TEST_TXN_RECORD_HEADER_SIZE 32u
 #define TEST_TXN_COMMIT_SIZE 64u
@@ -304,6 +305,11 @@ uint32_t file_get_size(const file_t *file) {
     return test_file ? test_file->size : 0;
 }
 
+uint8_t *file_get_data(const file_t *file) {
+    test_file_t *test_file = test_file_from_handle(file);
+    return test_file ? test_file->file.data : NULL;
+}
+
 int file_read_at(const file_t *file, uint32_t offset, uint8_t *data, size_t len) {
     test_file_t *test_file = test_file_from_handle(file);
     if (!test_file || (!data && len > 0) || offset > test_file->size || len > test_file->size - offset) {
@@ -356,6 +362,10 @@ bool flash_commit_sync(uint32_t timeout_ms) {
     }
     test_persist_files();
     return true;
+}
+
+void flash_commit(void) {
+    test_persist_files();
 }
 
 static void test_txn_read(const file_object_txn_layout_t *layout, const uint8_t *expected, size_t expected_len, uint32_t expected_generation) {
@@ -809,6 +819,178 @@ static void test_record_id_allocator_single_slot_corruption(void) {
     assert(record_id == 2);
 }
 
+typedef struct test_container_context {
+    uint16_t next_record_fid;
+    size_t activate_count;
+    size_t deactivate_count;
+} test_container_context_t;
+
+static test_container_context_t test_container_context;
+
+static uint16_t test_container_manifest_fid(void *ctx, uint32_t container_id, uint8_t slot) {
+    (void)ctx;
+    return (uint16_t)(((0xc0u + slot) << 8) | (uint8_t)container_id);
+}
+
+static int test_container_record_fid(void *ctx, uint32_t container_id, const file_object_descriptor_t *object, uint16_t *fid) {
+    (void)ctx;
+    (void)container_id;
+    if (!object || !fid || object->record_id > UINT16_MAX) {
+        return PICOKEYS_WRONG_DATA;
+    }
+    *fid = (uint16_t)object->record_id;
+    return PICOKEYS_OK;
+}
+
+static int test_container_record_allocate(void *ctx, uint32_t container_id, uint8_t target_slot, const file_object_container_write_t *write, const file_object_authenticator_t *auth, uint64_t *record_id, uint16_t *fid) {
+    test_container_context_t *container = (test_container_context_t *)ctx;
+    (void)container_id;
+    (void)target_slot;
+    (void)write;
+    (void)auth;
+    if (!record_id || !fid) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    *fid = container->next_record_fid++;
+    *record_id = *fid;
+    return PICOKEYS_OK;
+}
+
+static int test_container_policy_hash(void *ctx, uint16_t policy_id, uint8_t hash[FILE_OBJECT_POLICY_HASH_SIZE]) {
+    (void)ctx;
+    if (policy_id != 0x0100u) {
+        return PICOKEYS_WRONG_DATA;
+    }
+    memset(hash, 0x5c, FILE_OBJECT_POLICY_HASH_SIZE);
+    return PICOKEYS_OK;
+}
+
+static bool test_container_write_valid(void *ctx, const file_object_container_write_t *write) {
+    (void)ctx;
+    return write->object_tag == 0 && write->policy_id == 0x0100u;
+}
+
+static int test_container_activate(void *ctx, uint32_t container_id) {
+    test_container_context_t *container = (test_container_context_t *)ctx;
+    (void)container_id;
+    container->activate_count++;
+    return PICOKEYS_OK;
+}
+
+static int test_container_deactivate(void *ctx, uint32_t container_id) {
+    test_container_context_t *container = (test_container_context_t *)ctx;
+    (void)container_id;
+    container->deactivate_count++;
+    return PICOKEYS_OK;
+}
+
+static int test_container_retire(void *ctx, uint32_t container_id, const file_object_container_state_t *state, const file_object_manifest_t *next, uint8_t current_slot, uint8_t target_slot) {
+    (void)ctx;
+    (void)container_id;
+    if (!state->candidates[target_slot].valid) {
+        return PICOKEYS_OK;
+    }
+    const file_object_manifest_t *current = current_slot < FILE_OBJECT_CONTAINER_SLOT_COUNT ? &state->candidates[current_slot].manifest : NULL;
+    const file_object_manifest_t *overwritten = &state->candidates[target_slot].manifest;
+    for (uint16_t i = 0; i < overwritten->object_count; i++) {
+        uint64_t record_id = overwritten->objects[i].record_id;
+        if (!file_object_container_references(next, record_id) && (!current || !file_object_container_references(current, record_id))) {
+            file_t *record = file_search((uint16_t)record_id);
+            if (record) {
+                file_delete_no_commit(record);
+            }
+        }
+    }
+    flash_commit();
+    return PICOKEYS_OK;
+}
+
+static const file_object_container_layout_t test_container_layout = {
+    .ctx = &test_container_context,
+    .namespace_id = 0x1001u,
+    .container_kind = 0x2001u,
+    .commit_timeout_ms = 1000u,
+    .manifest_fid = test_container_manifest_fid,
+    .record_fid = test_container_record_fid,
+    .record_allocate = test_container_record_allocate,
+    .policy_hash = test_container_policy_hash,
+    .write_valid = test_container_write_valid,
+    .activate = test_container_activate,
+    .deactivate = test_container_deactivate,
+    .retire = test_container_retire,
+    .rollback_new_records = true
+};
+
+static file_object_container_write_t test_container_write(uint16_t object_type, const uint8_t *data, uint32_t data_size) {
+    return (file_object_container_write_t) {
+        .object_type = object_type,
+        .data = data,
+        .data_size = data_size,
+        .policy_id = 0x0100u,
+        .protection = FILE_OBJECT_PROTECTION_AEAD_SECRET,
+        .flags = FILE_OBJECT_FLAG_MUTABLE
+    };
+}
+
+static void test_container_store_lifecycle(void) {
+    static const uint8_t first[] = { 1, 2, 3, 4 };
+    static const uint8_t second[] = { 5, 6, 7 };
+    static const uint8_t replacement[] = { 8, 9, 10, 11, 12 };
+    static const uint8_t second_replacement[] = { 13, 14 };
+    const uint32_t container_id = 0x41u;
+    const file_object_container_crypto_t crypto = {
+        .auth = &test_auth,
+        .protector = &test_record_protector
+    };
+    file_object_container_write_t initial[] = {
+        test_container_write(2, second, sizeof(second)),
+        test_container_write(1, first, sizeof(first))
+    };
+    uint8_t output[16] = { 0 };
+    size_t written = 0;
+
+    memset(&test_container_context, 0, sizeof(test_container_context));
+    test_container_context.next_record_fid = 0xe100u;
+    assert(file_object_container_update(&test_container_layout, container_id, initial, sizeof(initial) / sizeof(initial[0]), &crypto, NULL) == PICOKEYS_OK);
+    assert(test_container_context.activate_count == 1);
+    assert(file_object_container_read(&test_container_layout, container_id, 1, 0, &crypto, NULL, NULL, NULL, output, sizeof(output), &written) == PICOKEYS_OK);
+    assert(written == sizeof(first));
+    assert(memcmp(output, first, sizeof(first)) == 0);
+
+    file_object_container_state_t state;
+    assert(file_object_container_load(&test_container_layout, container_id, &crypto, NULL, &state) == PICOKEYS_OK);
+    assert(state.current_slot == 0);
+    assert(state.candidates[0].manifest.objects[0].object_type == 1);
+    assert(state.candidates[0].manifest.objects[1].object_type == 2);
+    test_reboot();
+
+    file_object_container_write_t update = test_container_write(1, replacement, sizeof(replacement));
+    assert(file_object_container_update(&test_container_layout, container_id, &update, 1, &crypto, NULL) == PICOKEYS_OK);
+    test_file_t *new_record = test_file_from_handle(file_search(0xe102u));
+    assert(new_record && new_record->size > FILE_OBJECT_RECORD_HEADER_SIZE);
+    new_record->storage[FILE_OBJECT_RECORD_HEADER_SIZE] ^= 0x80u;
+    test_persist_files();
+    test_reboot();
+
+    assert(file_object_container_read(&test_container_layout, container_id, 1, 0, &crypto, NULL, NULL, NULL, output, sizeof(output), &written) == PICOKEYS_OK);
+    assert(written == sizeof(first));
+    assert(memcmp(output, first, sizeof(first)) == 0);
+
+    file_object_container_write_t second_update = test_container_write(2, second_replacement, sizeof(second_replacement));
+    assert(file_object_container_update(&test_container_layout, container_id, &second_update, 1, &crypto, NULL) == PICOKEYS_OK);
+    assert(!file_has_data(file_search(0xe102u)));
+    assert(file_object_container_remove(&test_container_layout, container_id, 2, 0, &crypto, NULL) == PICOKEYS_OK);
+    assert(file_object_container_read(&test_container_layout, container_id, 2, 0, &crypto, NULL, NULL, NULL, output, sizeof(output), &written) == PICOKEYS_ERR_FILE_NOT_FOUND);
+
+    uint32_t object_size = 0;
+    assert(file_object_container_object_size(&test_container_layout, container_id, 1, 0, &crypto, NULL, NULL, NULL, &object_size) == PICOKEYS_OK);
+    assert(object_size == sizeof(first));
+    assert(file_object_container_delete(&test_container_layout, container_id, &crypto, NULL) == PICOKEYS_OK);
+    assert(test_container_context.deactivate_count == 1);
+    assert(!file_has_data(file_search(test_container_manifest_fid(NULL, container_id, 0))));
+    assert(!file_has_data(file_search(test_container_manifest_fid(NULL, container_id, 1))));
+}
+
 int main(void) {
     test_files_reset();
     test_identity_and_stale_handles();
@@ -846,6 +1028,8 @@ int main(void) {
     test_record_id_allocator_power_loss();
     test_files_reset();
     test_record_id_allocator_single_slot_corruption();
+    test_files_reset();
+    test_container_store_lifecycle();
     puts("object_store_test: OK");
     return 0;
 }

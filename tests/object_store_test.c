@@ -21,6 +21,7 @@
 #include "fs/object_store.h"
 
 #include <assert.h>
+#include <setjmp.h>
 #include <stdio.h>
 
 #define TEST_FILE_COUNT 16u
@@ -51,6 +52,10 @@ static uint16_t test_fail_write_fid;
 static size_t test_fail_write_after = SIZE_MAX;
 static size_t test_commit_count;
 static size_t test_fail_commit = SIZE_MAX;
+static jmp_buf test_power_loss_env;
+static size_t test_power_loss_event;
+static size_t test_power_loss_at = SIZE_MAX;
+static bool test_power_loss_armed;
 
 static const file_object_txn_layout_t test_txn_layout = {
     .namespace_id = 0x1001,
@@ -237,6 +242,9 @@ static void test_files_reset(void) {
     test_fail_write_after = SIZE_MAX;
     test_commit_count = 0;
     test_fail_commit = SIZE_MAX;
+    test_power_loss_event = 0;
+    test_power_loss_at = SIZE_MAX;
+    test_power_loss_armed = false;
     test_auth_abort(&test_auth_context);
 }
 
@@ -261,6 +269,7 @@ static void test_reboot(void) {
     test_fail_write_fid = 0;
     test_fail_write_after = SIZE_MAX;
     test_fail_commit = SIZE_MAX;
+    test_power_loss_armed = false;
     test_auth_abort(&test_auth_context);
 }
 
@@ -356,6 +365,11 @@ int file_delete(file_t *file) {
 
 bool flash_commit_sync(uint32_t timeout_ms) {
     (void)timeout_ms;
+    test_power_loss_event++;
+    if (test_power_loss_armed && test_power_loss_event == test_power_loss_at) {
+        test_power_loss_armed = false;
+        longjmp(test_power_loss_env, 1);
+    }
     test_commit_count++;
     if (test_commit_count == test_fail_commit) {
         return false;
@@ -365,6 +379,11 @@ bool flash_commit_sync(uint32_t timeout_ms) {
 }
 
 void flash_commit(void) {
+    test_power_loss_event++;
+    if (test_power_loss_armed && test_power_loss_event == test_power_loss_at) {
+        test_power_loss_armed = false;
+        longjmp(test_power_loss_env, 1);
+    }
     test_persist_files();
 }
 
@@ -991,6 +1010,124 @@ static void test_container_store_lifecycle(void) {
     assert(!file_has_data(file_search(test_container_manifest_fid(NULL, container_id, 1))));
 }
 
+static void test_container_expect(uint32_t container_id, const file_object_container_crypto_t *crypto, const uint8_t *expected, size_t expected_size) {
+    uint8_t output[16] = { 0 };
+    size_t written = 0;
+    assert(expected_size <= sizeof(output));
+    assert(file_object_container_read(&test_container_layout, container_id, 1, 0, crypto, NULL, NULL, NULL, output, sizeof(output), &written) == PICOKEYS_OK);
+    assert(written == expected_size);
+    assert(memcmp(output, expected, expected_size) == 0);
+}
+
+static void test_container_power_loss_create(size_t failed_event) {
+    static const uint8_t first[] = { 0x11, 0x12 };
+    static const uint8_t second[] = { 0x21, 0x22, 0x23 };
+    const uint32_t container_id = 0x42u;
+    const file_object_container_crypto_t crypto = {
+        .auth = &test_auth,
+        .protector = &test_record_protector
+    };
+    file_object_container_write_t writes[] = {
+        test_container_write(1, first, sizeof(first)),
+        test_container_write(2, second, sizeof(second))
+    };
+
+    test_files_reset();
+    memset(&test_container_context, 0, sizeof(test_container_context));
+    test_container_context.next_record_fid = 0xe200u;
+    if (setjmp(test_power_loss_env) == 0) {
+        test_power_loss_event = 0;
+        test_power_loss_at = failed_event;
+        test_power_loss_armed = true;
+        (void)file_object_container_update(&test_container_layout, container_id, writes, sizeof(writes) / sizeof(writes[0]), &crypto, NULL);
+        assert(false);
+    }
+    test_reboot();
+
+    file_object_container_state_t state;
+    assert(file_object_container_load(&test_container_layout, container_id, &crypto, NULL, &state) == PICOKEYS_ERR_FILE_NOT_FOUND);
+    assert(file_object_container_update(&test_container_layout, container_id, writes, sizeof(writes) / sizeof(writes[0]), &crypto, NULL) == PICOKEYS_OK);
+    test_container_expect(container_id, &crypto, first, sizeof(first));
+}
+
+static void test_container_power_loss_update(size_t failed_event) {
+    static const uint8_t first[] = { 0x31, 0x32 };
+    static const uint8_t second[] = { 0x41, 0x42 };
+    static const uint8_t replacement[] = { 0x51, 0x52, 0x53 };
+    static const uint8_t final[] = { 0x61, 0x62, 0x63, 0x64 };
+    const uint32_t container_id = 0x43u;
+    const file_object_container_crypto_t crypto = {
+        .auth = &test_auth,
+        .protector = &test_record_protector
+    };
+    file_object_container_write_t initial[] = {
+        test_container_write(1, first, sizeof(first)),
+        test_container_write(2, second, sizeof(second))
+    };
+    file_object_container_write_t replacement_write = test_container_write(1, replacement, sizeof(replacement));
+    file_object_container_write_t final_write = test_container_write(1, final, sizeof(final));
+
+    test_files_reset();
+    memset(&test_container_context, 0, sizeof(test_container_context));
+    test_container_context.next_record_fid = 0xe300u;
+    assert(file_object_container_update(&test_container_layout, container_id, initial, sizeof(initial) / sizeof(initial[0]), &crypto, NULL) == PICOKEYS_OK);
+    assert(file_object_container_update(&test_container_layout, container_id, &replacement_write, 1, &crypto, NULL) == PICOKEYS_OK);
+
+    if (setjmp(test_power_loss_env) == 0) {
+        test_power_loss_event = 0;
+        test_power_loss_at = failed_event;
+        test_power_loss_armed = true;
+        (void)file_object_container_update(&test_container_layout, container_id, &final_write, 1, &crypto, NULL);
+        assert(false);
+    }
+    test_reboot();
+
+    if (failed_event < 3) {
+        test_container_expect(container_id, &crypto, replacement, sizeof(replacement));
+    }
+    else {
+        test_container_expect(container_id, &crypto, final, sizeof(final));
+    }
+    assert(file_object_container_update(&test_container_layout, container_id, &final_write, 1, &crypto, NULL) == PICOKEYS_OK);
+    test_container_expect(container_id, &crypto, final, sizeof(final));
+}
+
+static void test_container_power_loss_delete(void) {
+    static const uint8_t first[] = { 0x71, 0x72 };
+    const uint32_t container_id = 0x44u;
+    const file_object_container_crypto_t crypto = {
+        .auth = &test_auth,
+        .protector = &test_record_protector
+    };
+    file_object_container_write_t write = test_container_write(1, first, sizeof(first));
+
+    test_files_reset();
+    memset(&test_container_context, 0, sizeof(test_container_context));
+    test_container_context.next_record_fid = 0xe400u;
+    assert(file_object_container_update(&test_container_layout, container_id, &write, 1, &crypto, NULL) == PICOKEYS_OK);
+    if (setjmp(test_power_loss_env) == 0) {
+        test_power_loss_event = 0;
+        test_power_loss_at = 1;
+        test_power_loss_armed = true;
+        (void)file_object_container_delete(&test_container_layout, container_id, &crypto, NULL);
+        assert(false);
+    }
+    test_reboot();
+
+    test_container_expect(container_id, &crypto, first, sizeof(first));
+    assert(file_object_container_delete(&test_container_layout, container_id, &crypto, NULL) == PICOKEYS_OK);
+}
+
+static void test_container_power_loss_boundaries(void) {
+    for (size_t failed_event = 1; failed_event <= 2; failed_event++) {
+        test_container_power_loss_create(failed_event);
+    }
+    for (size_t failed_event = 1; failed_event <= 3; failed_event++) {
+        test_container_power_loss_update(failed_event);
+    }
+    test_container_power_loss_delete();
+}
+
 int main(void) {
     test_files_reset();
     test_identity_and_stale_handles();
@@ -1030,6 +1167,7 @@ int main(void) {
     test_record_id_allocator_single_slot_corruption();
     test_files_reset();
     test_container_store_lifecycle();
+    test_container_power_loss_boundaries();
     puts("object_store_test: OK");
     return 0;
 }

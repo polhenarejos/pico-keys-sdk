@@ -52,8 +52,10 @@ typedef int socklen_t;
 #include "ccid/ccid.h"
 #include "hid/ctap_hid.h"
 
-socket_t ccid_sock = 0;
-socket_t hid_server_sock = 0;
+#define PICOKEYS_EMULATION_DISABLE_CCID_ENV "PICOKEYS_EMULATION_DISABLE_CCID"
+
+socket_t ccid_sock = INVALID_SOCKET;
+socket_t hid_server_sock = INVALID_SOCKET;
 socket_t hid_client_sock = INVALID_SOCKET;
 extern uint8_t thread_type;
 extern const uint8_t *cbor_data;
@@ -96,7 +98,6 @@ static int msleep(long msec) {
 #endif
 
 int emul_init(const char *host, uint16_t port) {
-    struct sockaddr_in serv_addr;
     fprintf(stderr, "\n Starting emulation envionrment\n");
 #ifdef _MSC_VER
     WSADATA wsaData;
@@ -104,37 +105,43 @@ int emul_init(const char *host, uint16_t port) {
         printf("winsock initialization failure\n");
     }
 #endif
-    if ((ccid_sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-        log_sock_error("socket(ccid)");
-        return -1;
-    }
+#ifdef USB_ITF_CCID
+    if (!getenv(PICOKEYS_EMULATION_DISABLE_CCID_ENV)) {
+        struct sockaddr_in serv_addr;
+        if ((ccid_sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
+            log_sock_error("socket(ccid)");
+        }
+        else {
+            serv_addr.sin_family = AF_INET;
+            serv_addr.sin_port = htons(port);
 
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(port);
-
-    // Convert IPv4 and IPv6 addresses from text to binary
-    // form
-    if (inet_pton(AF_INET, host, &serv_addr.sin_addr) <= 0) {
-        log_sock_error("inet_pton(ccid)");
-        close(ccid_sock);
-        return -1;
-    }
-
-    if (connect(ccid_sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        log_sock_error("connect(ccid)");
-        close(ccid_sock);
-        return -1;
-    }
+            // Convert IPv4 and IPv6 addresses from text to binary
+            // form
+            if (inet_pton(AF_INET, host, &serv_addr.sin_addr) <= 0) {
+                log_sock_error("inet_pton(ccid)");
+                close(ccid_sock);
+                ccid_sock = INVALID_SOCKET;
+            }
+            else if (connect(ccid_sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+                log_sock_error("connect(ccid)");
+                close(ccid_sock);
+                ccid_sock = INVALID_SOCKET;
+            }
+        }
+        if (ccid_sock != INVALID_SOCKET) {
 #ifdef _MSC_VER
-    unsigned long on = 1;
-    if (0 != ioctlsocket(ccid_sock, FIONBIO, &on)) {
-        perror("ioctlsocket FIONBIO");
-    }
+            unsigned long on = 1;
+            if (0 != ioctlsocket(ccid_sock, FIONBIO, &on)) {
+                perror("ioctlsocket FIONBIO");
+            }
 #else
-    int x = fcntl(ccid_sock, F_GETFL, 0);
-    fcntl(ccid_sock, F_SETFL, x | O_NONBLOCK);
-    int flag = 1;
-    setsockopt(ccid_sock, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+            int x = fcntl(ccid_sock, F_GETFL, 0);
+            fcntl(ccid_sock, F_SETFL, x | O_NONBLOCK);
+            int flag = 1;
+            setsockopt(ccid_sock, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+#endif
+        }
+    }
 #endif
 
     // HID server
@@ -215,6 +222,9 @@ bool tud_hid_n_report(uint8_t itf, uint8_t report_id, const uint8_t *buffer, uin
 uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
     uint16_t size = htons(buffer_size);
     socket_t sock = get_sock_itf(itf);
+    if (sock == INVALID_SOCKET) {
+        return 0;
+    }
     // DEBUG_PAYLOAD(buffer,buffer_size);
 #ifdef _WIN32
     int ret = 0;
@@ -286,6 +296,9 @@ uint16_t emul_read(uint8_t itf) {
     }
 #endif
     socket_t sock = get_sock_itf(itf);
+    if (sock == INVALID_SOCKET) {
+        return 0;
+    }
     //printf("get_sockt itf %d - %d\n", itf, sock);
     uint16_t len = 0;
     fd_set input;

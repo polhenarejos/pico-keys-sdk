@@ -267,7 +267,7 @@ int driver_write_hid(uint8_t itf, const_byte_array_t buffer) {
 #ifdef ENABLE_EMULATION
     tud_hid_report_complete_cb(ITF_HID_CTAP, buffer.data, buffer.len);
 #endif
-    return MIN(64, buffer.len);
+    return MIN(64u, buffer.len);
 }
 
 int (*hid_set_report_cb)(uint8_t, uint8_t, hid_report_type_t, uint8_t const *, uint16_t) = NULL;

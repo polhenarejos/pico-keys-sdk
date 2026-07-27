@@ -134,23 +134,25 @@ static int get_system_uuid(char *out) {
 #include <string.h>
 #include <ctype.h>
 
-static int read_first_line(const char *path, byte_buffer_t out) {
+static int read_first_line(const char *path, byte_buffer_t *out) {
     FILE *f;
-    if (!out.data || out.capacity == 0) {
+    if (!out || !out->data || out->capacity == 0) {
         return -1;
     }
-    out.data[0] = '\0';
+    out->len = 0;
+    out->data[0] = '\0';
     f = fopen(path, "r");
     if (!f) {
         return -2;
     }
-    if (!fgets((char *)out.data, out.capacity, f)) {
+    if (!fgets((char *)out->data, (int)out->capacity, f)) {
         fclose(f);
         return -3;
     }
     fclose(f);
-    out.data[strcspn((const char *)out.data, "\r\n")] = '\0';
-    return out.data[0] ? 0 : -4;
+    out->data[strcspn((const char *)out->data, "\r\n")] = '\0';
+    out->len = strlen((const char *)out->data);
+    return out->len > 0 ? 0 : -4;
 }
 
 static int is_bad_value(const char *s) {
@@ -171,17 +173,23 @@ static int is_bad_value(const char *s) {
     return 0;
 }
 
-static int append_field(byte_buffer_t out, const char *prefix, const char *path) {
+static int append_field(byte_buffer_t *out, const char *prefix, const char *path) {
     char value[256];
-    if (read_first_line(path, BYTE_BUFFER((uint8_t *)value, sizeof(value))) != 0) {
+    byte_buffer_t value_buffer = BYTE_BUFFER((uint8_t *)value, sizeof(value));
+    if (read_first_line(path, &value_buffer) != 0) {
         return -1;
     }
     if (is_bad_value(value)) {
         return -2;
     }
-    strncat((char *)out.data, prefix, out.capacity - strlen((const char *)out.data) - 1);
-    strncat((char *)out.data, value, out.capacity - strlen((const char *)out.data) - 1);
-    strncat((char *)out.data, ";", out.capacity - strlen((const char *)out.data) - 1);
+    if (!out || out->len > out->capacity || !out->data) {
+        return -1;
+    }
+    int added = snprintf((char *)out->data + out->len, out->capacity - out->len, "%s%s;", prefix, value);
+    if (added < 0 || (size_t)added >= out->capacity - out->len) {
+        return -1;
+    }
+    out->len += (size_t)added;
     return 0;
 }
 
@@ -190,11 +198,12 @@ static int get_linux_hardware_id(char *out) {
         return -1;
     }
     char serial[256] = {0};
-    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "UUID=", "/sys/class/dmi/id/product_uuid");
-    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "BOARD=", "/sys/class/dmi/id/board_serial");
-    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "PRODUCT=", "/sys/class/dmi/id/product_serial");
-    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "CHASSIS=", "/sys/class/dmi/id/chassis_serial");
-    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "MACHINE=", "/etc/machine-id");
+    byte_buffer_t serial_buffer = BYTE_BUFFER((uint8_t *)serial, sizeof(serial));
+    append_field(&serial_buffer, "UUID=", "/sys/class/dmi/id/product_uuid");
+    append_field(&serial_buffer, "BOARD=", "/sys/class/dmi/id/board_serial");
+    append_field(&serial_buffer, "PRODUCT=", "/sys/class/dmi/id/product_serial");
+    append_field(&serial_buffer, "CHASSIS=", "/sys/class/dmi/id/chassis_serial");
+    append_field(&serial_buffer, "MACHINE=", "/etc/machine-id");
     if (serial[0]) {
         mbedtls_sha256((const unsigned char *)serial, strlen(serial), pico_serial_hash, false);
         memcpy(out, pico_serial_hash, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);

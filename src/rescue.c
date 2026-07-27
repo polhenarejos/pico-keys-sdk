@@ -385,12 +385,12 @@ static int cmd_read(void) {
     uint8_t p1 = P1(apdu), p2 = P2(apdu);
     if (p1 == 0x1) { // PHY
 #ifndef ENABLE_EMULATION
-        uint16_t len = 0;
-        int ret = phy_serialize_data(&phy_data, BYTE_BUFFER(apdu.rdata, PHY_MAX_SIZE), &len);
+        byte_buffer_t output = BYTE_BUFFER(apdu.rdata, PHY_MAX_SIZE);
+        int ret = phy_serialize_data(&phy_data, &output);
         if (ret != PICOKEYS_OK) {
             return SW_EXEC_ERROR();
         }
-        res_APDU_size = len;
+        res_APDU_size = (uint16_t)output.len;
 #endif
     }
     else if (p1 == 0x2) { // FLASH INFO

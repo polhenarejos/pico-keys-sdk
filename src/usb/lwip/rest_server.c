@@ -784,11 +784,11 @@ static int rest_verify_request_signature(const rest_request_t *request, const re
     mbedtls_md_context_t ctx;
     const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     unsigned char hmac[32], hmac_x[32];
-    size_t olen = 0;
     if (md_info == NULL) {
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
-    if (base64url_decode(BYTE_BUFFER(hmac_x, sizeof(hmac_x)), &olen, CONST_BYTE_ARRAY((const uint8_t *)request->headers[REST_HEADER_X_SIGNATURE], strlen(request->headers[REST_HEADER_X_SIGNATURE]))) != 0) {
+    byte_buffer_t decoded_hmac = BYTE_BUFFER(hmac_x, sizeof(hmac_x));
+    if (base64url_decode(&decoded_hmac, CONST_BYTE_ARRAY((const uint8_t *)request->headers[REST_HEADER_X_SIGNATURE], strlen(request->headers[REST_HEADER_X_SIGNATURE]))) != 0 || decoded_hmac.len != sizeof(hmac_x)) {
         return PICOKEYS_EXEC_ERROR;
     }
     mbedtls_md_init(&ctx);

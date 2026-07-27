@@ -348,35 +348,38 @@ uint32_t crc32c(const_byte_array_t data) {
     return ~crc;
 }
 
-int base64url_encode(byte_buffer_t dst, size_t *written, const_byte_array_t src) {
-    if ((!dst.data && dst.capacity > 0) || !written || (!src.data && src.len > 0)) {
+int base64url_encode(byte_buffer_t *dst, const_byte_array_t src) {
+    if (!dst || dst->len > dst->capacity || (!dst->data && dst->capacity > 0) || (!src.data && src.len > 0)) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    int rc = mbedtls_base64_encode(dst.data, dst.capacity, written, src.data, src.len);
+    size_t written = 0;
+    uint8_t *output = dst->data ? dst->data + dst->len : NULL;
+    int rc = mbedtls_base64_encode(output, dst->capacity - dst->len, &written, src.data, src.len);
     if (rc != 0) {
         return rc;
     }
-    for (size_t i = 0; i < *written; i++) {
-        if (dst.data[i] == '+') {
-            dst.data[i] = '-';
+    for (size_t i = 0; i < written; i++) {
+        if (output[i] == '+') {
+            output[i] = '-';
         }
-        else if (dst.data[i] == '/') {
-            dst.data[i] = '_';
+        else if (output[i] == '/') {
+            output[i] = '_';
         }
     }
-    if (*written == 0) {
+    if (written == 0) {
         return 0;
     }
-    uint8_t *p = dst.data + *written - 1;
+    uint8_t *p = output + written - 1;
     while (*p == '=') {
         *p-- = '\0';
-        (*written)--;
+        written--;
     }
+    dst->len += written;
     return 0;
 }
 
-int base64url_decode(byte_buffer_t dst, size_t *written, const_byte_array_t src) {
-    if ((!dst.data && dst.capacity > 0) || !written || (!src.data && src.len > 0)) {
+int base64url_decode(byte_buffer_t *dst, const_byte_array_t src) {
+    if (!dst || dst->len > dst->capacity || (!dst->data && dst->capacity > 0) || (!src.data && src.len > 0)) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
     // First convert from base64url to standard base64
@@ -402,8 +405,13 @@ int base64url_decode(byte_buffer_t dst, size_t *written, const_byte_array_t src)
     }
     size_t b64_len = src.len + padding;
 
-    int rc = mbedtls_base64_decode(dst.data, dst.capacity, written, b64_src, b64_len);
+    size_t written = 0;
+    uint8_t *output = dst->data ? dst->data + dst->len : NULL;
+    int rc = mbedtls_base64_decode(output, dst->capacity - dst->len, &written, b64_src, b64_len);
     free(b64_src);
+    if (rc == 0) {
+        dst->len += written;
+    }
     return rc;
 }
 

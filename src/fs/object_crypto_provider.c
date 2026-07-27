@@ -168,19 +168,20 @@ static int file_object_crypto_hmac(const uint8_t key[FILE_OBJECT_CRYPTO_ROOT_KEY
     return r == 0 ? PICOKEYS_OK : PICOKEYS_EXEC_ERROR;
 }
 
-static int file_object_crypto_record_seal(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const_byte_array_t plaintext, byte_buffer_t stored, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
+static int file_object_crypto_record_seal(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const_byte_array_t plaintext, byte_buffer_t *stored, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
     file_object_crypto_provider_t *provider = (file_object_crypto_provider_t *)ctx;
-    if (!file_object_crypto_identity_valid(provider, identity, nonce, aad) || (!plaintext.data && plaintext.len > 0) || (!stored.data && stored.capacity > 0) || stored.capacity < plaintext.len || !tag) {
+    if (!file_object_crypto_identity_valid(provider, identity, nonce, aad) || (!plaintext.data && plaintext.len > 0) || !stored || stored->len > stored->capacity || (!stored->data && stored->capacity > 0) || stored->capacity - stored->len < plaintext.len || !tag) {
         return PICOKEYS_WRONG_DATA;
     }
+    uint8_t *output = stored->data ? stored->data + stored->len : NULL;
 
     uint8_t key[FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE] = { 0 };
     int r = file_object_crypto_derive_record_key(provider, identity, aad, key);
     if (r == PICOKEYS_OK && identity->protection == FILE_OBJECT_PROTECTION_AUTHENTICATED_PUBLIC) {
         if (plaintext.len > 0) {
-            memmove(stored.data, plaintext.data, plaintext.len);
+            memmove(output, plaintext.data, plaintext.len);
         }
-        r = file_object_crypto_hmac(key, nonce, aad, CONST_BYTE_ARRAY(stored.data, plaintext.len), tag);
+        r = file_object_crypto_hmac(key, nonce, aad, CONST_BYTE_ARRAY(output, plaintext.len), tag);
     }
     else if (r == PICOKEYS_OK) {
         mbedtls_gcm_context gcm;
@@ -188,7 +189,7 @@ static int file_object_crypto_record_seal(void *ctx, const file_object_record_id
         uint8_t empty_input = 0;
         uint8_t empty_output = 0;
         const uint8_t *gcm_input = plaintext.len > 0 ? plaintext.data : &empty_input;
-        uint8_t *gcm_output = plaintext.len > 0 ? stored.data : &empty_output;
+        uint8_t *gcm_output = plaintext.len > 0 ? output : &empty_output;
         int crypto_result = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, key, FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE * 8u);
         if (crypto_result == 0) {
             crypto_result = mbedtls_gcm_crypt_and_tag(&gcm, MBEDTLS_GCM_ENCRYPT, plaintext.len, nonce, FILE_OBJECT_RECORD_NONCE_SIZE, aad, FILE_OBJECT_RECORD_AAD_SIZE, gcm_input, gcm_output, FILE_OBJECT_AUTH_TAG_SIZE, tag);
@@ -197,14 +198,18 @@ static int file_object_crypto_record_seal(void *ctx, const file_object_record_id
         r = crypto_result == 0 ? PICOKEYS_OK : PICOKEYS_EXEC_ERROR;
     }
     mbedtls_platform_zeroize(key, sizeof(key));
+    if (r == PICOKEYS_OK) {
+        stored->len += plaintext.len;
+    }
     return r;
 }
 
-static int file_object_crypto_record_unseal(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const_byte_array_t stored, const uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE], byte_buffer_t plaintext) {
+static int file_object_crypto_record_unseal(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const_byte_array_t stored, const uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE], byte_buffer_t *plaintext) {
     file_object_crypto_provider_t *provider = (file_object_crypto_provider_t *)ctx;
-    if (!file_object_crypto_identity_valid(provider, identity, nonce, aad) || (!stored.data && stored.len > 0) || !tag || (!plaintext.data && plaintext.capacity > 0) || plaintext.capacity < stored.len) {
+    if (!file_object_crypto_identity_valid(provider, identity, nonce, aad) || (!stored.data && stored.len > 0) || !tag || !plaintext || plaintext->len > plaintext->capacity || (!plaintext->data && plaintext->capacity > 0) || plaintext->capacity - plaintext->len < stored.len) {
         return PICOKEYS_WRONG_DATA;
     }
+    uint8_t *output = plaintext->data ? plaintext->data + plaintext->len : NULL;
 
     uint8_t key[FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE] = { 0 };
     int r = file_object_crypto_derive_record_key(provider, identity, aad, key);
@@ -215,7 +220,7 @@ static int file_object_crypto_record_unseal(void *ctx, const file_object_record_
             r = PICOKEYS_WRONG_SIGNATURE;
         }
         if (r == PICOKEYS_OK && stored.len > 0) {
-            memmove(plaintext.data, stored.data, stored.len);
+            memmove(output, stored.data, stored.len);
         }
         mbedtls_platform_zeroize(calculated_tag, sizeof(calculated_tag));
     }
@@ -225,7 +230,7 @@ static int file_object_crypto_record_unseal(void *ctx, const file_object_record_
         uint8_t empty_input = 0;
         uint8_t empty_output = 0;
         const uint8_t *gcm_input = stored.len > 0 ? stored.data : &empty_input;
-        uint8_t *gcm_output = stored.len > 0 ? plaintext.data : &empty_output;
+        uint8_t *gcm_output = stored.len > 0 ? output : &empty_output;
         int crypto_result = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, key, FILE_OBJECT_CRYPTO_ROOT_KEY_SIZE * 8u);
         if (crypto_result == 0) {
             crypto_result = mbedtls_gcm_auth_decrypt(&gcm, stored.len, nonce, FILE_OBJECT_RECORD_NONCE_SIZE, aad, FILE_OBJECT_RECORD_AAD_SIZE, tag, FILE_OBJECT_AUTH_TAG_SIZE, gcm_input, gcm_output);
@@ -236,8 +241,11 @@ static int file_object_crypto_record_unseal(void *ctx, const file_object_record_
         }
         mbedtls_gcm_free(&gcm);
     }
-    if (r != PICOKEYS_OK && plaintext.data && stored.len > 0) {
-        mbedtls_platform_zeroize(plaintext.data, stored.len);
+    if (r != PICOKEYS_OK && output && stored.len > 0) {
+        mbedtls_platform_zeroize(output, stored.len);
+    }
+    if (r == PICOKEYS_OK) {
+        plaintext->len += stored.len;
     }
     mbedtls_platform_zeroize(key, sizeof(key));
     return r;

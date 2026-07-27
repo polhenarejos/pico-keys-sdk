@@ -56,8 +56,8 @@ rest_session_t *rest_session_create(const rest_session_role_t role, rest_session
             random_fill_buffer(BYTE_ARRAY(rest_sessions[i].id, sizeof(rest_sessions[i].id)));
             rest_sessions[i].created_at = board_millis();
             rest_sessions[i].last_activity_timestamp = rest_sessions[i].created_at;
-            size_t olen = 0;
-            if (base64url_encode(BYTE_BUFFER(rest_sessions[i].id_str, sizeof(rest_sessions[i].id_str)), &olen, CONST_BYTE_ARRAY(rest_sessions[i].id, sizeof(rest_sessions[i].id))) != 0) {
+            byte_buffer_t encoded_id = BYTE_BUFFER(rest_sessions[i].id_str, sizeof(rest_sessions[i].id_str));
+            if (base64url_encode(&encoded_id, CONST_BYTE_ARRAY(rest_sessions[i].id, sizeof(rest_sessions[i].id))) != 0) {
                 memset(&rest_sessions[i], 0, sizeof(rest_session_t));
                 return NULL;
             }

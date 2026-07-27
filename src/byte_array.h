@@ -28,6 +28,7 @@ typedef struct {
 
 typedef struct {
     uint8_t *data;
+    size_t len;
     size_t capacity;
 } byte_buffer_t;
 
@@ -37,7 +38,7 @@ typedef struct {
 } const_byte_array_t;
 
 #define BYTE_ARRAY(buffer_, length_) ((byte_array_t){ .data = (buffer_), .len = (length_) })
-#define BYTE_BUFFER(buffer_, capacity_) ((byte_buffer_t){ .data = (buffer_), .capacity = (capacity_) })
+#define BYTE_BUFFER(buffer_, capacity_) ((byte_buffer_t){ .data = (buffer_), .len = 0, .capacity = (capacity_) })
 #define CONST_BYTE_ARRAY(buffer_, length_) ((const_byte_array_t){ .data = (buffer_), .len = (length_) })
 
 #endif

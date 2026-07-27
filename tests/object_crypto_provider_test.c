@@ -200,16 +200,16 @@ static void test_authenticated_public_record(void) {
     uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE];
 
     test_aad_build(&identity, aad, nonce);
-    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), BYTE_BUFFER(stored, sizeof(stored)), tag) == PICOKEYS_OK);
+    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), &BYTE_BUFFER(stored, sizeof(stored)), tag) == PICOKEYS_OK);
     assert(memcmp(stored, plaintext, sizeof(plaintext)) == 0);
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_OK);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_OK);
     assert(memcmp(output, plaintext, sizeof(plaintext)) == 0);
 
     root.available = false;
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_OK);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_OK);
 
     stored[0] ^= 0x01;
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
 
     file_object_crypto_provider_deinit(&provider);
 }
@@ -234,30 +234,30 @@ static void test_aead_secret_record(void) {
     uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE];
 
     test_aad_build(&identity, aad, nonce);
-    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), BYTE_BUFFER(stored, sizeof(stored)), tag) == PICOKEYS_OK);
+    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), &BYTE_BUFFER(stored, sizeof(stored)), tag) == PICOKEYS_OK);
     assert(memcmp(stored, plaintext, sizeof(plaintext)) != 0);
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_OK);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_OK);
     assert(memcmp(output, plaintext, sizeof(plaintext)) == 0);
-    assert(wrong_protector->unseal(wrong_protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
+    assert(wrong_protector->unseal(wrong_protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
     for (size_t i = 0; i < sizeof(output); i++) {
         assert(output[i] == 0);
     }
 
     stored[0] ^= 0x01;
     memset(output, 0xa5, sizeof(output));
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
     for (size_t i = 0; i < sizeof(output); i++) {
         assert(output[i] == 0);
     }
     stored[0] ^= 0x01;
 
     aad[TEST_AAD_CONTAINER_ID_OFFSET] ^= 0x01;
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_DATA);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_DATA);
     aad[TEST_AAD_CONTAINER_ID_OFFSET] ^= 0x01;
 
     tag[0] ^= 0x01;
     memset(output, 0xa5, sizeof(output));
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
     for (size_t i = 0; i < sizeof(output); i++) {
         assert(output[i] == 0);
     }
@@ -265,22 +265,22 @@ static void test_aead_secret_record(void) {
 
     identity.container_id++;
     test_aad_build(&identity, aad, nonce);
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
 
     identity = test_identity(TEST_NAMESPACE_A, FILE_OBJECT_PROTECTION_AEAD_SECRET);
     identity.policy_hash[0] ^= 0x01;
     test_aad_build(&identity, aad, nonce);
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(stored, sizeof(stored)), tag, &BYTE_BUFFER(output, sizeof(output))) == PICOKEYS_WRONG_SIGNATURE);
 
     identity = test_identity(TEST_NAMESPACE_A, FILE_OBJECT_PROTECTION_AEAD_SECRET);
     identity.key_domain = TEST_MAX_KEY_DOMAINS;
     test_aad_build(&identity, aad, nonce);
-    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), BYTE_BUFFER(stored, sizeof(stored)), tag) == PICOKEYS_WRONG_DATA);
+    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), &BYTE_BUFFER(stored, sizeof(stored)), tag) == PICOKEYS_WRONG_DATA);
 
     identity = test_identity(TEST_NAMESPACE_A, FILE_OBJECT_PROTECTION_AEAD_SECRET);
     test_aad_build(&identity, aad, nonce);
     root.available = false;
-    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), BYTE_BUFFER(stored, sizeof(stored)), tag) == PICOKEYS_NO_LOGIN);
+    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), &BYTE_BUFFER(stored, sizeof(stored)), tag) == PICOKEYS_NO_LOGIN);
 
     file_object_crypto_provider_deinit(&provider);
     file_object_crypto_provider_deinit(&wrong_provider);
@@ -300,8 +300,8 @@ static void test_empty_internal_record(void) {
 
     identity.logical_size = 0;
     test_aad_build(&identity, aad, nonce);
-    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(NULL, 0), BYTE_BUFFER(&stored, sizeof(stored)), tag) == PICOKEYS_OK);
-    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(&stored, 0), tag, BYTE_BUFFER(NULL, 0)) == PICOKEYS_OK);
+    assert(protector->seal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(NULL, 0), &BYTE_BUFFER(&stored, sizeof(stored)), tag) == PICOKEYS_OK);
+    assert(protector->unseal(protector->ctx, &identity, nonce, aad, CONST_BYTE_ARRAY(&stored, 0), tag, &BYTE_BUFFER(NULL, 0)) == PICOKEYS_OK);
 
     file_object_crypto_provider_deinit(&provider);
 }

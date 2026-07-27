@@ -40,17 +40,19 @@
 #define OTP_LINUX_DEFAULT_TPM_HANDLE "0x81010001"
 #define OTP_LINUX_DEFAULT_PEER_KEY_FILE ".config/pico-novus/otp_peer_p256.bin"
 
-static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t pin_out) {
+static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t *pin_out) {
     const char *pin_env = getenv("PICO_NOVUS_TPM_PIN");
-    if (!pin_out.data || pin_out.capacity < 2) {
+    if (!pin_out || !pin_out->data || pin_out->capacity < 2) {
         return -1;
     }
+    pin_out->len = 0;
     if (pin_env && pin_env[0] != '\0') {
         size_t n = strlen(pin_env);
-        if (n >= pin_out.capacity) {
+        if (n >= pin_out->capacity) {
             return -1;
         }
-        memcpy(pin_out.data, pin_env, n + 1);
+        memcpy(pin_out->data, pin_env, n + 1);
+        pin_out->len = n;
         return 0;
     }
     if (!isatty(STDIN_FILENO)) {
@@ -69,7 +71,7 @@ static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t pin_out) {
     if (tcsetattr(STDIN_FILENO, TCSANOW, &newt) != 0) {
         return -1;
     }
-    if (!fgets((char *)pin_out.data, (int)pin_out.capacity, stdin)) {
+    if (!fgets((char *)pin_out->data, (int)pin_out->capacity, stdin)) {
         tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
         fprintf(stderr, "\n");
         return -1;
@@ -77,12 +79,14 @@ static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t pin_out) {
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
     fprintf(stderr, "\n");
     {
-        size_t n = strlen((const char *)pin_out.data);
-        if (n > 0 && pin_out.data[n - 1] == '\n') {
-            pin_out.data[n - 1] = '\0';
+        size_t n = strlen((const char *)pin_out->data);
+        if (n > 0 && pin_out->data[n - 1] == '\n') {
+            pin_out->data[n - 1] = '\0';
+            n--;
         }
+        pin_out->len = n;
     }
-    return (pin_out.data[0] != '\0') ? 0 : -1;
+    return pin_out->len > 0 ? 0 : -1;
 }
 
 static int derive_secp256k1_privkey_from_secret(const_byte_array_t secret_data, uint8_t out_key32[32]) {
@@ -473,6 +477,7 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     uint8_t ecdh_secret[132] = {0};
     size_t ecdh_secret_len = 0;
     char pin[128] = {0};
+    byte_buffer_t pin_buffer = BYTE_BUFFER((uint8_t *)pin, sizeof(pin));
     int created_now = 0;
 
     int rc_out = -1;
@@ -510,7 +515,7 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
         goto cleanup;
     }
     unsigned long handle_num = strtoul(handle_hex, NULL, 0);
-    if (read_tpm_pin_prompt("Enter or set TPM key PIN: ", BYTE_BUFFER((uint8_t *)pin, sizeof(pin))) != 0) {
+    if (read_tpm_pin_prompt("Enter or set TPM key PIN: ", &pin_buffer) != 0) {
         fprintf(stderr, "[otp-linux] PIN is required to unlock/provision TPM key\n");
         goto cleanup;
     }
@@ -520,7 +525,8 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     }
     if (created_now && !getenv("PICO_NOVUS_TPM_PIN") && isatty(STDIN_FILENO)) {
         char confirm[128] = {0};
-        if (read_tpm_pin_prompt("Confirm TPM key PIN: ", BYTE_BUFFER((uint8_t *)confirm, sizeof(confirm))) != 0 || strcmp(pin, confirm) != 0) {
+        byte_buffer_t confirm_buffer = BYTE_BUFFER((uint8_t *)confirm, sizeof(confirm));
+        if (read_tpm_pin_prompt("Confirm TPM key PIN: ", &confirm_buffer) != 0 || strcmp(pin, confirm) != 0) {
             fprintf(stderr, "[otp-linux] PIN confirmation mismatch\n");
             memset(confirm, 0, sizeof(confirm));
             goto cleanup;

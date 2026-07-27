@@ -213,14 +213,13 @@ static void file_object_descriptor_decode(const uint8_t data[FILE_OBJECT_DESCRIP
     };
 }
 
-int file_object_manifest_build(const file_object_manifest_t *manifest, const_byte_array_t extensions, const file_object_authenticator_t *auth, byte_buffer_t output, size_t *written) {
-    if (!manifest || (!extensions.data && extensions.len > 0) || extensions.len > UINT16_MAX || !file_object_manifest_auth_valid(auth) || !output.data || !written) {
+int file_object_manifest_build(const file_object_manifest_t *manifest, const_byte_array_t extensions, const file_object_authenticator_t *auth, byte_buffer_t *output) {
+    if (!manifest || (!extensions.data && extensions.len > 0) || extensions.len > UINT16_MAX || !file_object_manifest_auth_valid(auth) || !output || output->len > output->capacity || !output->data) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    *written = 0;
     uint16_t extensions_size = (uint16_t)extensions.len;
     const uint8_t *extension_data = extensions.data;
-    uint8_t *data = output.data;
+    uint8_t *data = output->data + output->len;
 
     uint16_t object_count = manifest->object_count;
     if (object_count == 0 && manifest->has_object) {
@@ -236,7 +235,7 @@ int file_object_manifest_build(const file_object_manifest_t *manifest, const_byt
     if (manifest->generation == 0 || manifest->previous_generation >= manifest->generation) {
         return PICOKEYS_WRONG_DATA;
     }
-    if (total_size > UINT16_MAX || output.capacity < total_size) {
+    if (total_size > UINT16_MAX || output->capacity - output->len < total_size) {
         return PICOKEYS_WRONG_LENGTH;
     }
     if (!file_object_descriptors_valid(manifest->objects, object_count, extension_start, extension_end)) {
@@ -280,7 +279,7 @@ int file_object_manifest_build(const file_object_manifest_t *manifest, const_byt
         memset(data, 0, total_size);
         return r;
     }
-    *written = total_size;
+    output->len += total_size;
     return PICOKEYS_OK;
 }
 
@@ -459,44 +458,47 @@ static int file_object_record_identity_build(const file_object_manifest_t *manif
     return PICOKEYS_OK;
 }
 
-int file_object_record_seal(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], const file_object_record_protector_t *protector, const_byte_array_t plaintext, byte_buffer_t record, size_t *written) {
-    if (!manifest || !policy_hash || !file_object_record_protector_valid(protector) || (!plaintext.data && plaintext.len > 0) || (!record.data && record.capacity > 0) || !written) {
+int file_object_record_seal(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], const file_object_record_protector_t *protector, const_byte_array_t plaintext, byte_buffer_t *record) {
+    if (!manifest || !policy_hash || !file_object_record_protector_valid(protector) || (!plaintext.data && plaintext.len > 0) || !record || record->len > record->capacity || (!record->data && record->capacity > 0)) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    *written = 0;
     if (!manifest->has_object || plaintext.len != manifest->object.logical_size || plaintext.len != manifest->object.stored_size) {
         return PICOKEYS_WRONG_LENGTH;
     }
     uint64_t required_size = (uint64_t)FILE_OBJECT_RECORD_HEADER_SIZE + plaintext.len + FILE_OBJECT_AUTH_TAG_SIZE;
-    if (required_size > SIZE_MAX || record.capacity < (size_t)required_size) {
+    if (required_size > SIZE_MAX || record->capacity - record->len < (size_t)required_size) {
         return PICOKEYS_WRONG_LENGTH;
     }
+    uint8_t *record_data = record->data + record->len;
 
     file_object_record_identity_t identity;
     uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE];
     int r = file_object_record_identity_build(manifest, policy_hash, &identity, aad);
     if (r == PICOKEYS_OK) {
-        r = file_object_record_header_build(&manifest->object, record.data);
+        r = file_object_record_header_build(&manifest->object, record_data);
     }
     if (r == PICOKEYS_OK) {
-        r = protector->seal(protector->ctx, &identity, record.data + FILE_OBJECT_RECORD_NONCE_OFFSET, aad, plaintext, BYTE_BUFFER(record.data + FILE_OBJECT_RECORD_HEADER_SIZE, plaintext.len), record.data + FILE_OBJECT_RECORD_HEADER_SIZE + plaintext.len);
+        byte_buffer_t stored = BYTE_BUFFER(record_data + FILE_OBJECT_RECORD_HEADER_SIZE, plaintext.len);
+        r = protector->seal(protector->ctx, &identity, record_data + FILE_OBJECT_RECORD_NONCE_OFFSET, aad, plaintext, &stored, record_data + FILE_OBJECT_RECORD_HEADER_SIZE + plaintext.len);
+        if (r == PICOKEYS_OK && stored.len != plaintext.len) {
+            r = PICOKEYS_WRONG_LENGTH;
+        }
     }
     memset(&identity, 0, sizeof(identity));
     memset(aad, 0, sizeof(aad));
     if (r != PICOKEYS_OK) {
-        memset(record.data, 0, (size_t)required_size);
+        memset(record_data, 0, (size_t)required_size);
         return r;
     }
-    *written = (size_t)required_size;
+    record->len += (size_t)required_size;
     return PICOKEYS_OK;
 }
 
-int file_object_record_unseal(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], const file_object_record_protector_t *protector, const_byte_array_t record, byte_array_t plaintext, size_t *written) {
-    if (!manifest || !policy_hash || !file_object_record_protector_valid(protector) || !record.data || (!plaintext.data && plaintext.len > 0) || !written) {
+int file_object_record_unseal(const file_object_manifest_t *manifest, const uint8_t policy_hash[FILE_OBJECT_POLICY_HASH_SIZE], const file_object_record_protector_t *protector, const_byte_array_t record, byte_buffer_t *plaintext) {
+    if (!manifest || !policy_hash || !file_object_record_protector_valid(protector) || !record.data || !plaintext || plaintext->len > plaintext->capacity || (!plaintext->data && plaintext->capacity > 0)) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    *written = 0;
-    if (!manifest->has_object || plaintext.len < manifest->object.logical_size || manifest->object.logical_size != manifest->object.stored_size) {
+    if (!manifest->has_object || plaintext->capacity - plaintext->len < manifest->object.logical_size || manifest->object.logical_size != manifest->object.stored_size) {
         return PICOKEYS_WRONG_LENGTH;
     }
 
@@ -508,17 +510,21 @@ int file_object_record_unseal(const file_object_manifest_t *manifest, const uint
         r = file_object_record_identity_build(manifest, policy_hash, &identity, aad);
     }
     if (r == PICOKEYS_OK) {
-        r = protector->unseal(protector->ctx, &identity, record.data + FILE_OBJECT_RECORD_NONCE_OFFSET, aad, CONST_BYTE_ARRAY(record.data + info.payload_offset, info.stored_size), record.data + info.tag_offset, BYTE_BUFFER(plaintext.data, plaintext.len));
+        byte_buffer_t output = BYTE_BUFFER(plaintext->data ? plaintext->data + plaintext->len : NULL, plaintext->capacity - plaintext->len);
+        r = protector->unseal(protector->ctx, &identity, record.data + FILE_OBJECT_RECORD_NONCE_OFFSET, aad, CONST_BYTE_ARRAY(record.data + info.payload_offset, info.stored_size), record.data + info.tag_offset, &output);
+        if (r == PICOKEYS_OK && output.len != info.logical_size) {
+            r = PICOKEYS_WRONG_LENGTH;
+        }
     }
     memset(&identity, 0, sizeof(identity));
     memset(aad, 0, sizeof(aad));
     if (r != PICOKEYS_OK) {
-        if (plaintext.data && plaintext.len > 0) {
-            memset(plaintext.data, 0, MIN(plaintext.len, manifest->object.logical_size));
+        if (plaintext->data && plaintext->capacity > plaintext->len) {
+            memset(plaintext->data + plaintext->len, 0, MIN(plaintext->capacity - plaintext->len, manifest->object.logical_size));
         }
         return r;
     }
-    *written = info.logical_size;
+    plaintext->len += info.logical_size;
     return PICOKEYS_OK;
 }
 

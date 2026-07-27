@@ -64,17 +64,19 @@ static const char *ncrypt_status_hint(SECURITY_STATUS st) {
     }
 }
 
-static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t pin_out) {
+static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t *pin_out) {
     const char *pin_env = getenv("PICO_NOVUS_TPM_PIN");
-    if (!pin_out.data || pin_out.capacity < 2) {
+    if (!pin_out || !pin_out->data || pin_out->capacity < 2) {
         return -1;
     }
+    pin_out->len = 0;
     if (pin_env && pin_env[0] != '\0') {
         size_t n = strlen(pin_env);
-        if (n >= pin_out.capacity) {
+        if (n >= pin_out->capacity) {
             return -1;
         }
-        memcpy(pin_out.data, pin_env, n + 1);
+        memcpy(pin_out->data, pin_env, n + 1);
+        pin_out->len = n;
         return 0;
     }
 
@@ -97,21 +99,24 @@ static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t pin_out) {
     if (!SetConsoleMode(h_in, new_mode)) {
         return -1;
     }
-    if (!fgets((char *)pin_out.data, (int)pin_out.capacity, stdin)) {
+    if (!fgets((char *)pin_out->data, (int)pin_out->capacity, stdin)) {
         SetConsoleMode(h_in, old_mode);
         fprintf(stderr, "\n");
         return -1;
     }
     SetConsoleMode(h_in, old_mode);
     fprintf(stderr, "\n");
-    size_t n = strlen((const char *)pin_out.data);
-    if (n > 0 && pin_out.data[n - 1] == '\n') {
-        pin_out.data[n - 1] = '\0';
+    size_t n = strlen((const char *)pin_out->data);
+    if (n > 0 && pin_out->data[n - 1] == '\n') {
+        pin_out->data[n - 1] = '\0';
+        n--;
     }
-    if (n > 1 && pin_out.data[n - 2] == '\r') {
-        pin_out.data[n - 2] = '\0';
+    if (n > 0 && pin_out->data[n - 1] == '\r') {
+        pin_out->data[n - 1] = '\0';
+        n--;
     }
-    return (pin_out.data[0] != '\0') ? 0 : -1;
+    pin_out->len = n;
+    return pin_out->len > 0 ? 0 : -1;
 }
 
 static int key_exists_by_name(NCRYPT_PROV_HANDLE prov, LPCWSTR key_name, int *exists_out) {
@@ -361,6 +366,7 @@ static int windows_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     PBYTE peer_pub_blob = NULL;
     DWORD peer_pub_blob_len = 0;
     char pin[128] = {0};
+    byte_buffer_t pin_buffer = BYTE_BUFFER((uint8_t *)pin, sizeof(pin));
     int key_exists = 0;
     int pin_supported = 0;
 
@@ -433,13 +439,14 @@ static int windows_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     }
     if (pin_supported) {
         if (!key_exists) {
-            if (read_tpm_pin_prompt("Set TPM key PIN: ", BYTE_BUFFER((uint8_t *)pin, sizeof(pin))) != 0) {
+            if (read_tpm_pin_prompt("Set TPM key PIN: ", &pin_buffer) != 0) {
                 fprintf(stderr, "[win-tpm] PIN is required to provision TPM key\n");
                 goto cleanup;
             }
             if (!getenv("PICO_NOVUS_TPM_PIN") && _isatty(_fileno(stdin))) {
                 char confirm[128] = {0};
-                if (read_tpm_pin_prompt("Confirm TPM key PIN: ", BYTE_BUFFER((uint8_t *)confirm, sizeof(confirm))) != 0 || strcmp(pin, confirm) != 0) {
+                byte_buffer_t confirm_buffer = BYTE_BUFFER((uint8_t *)confirm, sizeof(confirm));
+                if (read_tpm_pin_prompt("Confirm TPM key PIN: ", &confirm_buffer) != 0 || strcmp(pin, confirm) != 0) {
                     fprintf(stderr, "[win-tpm] PIN confirmation mismatch\n");
                     SecureZeroMemory(confirm, sizeof(confirm));
                     goto cleanup;
@@ -448,7 +455,7 @@ static int windows_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
             }
         }
         else {
-            if (read_tpm_pin_prompt("Enter TPM key PIN: ", BYTE_BUFFER((uint8_t *)pin, sizeof(pin))) != 0) {
+            if (read_tpm_pin_prompt("Enter TPM key PIN: ", &pin_buffer) != 0) {
                 fprintf(stderr, "[win-tpm] PIN is required to unlock TPM key\n");
                 goto cleanup;
             }

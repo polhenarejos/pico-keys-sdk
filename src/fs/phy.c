@@ -22,11 +22,12 @@
 
 phy_data_t phy_data;
 
-int phy_serialize_data(const phy_data_t *phy, byte_buffer_t data, uint16_t *len) {
-    if (!phy || !data.data || data.capacity < PHY_MAX_SIZE || !len) {
+int phy_serialize_data(const phy_data_t *phy, byte_buffer_t *data) {
+    if (!phy || !data || data->len > data->capacity || !data->data || data->capacity - data->len < PHY_MAX_SIZE) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    uint8_t *p = data.data;
+    uint8_t *start = data->data + data->len;
+    uint8_t *p = start;
     if (phy->vidpid_present) {
         *p++ = PHY_VIDPID;
         *p++ = 4;
@@ -79,7 +80,7 @@ int phy_serialize_data(const phy_data_t *phy, byte_buffer_t data, uint16_t *len)
         }
     }
 
-    *len = (uint8_t)(p - data.data);
+    data->len += (size_t)(p - start);
     return PICOKEYS_OK;
 }
 
@@ -188,12 +189,12 @@ int phy_init(void) {
 
 int phy_save(void) {
     uint8_t tmp[PHY_MAX_SIZE] = {0};
-    uint16_t tmp_len = 0;
-    int ret = phy_serialize_data(&phy_data, BYTE_BUFFER(tmp, sizeof(tmp)), &tmp_len);
+    byte_buffer_t output = BYTE_BUFFER(tmp, sizeof(tmp));
+    int ret = phy_serialize_data(&phy_data, &output);
     if (ret != PICOKEYS_OK) {
         return ret;
     }
-    file_put_data(ef_phy, CONST_BYTE_ARRAY(tmp, tmp_len));
+    file_put_data(ef_phy, CONST_BYTE_ARRAY(tmp, output.len));
     flash_commit();
     return PICOKEYS_OK;
 }

@@ -41,23 +41,23 @@ void derive_kbase(uint8_t kbase[32]) {
     }
 }
 
-void derive_kver(const uint8_t *pin, size_t pin_len, uint8_t kver[32]) {
+void derive_kver(const_byte_array_t pin, uint8_t kver[32]) {
     uint8_t kbase[32];
     derive_kbase(kbase);
-    mbedtls_md_hmac(SHA256(), kbase, 32, pin, pin_len, kver);
+    mbedtls_md_hmac(SHA256(), kbase, 32, pin.data, pin.len, kver);
     mbedtls_platform_zeroize(kbase, sizeof(kbase));
 }
 
-void pin_derive_verifier(const uint8_t *pin, size_t pin_len, uint8_t verifier[32]) {
+void pin_derive_verifier(const_byte_array_t pin, uint8_t verifier[32]) {
     uint8_t kver[32];
-    derive_kver(pin, pin_len, kver);
+    derive_kver(pin, kver);
     mbedtls_hkdf(SHA256(), pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"PIN/VERIFY", 10, verifier, 32);
     mbedtls_platform_zeroize(kver, sizeof(kver));
 }
 
-void pin_derive_session(const uint8_t *pin, size_t pin_len, uint8_t pin_token[32]) {
+void pin_derive_session(const_byte_array_t pin, uint8_t pin_token[32]) {
     uint8_t kver[32];
-    derive_kver(pin, pin_len, kver);
+    derive_kver(pin, kver);
     mbedtls_hkdf(SHA256(), pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"PIN/TOKEN", 9, pin_token, 32);
     mbedtls_platform_zeroize(kver, sizeof(kver));
 }
@@ -78,12 +78,12 @@ void pin_derive_kenc2(const uint8_t pin_token[32], uint8_t kenc[32]) {
 // Encrypt 32-byte device key using AES-256-GCM
 // Output: [nonce|ciphertext|tag]  =  12 + in_len + 16 = 60 bytes
 // ------------------------------------------------------------------
-int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, const pin_kdf_version_t version, uint8_t *out_buf) {
+int encrypt_with_aad(const uint8_t key[32], const_byte_array_t input, pin_kdf_version_t version, uint8_t *out_buf) {
     uint8_t *nonce = out_buf;
     uint8_t *ct    = out_buf + 12;
-    uint8_t *tag   = out_buf + 12 + in_len;
+    uint8_t *tag   = out_buf + 12 + input.len;
 
-    random_fill_buffer(nonce, 12);
+    random_fill_buffer(BYTE_ARRAY(nonce, 12));
 
     mbedtls_gcm_context gcm;
     mbedtls_gcm_init(&gcm);
@@ -104,7 +104,7 @@ int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
         return rc;
     }
 
-    rc = mbedtls_gcm_crypt_and_tag(&gcm, MBEDTLS_GCM_ENCRYPT, in_len, nonce, 12, pico_serial_hash, sizeof(pico_serial_hash), in_buf, ct, 16, tag);
+    rc = mbedtls_gcm_crypt_and_tag(&gcm, MBEDTLS_GCM_ENCRYPT, input.len, nonce, 12, pico_serial_hash, sizeof(pico_serial_hash), input.data, ct, 16, tag);
     mbedtls_gcm_free(&gcm);
     return rc;
 }
@@ -114,10 +114,14 @@ int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
 // Input: [nonce|ciphertext|tag]  =  in_len bytes
 // Output: decrypted = in_len - 12 - 16 bytes
 // ------------------------------------------------------------------
-int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, const pin_kdf_version_t version, uint8_t *out_buf) {
-    const uint8_t *nonce = in_buf;
-    const uint8_t *ct    = in_buf + 12;
-    const uint8_t *tag   = in_buf + in_len - 16;
+int decrypt_with_aad(const uint8_t key[32], const_byte_array_t input, pin_kdf_version_t version, uint8_t *out_buf) {
+    if (!input.data || input.len < 28) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+
+    const uint8_t *nonce = input.data;
+    const uint8_t *ct    = input.data + 12;
+    const uint8_t *tag   = input.data + input.len - 16;
 
     mbedtls_gcm_context gcm;
     uint8_t kenc[32];
@@ -137,24 +141,32 @@ int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len
         return ret;
     }
 
-    MBEDTLS_MPI_CHK(mbedtls_gcm_auth_decrypt(&gcm, in_len - 16 - 12, nonce, 12, pico_serial_hash, sizeof(pico_serial_hash), tag, 16, ct, out_buf));
+    MBEDTLS_MPI_CHK(mbedtls_gcm_auth_decrypt(&gcm, input.len - 16 - 12, nonce, 12, pico_serial_hash, sizeof(pico_serial_hash), tag, 16, ct, out_buf));
     cleanup:
     mbedtls_gcm_free(&gcm);
     return ret;
 }
 
 // Old functions, kept for compatibility. NOT SECURE, use the new ones above.
-void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]) {
+void double_hash_pin(const_byte_array_t pin, uint8_t output[32]) {
     uint8_t o1[32];
-    hash_multi(pin, len, o1);
+    hash_multi(pin, o1);
     for (size_t i = 0; i < sizeof(o1); i++) {
-        o1[i] ^= pin[i % len];
+        o1[i] ^= pin.data[i % pin.len];
     }
-    hash_multi(o1, sizeof(o1), output);
+    hash_multi(CONST_BYTE_ARRAY(o1, sizeof(o1)), output);
 }
 
-void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
+void hash_multi(const_byte_array_t input, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
+    uint16_t len = 0;
+
+    if (!input.data || input.len == 0 || input.len > UINT16_MAX) {
+        memset(output, 0, 32);
+        return;
+    }
+    len = (uint16_t)input.len;
+
     mbedtls_sha256_init(&ctx);
     uint16_t iters = 256;
     mbedtls_sha256_starts(&ctx, 0);
@@ -163,32 +175,35 @@ void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]) {
 #endif
 
     while (iters > len) {
-        mbedtls_sha256_update(&ctx, input, len);
+        mbedtls_sha256_update(&ctx, input.data, len);
         iters -= len;
     }
     if (iters > 0) { // remaining iterations
-        mbedtls_sha256_update(&ctx, input, iters);
+        mbedtls_sha256_update(&ctx, input.data, iters);
     }
     mbedtls_sha256_finish(&ctx, output);
     mbedtls_sha256_free(&ctx);
 }
 
-void hash256(const uint8_t *input, size_t len, uint8_t output[32]) {
+void hash256(const_byte_array_t input, uint8_t output[32]) {
     mbedtls_sha256_context ctx;
     mbedtls_sha256_init(&ctx);
 
     mbedtls_sha256_starts(&ctx, 0);
-    mbedtls_sha256_update(&ctx, input, len);
+    mbedtls_sha256_update(&ctx, input.data, input.len);
 
     mbedtls_sha256_finish(&ctx, output);
     mbedtls_sha256_free(&ctx);
 }
 
-void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output) {
-    mbedtls_md(mbedtls_md_info_from_type(md), input, len, output);
+void generic_hash(mbedtls_md_type_t md, const_byte_array_t input, uint8_t *output) {
+    mbedtls_md(mbedtls_md_info_from_type(md), input.data, input.len, output);
 }
 
-int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mode, uint8_t *data, uint16_t len) {
+int aes_encrypt(const_byte_array_t key, const uint8_t *iv, int mode, byte_array_t data) {
+    if (!key.data || (key.len != 16 && key.len != 24 && key.len != 32)) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
     mbedtls_aes_context aes;
     mbedtls_aes_init(&aes);
     uint8_t tmp_iv[IV_SIZE];
@@ -197,7 +212,7 @@ int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     if (iv) {
         memcpy(tmp_iv, iv, IV_SIZE);
     }
-    int r = mbedtls_aes_setkey_enc(&aes, key, key_size);
+    int r = mbedtls_aes_setkey_enc(&aes, key.data, (unsigned int)(key.len * 8));
     if (r != 0) {
         mbedtls_aes_free(&aes);
         mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
@@ -205,17 +220,20 @@ int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     }
     int rc = 0;
     if (mode == PICOKEYS_AES_MODE_CBC) {
-        rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, len, tmp_iv, data, data);
+        rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, data.len, tmp_iv, data.data, data.data);
     }
     else {
-        rc = mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, len, &iv_offset, tmp_iv, data, data);
+        rc = mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_ENCRYPT, data.len, &iv_offset, tmp_iv, data.data, data.data);
     }
     mbedtls_aes_free(&aes);
     mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
     return rc;
 }
 
-int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mode, uint8_t *data, uint16_t len) {
+int aes_decrypt(const_byte_array_t key, const uint8_t *iv, int mode, byte_array_t data) {
+    if (!key.data || (key.len != 16 && key.len != 24 && key.len != 32)) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
     mbedtls_aes_context aes;
     mbedtls_aes_init(&aes);
     uint8_t tmp_iv[IV_SIZE];
@@ -224,7 +242,7 @@ int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     if (iv) {
         memcpy(tmp_iv, iv, IV_SIZE);
     }
-    int r = mbedtls_aes_setkey_dec(&aes, key, key_size);
+    int r = mbedtls_aes_setkey_dec(&aes, key.data, (unsigned int)(key.len * 8));
     if (r != 0) {
         mbedtls_aes_free(&aes);
         mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
@@ -232,27 +250,33 @@ int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mo
     }
     int rc = 0;
     if (mode == PICOKEYS_AES_MODE_CBC) {
-        rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, len, tmp_iv, data, data);
+        rc = mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, data.len, tmp_iv, data.data, data.data);
     }
     else {
-        r = mbedtls_aes_setkey_enc(&aes, key, key_size); //CFB requires set_enc instead set_dec
+        r = mbedtls_aes_setkey_enc(&aes, key.data, (unsigned int)(key.len * 8)); //CFB requires set_enc instead set_dec
         if (r != 0) {
             mbedtls_aes_free(&aes);
             mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
             return PICOKEYS_EXEC_ERROR;
         }
-        rc = mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_DECRYPT, len, &iv_offset, tmp_iv, data, data);
+        rc = mbedtls_aes_crypt_cfb128(&aes, MBEDTLS_AES_DECRYPT, data.len, &iv_offset, tmp_iv, data.data, data.data);
     }
     mbedtls_aes_free(&aes);
     mbedtls_platform_zeroize(tmp_iv, sizeof(tmp_iv));
     return rc;
 }
 
-int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len) {
-    return aes_encrypt(key, iv, 256, PICOKEYS_AES_MODE_CFB, data, len);
+int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, byte_array_t data) {
+    if (data.len > UINT16_MAX) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+    return aes_encrypt(CONST_BYTE_ARRAY(key, 32), iv, PICOKEYS_AES_MODE_CFB, data);
 }
-int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len) {
-    return aes_decrypt(key, iv, 256, PICOKEYS_AES_MODE_CFB, data, len);
+int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, byte_array_t data) {
+    if (data.len > UINT16_MAX) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+    return aes_decrypt(CONST_BYTE_ARRAY(key, 32), iv, PICOKEYS_AES_MODE_CFB, data);
 }
 
 struct lv_data {
@@ -302,9 +326,9 @@ struct ec_curve_mbed_id ec_curves_mbed[] = {
     {   { NULL, 0 }, MBEDTLS_ECP_DP_NONE }
 };
 
-mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t prime_len) {
+mbedtls_ecp_group_id ec_get_curve_from_prime(const_byte_array_t prime) {
     for (struct ec_curve_mbed_id *ec = ec_curves_mbed; ec->id != MBEDTLS_ECP_DP_NONE; ec++) {
-        if (prime_len == ec->curve.len && memcmp(prime, ec->curve.value, prime_len) == 0) {
+        if (prime.len == ec->curve.len && memcmp(prime.data, ec->curve.value, prime.len) == 0) {
             return ec->id;
         }
     }
@@ -313,10 +337,10 @@ mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t prime_
 
 #define POLY 0xedb88320
 
-uint32_t crc32c(const uint8_t *buf, size_t len) {
+uint32_t crc32c(const_byte_array_t data) {
     uint32_t crc = 0xffffffff;
-    while (len--) {
-        crc ^= *buf++;
+    for (size_t i = 0; i < data.len; i++) {
+        crc ^= data.data[i];
         for (int k = 0; k < 8; k++) {
             crc = (crc >> 1) ^ (POLY & (0 - (crc & 1)));
         }
@@ -324,55 +348,61 @@ uint32_t crc32c(const uint8_t *buf, size_t len) {
     return ~crc;
 }
 
-int base64url_encode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen) {
-    int rc = mbedtls_base64_encode(dst, dlen, olen, src, slen);
+int base64url_encode(byte_buffer_t dst, size_t *written, const_byte_array_t src) {
+    if ((!dst.data && dst.capacity > 0) || !written || (!src.data && src.len > 0)) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    int rc = mbedtls_base64_encode(dst.data, dst.capacity, written, src.data, src.len);
     if (rc != 0) {
         return rc;
     }
-    for (size_t i = 0; i < *olen; i++) {
-        if (dst[i] == '+') {
-            dst[i] = '-';
+    for (size_t i = 0; i < *written; i++) {
+        if (dst.data[i] == '+') {
+            dst.data[i] = '-';
         }
-        else if (dst[i] == '/') {
-            dst[i] = '_';
+        else if (dst.data[i] == '/') {
+            dst.data[i] = '_';
         }
     }
-    if (*olen == 0) {
+    if (*written == 0) {
         return 0;
     }
-    uint8_t *p = dst + *olen - 1;
+    uint8_t *p = dst.data + *written - 1;
     while (*p == '=') {
         *p-- = '\0';
-        (*olen)--;
+        (*written)--;
     }
     return 0;
 }
 
-int base64url_decode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen) {
+int base64url_decode(byte_buffer_t dst, size_t *written, const_byte_array_t src) {
+    if ((!dst.data && dst.capacity > 0) || !written || (!src.data && src.len > 0)) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
     // First convert from base64url to standard base64
-    if ((slen % 4) == 1) return MBEDTLS_ERR_BASE64_INVALID_CHARACTER;
-    size_t padding = (4 - (slen % 4)) % 4;
-    unsigned char *b64_src = malloc(slen + padding);
+    if ((src.len % 4) == 1) return MBEDTLS_ERR_BASE64_INVALID_CHARACTER;
+    size_t padding = (4 - (src.len % 4)) % 4;
+    unsigned char *b64_src = malloc(src.len + padding);
     if (b64_src == NULL) {
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
-    for (size_t i = 0; i < slen; i++) {
-        if (src[i] == '-') {
+    for (size_t i = 0; i < src.len; i++) {
+        if (src.data[i] == '-') {
             b64_src[i] = '+';
         }
-        else if (src[i] == '_') {
+        else if (src.data[i] == '_') {
             b64_src[i] = '/';
         }
         else {
-            b64_src[i] = src[i];
+            b64_src[i] = src.data[i];
         }
     }
     for (size_t i = 0; i < padding; i++) {
-        b64_src[slen + i] = '=';
+        b64_src[src.len + i] = '=';
     }
-    size_t b64_len = slen + padding;
+    size_t b64_len = src.len + padding;
 
-    int rc = mbedtls_base64_decode(dst, dlen, olen, b64_src, b64_len);
+    int rc = mbedtls_base64_decode(dst.data, dst.capacity, written, b64_src, b64_len);
     free(b64_src);
     return rc;
 }

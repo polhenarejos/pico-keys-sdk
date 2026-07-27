@@ -205,7 +205,7 @@ static socket_t get_sock_itf(uint8_t itf) {
 }
 
 uint32_t tud_vendor_n_write(uint8_t itf, const uint8_t *buffer, uint32_t n) {
-    uint16_t ret = driver_write_emul(ITF_CCID, buffer, (uint16_t)n);
+    uint16_t ret = driver_write_emul(ITF_CCID, CONST_BYTE_ARRAY(buffer, (uint16_t)n));
     tud_vendor_tx_cb(itf, ret);
     return ret;
 }
@@ -214,13 +214,13 @@ uint32_t tud_vendor_n_write(uint8_t itf, const uint8_t *buffer, uint32_t n) {
 bool tud_hid_n_report(uint8_t itf, uint8_t report_id, const uint8_t *buffer, uint32_t n) {
     (void) itf;
     (void) report_id;
-    uint16_t ret = driver_write_emul(ITF_HID, buffer, (uint16_t)n);
+    uint16_t ret = driver_write_emul(ITF_HID, CONST_BYTE_ARRAY(buffer, (uint16_t)n));
     return ret > 0;
 }
 #endif
 
-uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
-    uint16_t size = htons(buffer_size);
+uint16_t driver_write_emul(uint8_t itf, const_byte_array_t buffer) {
+    uint16_t size = htons((uint16_t)buffer.len);
     socket_t sock = get_sock_itf(itf);
     if (sock == INVALID_SOCKET) {
         return 0;
@@ -238,13 +238,13 @@ uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_s
         }
     } while (ret <= 0);
     do {
-        ret = send(sock, (const char *)buffer, buffer_size, 0);
+        ret = send(sock, (const char *)buffer.data, buffer.len, 0);
         if (ret == SOCKET_ERROR) {
             msleep(10);
         }
     } while (ret <= 0);
-    emul_tx_size = buffer_size;
-    return buffer_size;
+    emul_tx_size = (uint16_t)buffer.len;
+    return (uint16_t)buffer.len;
 }
 
 void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint16_t offset) {
@@ -255,7 +255,7 @@ void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint16_t of
 #endif
 #ifdef USB_ITF_CCID
     if (itf == ITF_CCID) {
-        driver_write_emul(itf, emul_tx + offset, size_next);
+        driver_write_emul(itf, CONST_BYTE_ARRAY(emul_tx + offset, size_next));
     }
 #endif
 }
@@ -337,7 +337,7 @@ uint16_t emul_read(uint8_t itf) {
                     if (len == 1) {
                         uint8_t c = emul_rx[0];
                         if (c == 4) {
-                            driver_write_emul(itf, ccid_atr ? ccid_atr + 1 : NULL, ccid_atr ? ccid_atr[0] : 0);
+                            driver_write_emul(itf, CONST_BYTE_ARRAY(ccid_atr ? ccid_atr + 1 : NULL, ccid_atr ? ccid_atr[0] : 0));
                         }
                     }
 #ifdef USB_ITF_CCID
@@ -345,14 +345,14 @@ uint16_t emul_read(uint8_t itf) {
                         uint16_t sent = 0;
                         DEBUG_PAYLOAD(emul_rx, len);
                         apdu.rdata = emul_tx;
-                        if ((sent = apdu_process(itf, emul_rx, len)) > 0) {
+                        if ((sent = apdu_process(itf, CONST_BYTE_ARRAY(emul_rx, len))) > 0) {
                             process_apdu();
                             apdu_finish();
                         }
                         if (sent > 0) {
                             uint16_t ret = apdu_next();
                             DEBUG_PAYLOAD(apdu.rdata, ret);
-                            driver_write_emul(itf, apdu.rdata, ret);
+                            driver_write_emul(itf, CONST_BYTE_ARRAY(apdu.rdata, ret));
                         }
                     }
 #endif

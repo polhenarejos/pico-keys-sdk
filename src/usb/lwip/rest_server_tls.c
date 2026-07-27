@@ -90,16 +90,16 @@ int tls_init_tls_context(const tls_credentials_t *tls_creds) {
     return 0;
 }
 
-static const char *find_header_end(const char *request, size_t request_len) {
-    if (request == NULL || request_len < 4) {
+static const char *find_header_end(const_byte_array_t request) {
+    if (request.data == NULL || request.len < 4) {
         return NULL;
     }
-    return strstr(request, "\r\n\r\n");
+    return strstr((const char *)request.data, "\r\n\r\n");
 }
 
-static int parse_content_length(const char *request, size_t request_len, size_t *content_len) {
-    const char *line = request;
-    const char *header_end = find_header_end(request, request_len);
+static int parse_content_length(const_byte_array_t request, size_t *content_len) {
+    const char *line = (const char *)request.data;
+    const char *header_end = find_header_end(request);
     if (header_end == NULL) {
         return 0;
     }
@@ -136,20 +136,20 @@ static int parse_content_length(const char *request, size_t request_len, size_t 
     return 1;
 }
 
-static int request_is_complete(const char *request, size_t request_len, size_t *payload_offset, size_t *payload_len) {
-    const char *header_end = find_header_end(request, request_len);
+static int request_is_complete(const_byte_array_t request, size_t *payload_offset, size_t *payload_len) {
+    const char *header_end = find_header_end(request);
     size_t content_len = 0;
     int rc;
     if (header_end == NULL) {
         return 0;
     }
-    *payload_offset = (size_t)((header_end + 4) - request);
-    rc = parse_content_length(request, request_len, &content_len);
+    *payload_offset = (size_t)((header_end + 4) - (const char *)request.data);
+    rc = parse_content_length(request, &content_len);
     if (rc < 0) {
         return -1;
     }
     *payload_len = content_len;
-    if (request_len < *payload_offset + content_len) {
+    if (request.len < *payload_offset + content_len) {
         return 0;
     }
     return 1;
@@ -336,7 +336,7 @@ err_t tls_progress_conn(rest_conn_t *conn) {
         conn->request_len += (size_t)ret;
         conn->last_progress_ms = board_millis();
         conn->request[conn->request_len] = '\0';
-        ret = request_is_complete(conn->request, conn->request_len, &payload_offset, &payload_len);
+        ret = request_is_complete(CONST_BYTE_ARRAY((const uint8_t *)conn->request, conn->request_len), &payload_offset, &payload_len);
         if (ret < 0) {
             rest_close_conn(conn);
             return ERR_ABRT;

@@ -121,14 +121,13 @@ void file_process_fci(const file_t *pe, int fmd) {
     }
     memcpy(res_APDU + res_APDU_size, "\x8A\x01\x05", 3); //life-cycle (5 -> activated)
     res_APDU_size += 3;
-    uint8_t *meta_data = NULL;
-    uint16_t meta_size = meta_find(pe->fid, &meta_data);
-    if (meta_size > 0 && meta_data != NULL) {
+    byte_array_t metadata = meta_find(pe->fid);
+    if (metadata.len > 0 && metadata.data != NULL) {
         res_APDU[res_APDU_size++] = 0xA5;
         res_APDU[res_APDU_size++] = 0x81;
-        res_APDU[res_APDU_size++] = (uint8_t )meta_size;
-        memcpy(res_APDU + res_APDU_size, meta_data, meta_size);
-        res_APDU_size += meta_size;
+        res_APDU[res_APDU_size++] = (uint8_t)metadata.len;
+        memcpy(res_APDU + res_APDU_size, metadata.data, metadata.len);
+        res_APDU_size += metadata.len;
     }
     res_APDU[1] = (uint8_t)res_APDU_size - 2;
     if (fmd) {
@@ -157,9 +156,9 @@ file_t *get_parent(file_t *f) {
     return &file_entries[parent].file;
 }
 
-file_t *file_search_by_name(uint8_t *name, uint16_t namelen) {
+file_t *file_search_by_name(const_byte_array_t name) {
     for (file_entry_t *p = file_entries; p != file_last; p++) {
-        if (p->name && *p->name == apdu.nc && memcmp(p->name + 1, name, namelen) == 0) {
+        if (p->name && *p->name == name.len && memcmp(p->name + 1, name.data, name.len) == 0) {
             return &p->file;
         }
     }
@@ -245,21 +244,21 @@ file_t *file_search(const uint16_t fid) {
     return search_dynamic_file(fid);
 }
 
-static uint8_t make_path_buf(const file_t *pe, uint8_t *buf, uint8_t buflen, const file_t *top) {
-    if (!buflen) {
+static uint8_t make_path_buf(const file_t *pe, byte_array_t buf, const file_t *top) {
+    if (buf.len < 2) {
         return 0;
     }
     if (pe == top) { //MF or relative DF
         return 0;
     }
-    put_uint16_be(pe->fid, buf);
-    return make_path_buf(get_parent((file_t *)pe), buf + 2, buflen - 2, top) + 2;
+    put_uint16_be(pe->fid, buf.data);
+    return make_path_buf(get_parent((file_t *)pe), BYTE_ARRAY(buf.data + 2, buf.len - 2), top) + 2;
 }
 
 static uint8_t make_path(const file_t *pe, const file_t *top, uint8_t *path) {
     uint8_t buf[MAX_DEPTH * 2], *p = path;
     put_uint16_be(pe->fid, buf);
-    uint8_t depth = make_path_buf(get_parent((file_t *)pe), buf + 2, sizeof(buf) - 2, top) + 2;
+    uint8_t depth = make_path_buf(get_parent((file_t *)pe), BYTE_ARRAY(buf + 2, sizeof(buf) - 2), top) + 2;
     for (int d = depth - 2; d >= 0; d -= 2) {
         memcpy(p, buf + d, 2);
         p += 2;
@@ -267,14 +266,14 @@ static uint8_t make_path(const file_t *pe, const file_t *top, uint8_t *path) {
     return depth;
 }
 
-file_t *file_search_by_path(const uint8_t *pe_path, uint8_t pathlen, const file_t *parent) {
+file_t *file_search_by_path(const_byte_array_t path_data, const file_t *parent) {
     uint8_t path[MAX_DEPTH * 2];
-    if (pathlen > sizeof(path)) {
+    if ((!path_data.data && path_data.len > 0) || path_data.len > sizeof(path)) {
         return NULL;
     }
     for (file_entry_t *p = file_entries; p != file_last; p++) {
         uint8_t depth = make_path(&p->file, parent, path);
-        if (pathlen == depth && memcmp(path, pe_path, depth) == 0) {
+        if (path_data.len == depth && memcmp(path, path_data.data, depth) == 0) {
             return &p->file;
         }
     }
@@ -310,7 +309,7 @@ bool file_authenticate_action(const file_t *ef, uint8_t op) {
 void file_initialize_flash(bool hard) {
     if (hard) {
         const uint8_t empty[8] = { 0 };
-        flash_program_block(end_data_pool, empty, sizeof(empty));
+        flash_program_block(end_data_pool, CONST_BYTE_ARRAY(empty, sizeof(empty)));
         flash_commit();
     }
     for (file_entry_t *f = file_entries; f != file_last; f++) {
@@ -370,8 +369,8 @@ void file_scan_flash(void) {
         printf("First initialization (or corrupted!)\n");
         uint8_t empty[sizeof(uintptr_t) * 2 + sizeof(uint32_t)];
         memset(empty, 0, sizeof(empty));
-        flash_program_block(end_data_pool, empty, sizeof(empty));
-        flash_program_block(end_rom_pool, empty, sizeof(empty));
+        flash_program_block(end_data_pool, CONST_BYTE_ARRAY(empty, sizeof(empty)));
+        flash_program_block(end_rom_pool, CONST_BYTE_ARRAY(empty, sizeof(empty)));
         //flash_commit();
     }
     printf("SCAN\n");
@@ -392,7 +391,7 @@ uint32_t file_read_uint32(const uint8_t *addr) {
 
 uint8_t file_read_uint8_offset(const file_t *ef, const uint16_t offset) {
     uint8_t value = 0;
-    file_read_at(ef, offset, &value, sizeof(value));
+    file_read_at(ef, offset, BYTE_ARRAY(&value, sizeof(value)));
     return value;
 }
 uint8_t file_read_uint8(const file_t *ef) {
@@ -417,30 +416,30 @@ uint32_t file_get_size(const file_t *tf) {
     return length == FLASH_FILE_EXTENDED_LENGTH ? file_read_uint32(tf->data + sizeof(uint16_t)) : length;
 }
 
-int file_read_at(const file_t *tf, uint32_t offset, uint8_t *data, size_t len) {
-    if (!tf || !tf->data || (!data && len > 0)) {
+int file_read_at(const file_t *tf, uint32_t offset, byte_array_t data) {
+    if (!tf || !tf->data || (!data.data && data.len > 0)) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
 
     uint32_t size = file_get_size(tf);
-    if (offset > size || len > size - offset) {
+    if (offset > size || data.len > size - offset) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    if (len == 0) {
+    if (data.len == 0) {
         return PICOKEYS_OK;
     }
 
     uint16_t stored_length = file_read_uint16(tf->data);
     size_t length_size = stored_length == FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
-    return flash_read_block((uintptr_t)tf->data + length_size + offset, data, len);
+    return flash_read_block((uintptr_t)tf->data + length_size + offset, data);
 }
 
-int file_put_data(file_t *file, const uint8_t *data, uint32_t len) {
-    return flash_write_data_to_file(file, data, len);
+int file_put_data(file_t *file, const_byte_array_t data) {
+    return flash_write_data_to_file(file, data);
 }
 
-int file_put_data_offset(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset) {
-    return flash_write_data_to_file_offset(file, data, len, offset);
+int file_put_data_offset(file_t *file, const_byte_array_t data, uint32_t offset) {
+    return flash_write_data_to_file_offset(file, data, offset);
 }
 
 static int delete_dynamic_file(file_t *f) {
@@ -477,42 +476,41 @@ file_t *file_new(uint16_t fid) {
     dynamic_files++;
     return f;
 }
-uint16_t meta_find(uint16_t fid, uint8_t **out) {
+byte_array_t meta_find(uint16_t fid) {
     file_t *ef = file_search(EF_META);
     if (!ef) {
-        return 0;
+        return BYTE_ARRAY(NULL, 0);
     }
-    uint16_t tag = 0x0;
-    uint8_t *tag_data = NULL, *p = NULL;
-    uint16_t tag_len = 0;
+    uint8_t *p = NULL;
+    tlv_item_t item;
     tlv_ctx_t ctxi;
-    tlv_ctx_init(file_get_data(ef), file_get_size(ef), &ctxi);
-    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+    tlv_ctx_init(BYTE_ARRAY(file_get_data(ef), file_get_size(ef)), &ctxi);
+    while (tlv_walk(&ctxi, &p, &item)) {
+        uint16_t tag_len = (uint16_t)item.value.len;
+        uint8_t *tag_data = (uint8_t *)item.value.data;
         if (tag_len < 2) {
             continue;
         }
         uint16_t cfid = get_uint16_be(tag_data);
         if (cfid == fid) {
-            if (out) {
-                *out = tag_data + 2;
-            }
-            return tag_len - 2;
+            return BYTE_ARRAY(tag_data + 2, tag_len - 2);
         }
     }
-    return 0;
+    return BYTE_ARRAY(NULL, 0);
 }
 static int meta_delete_internal(uint16_t fid, bool commit) {
     file_t *ef = file_search(EF_META);
     if (!ef) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
-    uint16_t tag = 0x0;
-    uint8_t *tag_data = NULL, *p = NULL;
-    uint16_t tag_len = 0;
+    uint8_t *p = NULL;
+    tlv_item_t item;
     uint8_t *fdata = NULL;
     tlv_ctx_t ctxi;
-    tlv_ctx_init(file_get_data(ef), file_get_size(ef), &ctxi);
-    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+    tlv_ctx_init(BYTE_ARRAY(file_get_data(ef), file_get_size(ef)), &ctxi);
+    while (tlv_walk(&ctxi, &p, &item)) {
+        uint16_t tag_len = (uint16_t)item.value.len;
+        uint8_t *tag_data = (uint8_t *)item.value.data;
         uint8_t *tpos = p - tag_len - tlv_format_len(tag_len, NULL) - 1;
         if (tag_len < 2) {
             continue;
@@ -531,7 +529,7 @@ static int meta_delete_internal(uint16_t fid, bool commit) {
                 if (ctxi.data + ctxi.len > p) {
                     memcpy(fdata + (tpos - ctxi.data), p, ctxi.data + ctxi.len - p);
                 }
-                int r = file_put_data(ef, fdata, new_len);
+                int r = file_put_data(ef, CONST_BYTE_ARRAY(fdata, new_len));
                 free(fdata);
                 if (r != PICOKEYS_OK) {
                     return PICOKEYS_EXEC_ERROR;
@@ -554,8 +552,14 @@ int meta_delete_no_commit(uint16_t fid) {
     return meta_delete_internal(fid, false);
 }
 
-int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
+int meta_add(uint16_t fid, const_byte_array_t data) {
     int r;
+    uint16_t len = 0;
+
+    if (!data.data || data.len > UINT16_MAX) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    len = (uint16_t)data.len;
     file_t *ef = file_search(EF_META);
     if (!ef) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
@@ -563,20 +567,21 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     uint16_t ef_size = file_get_size(ef);
     uint8_t *fdata = (uint8_t *) calloc(1, ef_size);
     memcpy(fdata, file_get_data(ef), ef_size);
-    uint16_t tag = 0x0;
-    uint8_t *tag_data = NULL, *p = NULL;
-    uint16_t tag_len = 0;
+    uint8_t *p = NULL;
+    tlv_item_t item;
     tlv_ctx_t ctxi;
-    tlv_ctx_init(fdata, ef_size, &ctxi);
-    while (tlv_walk(&ctxi, &p, &tag, &tag_len, &tag_data)) {
+    tlv_ctx_init(BYTE_ARRAY(fdata, ef_size), &ctxi);
+    while (tlv_walk(&ctxi, &p, &item)) {
+        uint16_t tag_len = (uint16_t)item.value.len;
+        uint8_t *tag_data = (uint8_t *)item.value.data;
         if (tag_len < 2) {
             continue;
         }
         uint16_t cfid = get_uint16_be(tag_data);
         if (cfid == fid) {
             if (tag_len - 2 == len) { //an update
-                memcpy(p - tag_len + 2, data, len);
-                r = file_put_data(ef, fdata, ef_size);
+                memcpy(p - tag_len + 2, data.data, len);
+                r = file_put_data(ef, CONST_BYTE_ARRAY(fdata, ef_size));
                 free(fdata);
                 if (r != PICOKEYS_OK) {
                     return PICOKEYS_EXEC_ERROR;
@@ -584,7 +589,7 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 return PICOKEYS_OK;
             }
             else {   //needs reallocation
-                uint8_t *tpos = p - tlv_len_tag(tag, tag_len);
+                uint8_t *tpos = p - tlv_len_tag(item.tag, tag_len);
                 memmove(tpos, p, fdata + ef_size - p);
                 tpos += fdata + ef_size - p;
                 volatile uintptr_t meta_offset = tpos - fdata;
@@ -603,8 +608,8 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
                 *f++ = fid & 0xff;
                 f += tlv_format_len(len + 2, f);
                 f += put_uint16_be(fid, f);
-                memcpy(f, data, len);
-                r = file_put_data(ef, fdata, ef_size);
+                memcpy(f, data.data, len);
+                r = file_put_data(ef, CONST_BYTE_ARRAY(fdata, ef_size));
                 free(fdata);
                 if (r != PICOKEYS_OK) {
                     return PICOKEYS_EXEC_ERROR;
@@ -618,8 +623,8 @@ int meta_add(uint16_t fid, const uint8_t *data, uint16_t len) {
     *f++ = fid & 0x1f;
     f += tlv_format_len(len + 2, f);
     f += put_uint16_be(fid, f);
-    memcpy(f, data, len);
-    r = file_put_data(ef, fdata, ef_size + (uint16_t)tlv_len_tag(fid & 0x1f, len + 2));
+    memcpy(f, data.data, len);
+    r = file_put_data(ef, CONST_BYTE_ARRAY(fdata, ef_size + (uint16_t)tlv_len_tag(fid & 0x1f, len + 2)));
     free(fdata);
     if (r != PICOKEYS_OK) {
         return PICOKEYS_EXEC_ERROR;
@@ -672,7 +677,7 @@ int flash_clear_file(file_t *file) {
     const uint8_t zeros[256] = {0};
     for (uint32_t offset = 0; offset < len;) {
         size_t chunk = MIN(sizeof(zeros), len - offset);
-        if (flash_program_block(payload_addr + offset, zeros, chunk) != PICOKEYS_OK) {
+        if (flash_program_block(payload_addr + offset, CONST_BYTE_ARRAY(zeros, chunk)) != PICOKEYS_OK) {
             return PICOKEYS_EXEC_ERROR;
         }
         offset += chunk;

@@ -18,22 +18,24 @@
 #include "picokeys.h"
 #include "tlv.h"
 
-int tlv_ctx_init(uint8_t *data, uint16_t len, tlv_ctx_t *ctx) {
+int tlv_ctx_init(byte_array_t data, tlv_ctx_t *ctx) {
     if (!ctx) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    ctx->data = data;
-    ctx->len = len;
+    *ctx = data;
     return PICOKEYS_OK;
 }
 
 int tlv_ctx_clear(tlv_ctx_t *ctx) {
+    if (!ctx) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
     ctx->data = NULL;
     ctx->len = 0;
     return PICOKEYS_OK;
 }
 
-uint16_t tlv_len(tlv_ctx_t *ctx) {
+size_t tlv_len(const tlv_ctx_t *ctx) {
     if (ctx->data && ctx->len > 0) {
         return ctx->len;
     }
@@ -78,7 +80,7 @@ uint8_t tlv_format_len(uint16_t len, uint8_t *out) {
     return 3;
 }
 
-int tlv_walk(const tlv_ctx_t *ctxi, uint8_t **p, uint16_t *tag, uint16_t *tag_len, uint8_t **data) {
+int tlv_walk(const tlv_ctx_t *ctxi, uint8_t **p, tlv_item_t *item) {
     if (!ctxi || !ctxi->data || !p) {
         return 0;
     }
@@ -120,27 +122,22 @@ int tlv_walk(const tlv_ctx_t *ctxi, uint8_t **p, uint16_t *tag, uint16_t *tag_le
     if (tgl > ctxi->len - (size_t)(*p - ctxi->data)) {
         return 0;
     }
-    if (tag) {
-        *tag = tg;
-    }
-    if (tag_len) {
-        *tag_len = tgl;
-    }
-    if (data) {
-        *data = *p;
+    if (item) {
+        item->tag = tg;
+        item->value = CONST_BYTE_ARRAY(*p, tgl);
     }
     *p = *p + tgl;
     return 1;
 }
 
 bool tlv_find_tag(const tlv_ctx_t *ctxi, uint16_t itag, tlv_ctx_t *ctxo) {
-    uint16_t tag = 0x0, tlen = 0;
-    uint8_t *p = NULL, *tdata = NULL;
-    while (tlv_walk(ctxi, &p, &tag, &tlen, &tdata)) {
-        if (itag == tag) {
+    uint8_t *p = NULL;
+    tlv_item_t item;
+    while (tlv_walk(ctxi, &p, &item)) {
+        if (itag == item.tag) {
             if (ctxo != NULL) {
-                ctxo->data = tdata;
-                ctxo->len = tlen;
+                ctxo->data = (uint8_t *)item.value.data;
+                ctxo->len = (uint16_t)item.value.len;
             }
             return true;
         }

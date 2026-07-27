@@ -23,12 +23,13 @@
 #include "compat/queue.h"
 #include "compat/board.h"
 #include <stdbool.h>
+#include "byte_array.h"
 
 #define USB_BUFFER_SIZE 4096
 extern int emul_init(const char *host, uint16_t port);
 extern uint8_t emul_rx[USB_BUFFER_SIZE];
 extern uint16_t emul_rx_size, emul_tx_size;
-extern uint16_t driver_write_emul(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size);
+extern uint16_t driver_write_emul(uint8_t itf, const_byte_array_t buffer);
 extern uint16_t emul_read(uint8_t itf);
 extern void emul_task(void);
 

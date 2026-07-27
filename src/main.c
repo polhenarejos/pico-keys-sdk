@@ -53,9 +53,9 @@ app_t *current_app = NULL;
 
 const uint8_t *ccid_atr = NULL;
 
-bool app_exists(const uint8_t *aid, size_t aid_len) {
+bool app_exists(const_byte_array_t aid) {
     for (int a = 0; a < num_apps; a++) {
-        if (aid_len >= apps[a].aid[0] && !memcmp(apps[a].aid + 1, aid, apps[a].aid[0])) {
+        if (aid.len >= apps[a].aid[0] && !memcmp(apps[a].aid + 1, aid.data, apps[a].aid[0])) {
             return true;
         }
     }
@@ -63,7 +63,7 @@ bool app_exists(const uint8_t *aid, size_t aid_len) {
 }
 
 int register_app(int (*select_aid)(app_t *, uint8_t), const uint8_t *aid) {
-    if (app_exists(aid + 1, aid[0])) {
+    if (app_exists(CONST_BYTE_ARRAY(aid + 1, aid[0]))) {
         return 1;
     }
     if (num_apps < sizeof(apps) / sizeof(app_t)) {
@@ -75,15 +75,15 @@ int register_app(int (*select_aid)(app_t *, uint8_t), const uint8_t *aid) {
     return 0;
 }
 
-int select_app(const uint8_t *aid, size_t aid_len) {
-    if (current_app && current_app->aid && (current_app->aid + 1 == aid || (aid_len >= current_app->aid[0] && !memcmp(current_app->aid + 1, aid, current_app->aid[0])))) {
+int select_app(const_byte_array_t aid) {
+    if (current_app && current_app->aid && (current_app->aid + 1 == aid.data || (aid.len >= current_app->aid[0] && !memcmp(current_app->aid + 1, aid.data, current_app->aid[0])))) {
         current_app->select_aid(current_app, 0);
         return PICOKEYS_OK;
     }
     for (int a = 0; a < num_apps; a++) {
-        if (aid_len >= apps[a].aid[0] && !memcmp(apps[a].aid + 1, aid, apps[a].aid[0])) {
+        if (aid.len >= apps[a].aid[0] && !memcmp(apps[a].aid + 1, aid.data, apps[a].aid[0])) {
             if (current_app) {
-                if (current_app->aid && aid_len >= current_app->aid[0] && !memcmp(current_app->aid + 1, aid, current_app->aid[0])) {
+                if (current_app->aid && aid.len >= current_app->aid[0] && !memcmp(current_app->aid + 1, aid.data, current_app->aid[0])) {
                     current_app->select_aid(current_app, 1);
                     return PICOKEYS_OK;
                 }

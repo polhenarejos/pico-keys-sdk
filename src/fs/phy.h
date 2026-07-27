@@ -18,6 +18,8 @@
 #ifndef _PHY_H_
 #define _PHY_H_
 
+#include "byte_array.h"
+
 #define EF_PHY       0xE020
 
 #define PHY_VIDPID      0x0
@@ -114,8 +116,8 @@ typedef struct phy_data {
 #define PHY_MAX_SIZE    ((2+4)+(2+4)+(2+32)+(2+2)+(2+1)+(2+1)+(2+1)+(2+1)+(2+2))
 
 #ifndef ENABLE_EMULATION
-extern int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len);
-extern int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy);
+extern int phy_serialize_data(const phy_data_t *phy, byte_buffer_t data, uint16_t *len);
+extern int phy_unserialize_data(const_byte_array_t data, phy_data_t *phy);
 extern int phy_init(void);
 extern int phy_save(void);
 extern int phy_load(void);

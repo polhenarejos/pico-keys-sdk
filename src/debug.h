@@ -24,13 +24,15 @@
 #include <stdint.h>
 #include <stdio.h>
 
-static inline void debug_payload_impl(const char *name, const uint8_t *p, size_t s, const char *file, int line) {
-    printf("Payload %s (%zu bytes) [%s:%d]:\n", name, s, file, line);
-    for (size_t i = 0; i < s; i += 16) {
-        printf("%" PRIxPTR "h : ", (uintptr_t)(p + i));
+#include "byte_array.h"
+
+static inline void debug_payload_impl(const char *name, const_byte_array_t data, const char *file, int line) {
+    printf("Payload %s (%zu bytes) [%s:%d]:\n", name, data.len, file, line);
+    for (size_t i = 0; i < data.len; i += 16) {
+        printf("%" PRIxPTR "h : ", (uintptr_t)(data.data + i));
         for (size_t j = 0; j < 16; j++) {
-            if (j < s - i) {
-                printf("%02X ", p[i + j]);
+            if (j < data.len - i) {
+                printf("%02X ", data.data[i + j]);
             }
             else {
                 printf("   ");
@@ -41,8 +43,8 @@ static inline void debug_payload_impl(const char *name, const uint8_t *p, size_t
         }
         printf(":  ");
         for (size_t j = 0; j < 16; j++) {
-            if (j < s - i && p[i + j] > 32 && p[i + j] != 127 && p[i + j] < 176) {
-                printf("%c", p[i + j]);
+            if (j < data.len - i && data.data[i + j] > 32 && data.data[i + j] != 127 && data.data[i + j] < 176) {
+                printf("%c", data.data[i + j]);
             }
             else {
                 printf(" ");
@@ -56,16 +58,16 @@ static inline void debug_payload_impl(const char *name, const uint8_t *p, size_t
     printf("\n");
 }
 
-static inline void debug_data_impl(const char *name, const uint8_t *p, size_t s, const char *file, int line) {
-    printf("Data %s (%zu bytes) [%s:%d]:\n", name, s, file, line);
-    for (size_t i = 0; i < s; i++) {
-        printf("%02X", p[i]);
+static inline void debug_data_impl(const char *name, const_byte_array_t data, const char *file, int line) {
+    printf("Data %s (%zu bytes) [%s:%d]:\n", name, data.len, file, line);
+    for (size_t i = 0; i < data.len; i++) {
+        printf("%02X", data.data[i]);
     }
     printf("\n");
 }
 
-#define DEBUG_PAYLOAD(_p, _s) debug_payload_impl(#_p, (const uint8_t *)(_p), (size_t)(_s), __FILE__, __LINE__)
-#define DEBUG_DATA(_p, _s) debug_data_impl(#_p, (const uint8_t *)(_p), (size_t)(_s), __FILE__, __LINE__)
+#define DEBUG_PAYLOAD(_p, _s) debug_payload_impl(#_p, CONST_BYTE_ARRAY((const uint8_t *)(_p), (size_t)(_s)), __FILE__, __LINE__)
+#define DEBUG_DATA(_p, _s) debug_data_impl(#_p, CONST_BYTE_ARRAY((const uint8_t *)(_p), (size_t)(_s)), __FILE__, __LINE__)
 
 #else
 #define DEBUG_PAYLOAD(_p, _s)

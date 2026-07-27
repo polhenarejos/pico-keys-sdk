@@ -37,30 +37,33 @@
 #define OTP_KEY_2    OTP_DEVK_ROW
 
 
-static bool is_empty_buffer(const uint8_t *buffer, uint16_t buffer_len) {
-    for (int i = 0; i < buffer_len; i++) {
-        if (buffer[i] != 0x00) {
+static bool is_empty_buffer(const_byte_array_t buffer) {
+    for (size_t i = 0; i < buffer.len; i++) {
+        if (buffer.data[i] != 0x00) {
             return false;
         }
     }
     return true;
 }
 
-static int otp_write_data_mode(uint16_t row, const uint8_t *data, uint16_t len, bool is_ecc) {
+static int otp_write_data_mode(uint16_t row, const_byte_array_t data, bool is_ecc) {
+    if (data.len > UINT16_MAX) {
+        return BOOTROM_ERROR_INVALID_STATE;
+    }
     otp_cmd_t cmd = { .flags = row | (is_ecc ? OTP_CMD_ECC_BITS : 0) | OTP_CMD_WRITE_BITS };
-    uint32_t ret = rom_func_otp_access((uint8_t *)data, len, cmd);
+    uint32_t ret = rom_func_otp_access((uint8_t *)data.data, (uint16_t)data.len, cmd);
     if (ret) {
         printf("OTP Write failed with error: %lu\n", ret);
     }
     return ret;
 }
 
-static int otp_write_data(uint16_t row, const uint8_t *data, uint16_t len) {
-    return otp_write_data_mode(row, data, len, true);
+static int otp_write_data(uint16_t row, const_byte_array_t data) {
+    return otp_write_data_mode(row, data, true);
 }
 
-static int otp_write_data_raw(uint16_t row, const uint8_t *data, uint16_t len) {
-    return otp_write_data_mode(row, data, len, false);
+static int otp_write_data_raw(uint16_t row, const_byte_array_t data) {
+    return otp_write_data_mode(row, data, false);
 }
 
 static const uint8_t* otp_buffer(uint16_t row) {
@@ -74,7 +77,7 @@ static const uint8_t* otp_buffer_raw(uint16_t row) {
 }
 
 static bool is_empty_otp_buffer(uint16_t row, uint16_t len) {
-    return is_empty_buffer(otp_buffer_raw(row), len * 2);
+    return is_empty_buffer(CONST_BYTE_ARRAY(otp_buffer_raw(row), len * 2));
 }
 
 static bool is_otp_locked_page(uint8_t page) {
@@ -85,7 +88,7 @@ static bool is_otp_locked_page(uint8_t page) {
 static void otp_lock_page(uint8_t page) {
     if (!is_otp_locked_page(page)) {
         alignas(4) uint32_t value = 0x3c3c3c;
-        otp_write_data_raw(OTP_DATA_PAGE0_LOCK0_ROW + page*2 + 1, (uint8_t *)&value, sizeof(value));
+        otp_write_data_raw(OTP_DATA_PAGE0_LOCK0_ROW + page*2 + 1, CONST_BYTE_ARRAY((uint8_t *)&value, sizeof(value)));
     }
 
     otp_hw->sw_lock[page] = 0b1100;
@@ -96,7 +99,7 @@ static void otp_invalidate_key(uint16_t row, uint16_t len) {
         uint8_t *inval = (uint8_t *)calloc(len * 2, sizeof(uint8_t));
         if (inval) {
             memset(inval, 0xFF, len * 2);
-            otp_write_data_raw(row, inval, len * 2);
+            otp_write_data_raw(row, CONST_BYTE_ARRAY(inval, len * 2));
             mbedtls_platform_zeroize(inval, len * 2);
             free(inval);
         }
@@ -111,7 +114,7 @@ static int otp_chaff(uint16_t row, uint16_t len) {
         for (int i = 0; i < len * 2; i++) {
             chaff[i] ^= 0xFF;
         }
-        int ret = otp_write_data_raw(row + 32, chaff, len * 2);
+        int ret = otp_write_data_raw(row + 32, CONST_BYTE_ARRAY(chaff, len * 2));
         mbedtls_platform_zeroize(chaff, len * 2);
         free(chaff);
         return ret;
@@ -125,7 +128,7 @@ static int otp_migrate_key(uint16_t new_row, uint16_t old_row, uint16_t len) {
         uint8_t *new_key = (uint8_t *)calloc(len, sizeof(uint8_t));
         if (new_key) {
             memcpy(new_key, key, len);
-            int ret = otp_write_data(new_row, new_key, len);
+            int ret = otp_write_data(new_row, CONST_BYTE_ARRAY(new_key, len));
             if (ret == BOOTROM_OK) {
                 otp_chaff(new_row, len);
                 otp_invalidate_key(old_row, 32);
@@ -203,7 +206,7 @@ int otp_platform_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
 
     alignas(2) uint8_t BOOTKEY[] = "\xe1\xd1\x6b\xa7\x64\xab\xd7\x12\xd4\xef\x6e\x3e\xdd\x74\x4e\xd5\x63\x8c\x26\xb\x77\x1c\xf9\x81\x51\x11\xb\xaf\xac\x9b\xc8\x71";
     if (is_empty_otp_buffer(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, 32)) {
-        PICOKEYS_CHECK(otp_write_data(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, BOOTKEY, sizeof(BOOTKEY)));
+        PICOKEYS_CHECK(otp_write_data(OTP_DATA_BOOTKEY0_0_ROW + 0x10*bootkey, CONST_BYTE_ARRAY(BOOTKEY, sizeof(BOOTKEY))));
     }
 
     const uint8_t *boot_flags1 = otp_buffer_raw(OTP_DATA_BOOT_FLAGS1_ROW);
@@ -212,9 +215,9 @@ int otp_platform_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
         flagsb1[1] |= ((OTP_DATA_BOOT_FLAGS1_KEY_INVALID_BITS >> OTP_DATA_BOOT_FLAGS1_KEY_INVALID_LSB) & (~(1 << bootkey)));
     }
 
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_ROW, flagsb1, sizeof(flagsb1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R1_ROW, flagsb1, sizeof(flagsb1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R2_ROW, flagsb1, sizeof(flagsb1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_ROW, CONST_BYTE_ARRAY(flagsb1, sizeof(flagsb1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R1_ROW, CONST_BYTE_ARRAY(flagsb1, sizeof(flagsb1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_BOOT_FLAGS1_R2_ROW, CONST_BYTE_ARRAY(flagsb1, sizeof(flagsb1))));
 
     const uint8_t *crit1 = otp_buffer_raw(OTP_DATA_CRIT1_ROW);
     alignas(4) uint8_t flagsc1[] = { crit1[0] | (1 << OTP_DATA_CRIT1_SECURE_BOOT_ENABLE_LSB), crit1[1], crit1[2], 0x00 };
@@ -223,24 +226,24 @@ int otp_platform_enable_secure_boot(uint8_t bootkey, bool secure_lock) {
         flagsc1[0] |= (1 << OTP_DATA_CRIT1_GLITCH_DETECTOR_ENABLE_LSB);
         flagsc1[0] |= (3 << OTP_DATA_CRIT1_GLITCH_DETECTOR_SENS_LSB);
     }
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R1_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R2_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R3_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R4_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R5_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R6_ROW, flagsc1, sizeof(flagsc1)));
-    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R7_ROW, flagsc1, sizeof(flagsc1)));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_ROW, CONST_BYTE_ARRAY(flagsc1, sizeof(flagsc1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R1_ROW, CONST_BYTE_ARRAY(flagsc1, sizeof(flagsc1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R2_ROW, CONST_BYTE_ARRAY(flagsc1, sizeof(flagsc1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R3_ROW, CONST_BYTE_ARRAY(flagsc1, sizeof(flagsc1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R4_ROW, CONST_BYTE_ARRAY(flagsc1, sizeof(flagsc1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R5_ROW, CONST_BYTE_ARRAY(flagsc1, sizeof(flagsc1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R6_ROW, CONST_BYTE_ARRAY(flagsc1, sizeof(flagsc1))));
+    PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_CRIT1_R7_ROW, CONST_BYTE_ARRAY(flagsc1, sizeof(flagsc1))));
 
     if (secure_lock) {
         const uint8_t *page1 = otp_buffer_raw(OTP_DATA_PAGE1_LOCK1_ROW);
         uint8_t page1v = page1[0] | (OTP_DATA_PAGE1_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE1_LOCK1_LOCK_BL_LSB);
         alignas(4) uint8_t flagsp1[] = { page1v, page1v, page1v, 0x00 };
-        PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_PAGE1_LOCK1_ROW, flagsp1, sizeof(flagsp1)));
+        PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_PAGE1_LOCK1_ROW, CONST_BYTE_ARRAY(flagsp1, sizeof(flagsp1))));
         const uint8_t *page2 = otp_buffer_raw(OTP_DATA_PAGE2_LOCK1_ROW);
         uint8_t page2v = page2[0] | (OTP_DATA_PAGE2_LOCK1_LOCK_BL_VALUE_READ_ONLY << OTP_DATA_PAGE2_LOCK1_LOCK_BL_LSB);
         alignas(4) uint8_t flagsp2[] = { page2v, page2v, page2v, 0x00 };
-        PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_PAGE2_LOCK1_ROW, flagsp2, sizeof(flagsp2)));
+        PICOKEYS_CHECK(otp_write_data_raw(OTP_DATA_PAGE2_LOCK1_ROW, CONST_BYTE_ARRAY(flagsp2, sizeof(flagsp2))));
     }
 
     goto err;
@@ -258,8 +261,8 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
     uint16_t write_otp[2] = {0xFFFF, 0xFFFF};
     if (is_empty_otp_buffer(OTP_KEY_1, 32)) {
         uint8_t mkek[32] = {0};
-        random_fill_buffer(mkek, sizeof(mkek));
-        ret = otp_write_data(OTP_KEY_1, mkek, sizeof(mkek));
+        random_fill_buffer(BYTE_ARRAY(mkek, sizeof(mkek)));
+        ret = otp_write_data(OTP_KEY_1, CONST_BYTE_ARRAY(mkek, sizeof(mkek)));
         if (ret != 0) {
             printf("Error writing OTP key 1 [%d]\n", ret);
         }
@@ -280,7 +283,7 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
             mbedtls_ecp_write_key_ext(&ecdsa, &olen, pkey, sizeof(pkey));
             mbedtls_ecdsa_free(&ecdsa);
         }
-        ret = otp_write_data(OTP_KEY_2, pkey, olen);
+        ret = otp_write_data(OTP_KEY_2, CONST_BYTE_ARRAY(pkey, olen));
         if (ret != 0) {
             printf("Error writing OTP key 2 [%d]\n", ret);
         }

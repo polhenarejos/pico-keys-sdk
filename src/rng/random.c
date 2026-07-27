@@ -25,7 +25,7 @@
 static uint8_t random_pool[256];
 
 void random_init(void) {
-    hwrng_init(random_pool, sizeof(random_pool));
+    hwrng_init(BYTE_ARRAY(random_pool, sizeof(random_pool)));
 
     for (int i = 0; i < HWRNG_PRE_LOOP; i++) {
         hwrng_task();
@@ -41,7 +41,7 @@ const uint8_t *random_bytes_get(size_t len) {
         return NULL;
     }
     static uint8_t return_word[MAX_RANDOM_BUFFER];
-    if (random_fill_buffer(return_word, len) != 0) {
+    if (random_fill_buffer(BYTE_ARRAY(return_word, len)) != 0) {
         return NULL;
     }
     return (const uint8_t *) return_word;
@@ -59,7 +59,7 @@ int random_fill_iterator(void *arg, unsigned char *out, size_t out_len) {
             ret = -1;
             break;
         }
-        size_t n = hwrng_read(out, out_len);
+        size_t n = hwrng_read(BYTE_ARRAY(out, out_len));
         if (n == 0) {
             hwrng_task();
             continue;
@@ -74,6 +74,6 @@ int random_fill_iterator(void *arg, unsigned char *out, size_t out_len) {
     return ret;
 }
 
-int random_fill_buffer(uint8_t *buf, size_t n) {
-    return random_fill_iterator(NULL, buf, n);
+int random_fill_buffer(byte_array_t buffer) {
+    return random_fill_iterator(NULL, buffer.data, buffer.len);
 }

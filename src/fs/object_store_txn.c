@@ -106,15 +106,15 @@ static void file_object_txn_auth_abort(const file_object_authenticator_t *auth) 
     }
 }
 
-static int file_object_txn_auth_buffer(const file_object_authenticator_t *auth, const uint8_t *first, size_t first_len, const uint8_t *second, size_t second_len, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
+static int file_object_txn_auth_buffer(const file_object_authenticator_t *auth, const_byte_array_t first, const_byte_array_t second, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
     int r = auth->start(auth->ctx);
     if (r != PICOKEYS_OK) {
         file_object_txn_auth_abort(auth);
         return r;
     }
-    r = auth->update(auth->ctx, first, first_len);
-    if (r == PICOKEYS_OK && second_len > 0) {
-        r = auth->update(auth->ctx, second, second_len);
+    r = auth->update(auth->ctx, first);
+    if (r == PICOKEYS_OK && second.len > 0) {
+        r = auth->update(auth->ctx, second);
     }
     if (r == PICOKEYS_OK) {
         r = auth->finish(auth->ctx, tag);
@@ -131,15 +131,15 @@ static int file_object_txn_auth_record(const file_object_authenticator_t *auth, 
         file_object_txn_auth_abort(auth);
         return r;
     }
-    r = auth->update(auth->ctx, header, FILE_OBJECT_TXN_RECORD_HEADER_SIZE);
+    r = auth->update(auth->ctx, CONST_BYTE_ARRAY(header, FILE_OBJECT_TXN_RECORD_HEADER_SIZE));
 
     uint8_t buffer[FILE_OBJECT_TXN_READ_CHUNK_SIZE];
     uint32_t offset = 0;
     while (r == PICOKEYS_OK && offset < payload_size) {
         size_t chunk = MIN(sizeof(buffer), payload_size - offset);
-        r = file_read_at(file, FILE_OBJECT_TXN_RECORD_HEADER_SIZE + offset, buffer, chunk);
+        r = file_read_at(file, FILE_OBJECT_TXN_RECORD_HEADER_SIZE + offset, BYTE_ARRAY(buffer, chunk));
         if (r == PICOKEYS_OK) {
-            r = auth->update(auth->ctx, buffer, chunk);
+            r = auth->update(auth->ctx, CONST_BYTE_ARRAY(buffer, chunk));
         }
         offset += chunk;
     }
@@ -168,7 +168,7 @@ static int file_object_txn_validate_record(const file_object_txn_layout_t *layou
     }
 
     uint8_t header[FILE_OBJECT_TXN_RECORD_HEADER_SIZE];
-    int r = file_read_at(file, 0, header, sizeof(header));
+    int r = file_read_at(file, 0, BYTE_ARRAY(header, sizeof(header)));
     if (r != PICOKEYS_OK) {
         return r;
     }
@@ -192,7 +192,7 @@ static int file_object_txn_validate_record(const file_object_txn_layout_t *layou
     uint8_t stored_tag[FILE_OBJECT_AUTH_TAG_SIZE];
     r = file_object_txn_auth_record(auth, file, header, payload_size, calculated_tag);
     if (r == PICOKEYS_OK) {
-        r = file_read_at(file, FILE_OBJECT_TXN_RECORD_HEADER_SIZE + payload_size, stored_tag, sizeof(stored_tag));
+        r = file_read_at(file, FILE_OBJECT_TXN_RECORD_HEADER_SIZE + payload_size, BYTE_ARRAY(stored_tag, sizeof(stored_tag)));
     }
     if (r == PICOKEYS_OK && (!file_object_txn_tag_equal(calculated_tag, stored_tag) || !file_object_txn_tag_equal(calculated_tag, commit_record_tag))) {
         r = PICOKEYS_WRONG_SIGNATURE;
@@ -212,7 +212,7 @@ static int file_object_txn_parse_commit(const file_object_txn_layout_t *layout, 
     }
 
     uint8_t commit[FILE_OBJECT_TXN_COMMIT_SIZE];
-    int r = file_read_at(file, 0, commit, sizeof(commit));
+    int r = file_read_at(file, 0, BYTE_ARRAY(commit, sizeof(commit)));
     if (r != PICOKEYS_OK) {
         return r;
     }
@@ -236,7 +236,7 @@ static int file_object_txn_parse_commit(const file_object_txn_layout_t *layout, 
     }
 
     uint8_t calculated_tag[FILE_OBJECT_AUTH_TAG_SIZE];
-    r = file_object_txn_auth_buffer(auth, commit, FILE_OBJECT_TXN_COMMIT_HEADER_SIZE, NULL, 0, calculated_tag);
+    r = file_object_txn_auth_buffer(auth, CONST_BYTE_ARRAY(commit, FILE_OBJECT_TXN_COMMIT_HEADER_SIZE), CONST_BYTE_ARRAY(NULL, 0), calculated_tag);
     if (r == PICOKEYS_OK && !file_object_txn_tag_equal(calculated_tag, commit + FILE_OBJECT_TXN_COMMIT_TAG_OFFSET)) {
         r = PICOKEYS_WRONG_SIGNATURE;
     }
@@ -362,7 +362,7 @@ static int file_object_txn_remove_file(uint16_t fid) {
     return file_delete_no_commit(file);
 }
 
-static int file_object_txn_replace_file(uint16_t fid, const uint8_t *data, uint32_t len) {
+static int file_object_txn_replace_file(uint16_t fid, const_byte_array_t data) {
     int r = file_object_txn_remove_file(fid);
     if (r != PICOKEYS_OK) {
         return r;
@@ -371,13 +371,14 @@ static int file_object_txn_replace_file(uint16_t fid, const uint8_t *data, uint3
     if (!file) {
         return PICOKEYS_ERR_NO_MEMORY;
     }
-    return file_put_data(file, data, len);
+    return file_put_data(file, data);
 }
 
-static int file_object_txn_write_record(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, uint8_t slot, uint32_t generation, uint32_t record_id, const uint8_t *data, uint32_t len, uint8_t record_tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
-    if (len > UINT32_MAX - FILE_OBJECT_TXN_RECORD_HEADER_SIZE - FILE_OBJECT_AUTH_TAG_SIZE) {
+static int file_object_txn_write_record(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, uint8_t slot, uint32_t generation, uint32_t record_id, const_byte_array_t data, uint8_t record_tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
+    if (data.len > UINT32_MAX - FILE_OBJECT_TXN_RECORD_HEADER_SIZE - FILE_OBJECT_AUTH_TAG_SIZE) {
         return PICOKEYS_ERR_NO_MEMORY;
     }
+    uint32_t len = (uint32_t)data.len;
     uint32_t record_size = FILE_OBJECT_TXN_RECORD_HEADER_SIZE + len + FILE_OBJECT_AUTH_TAG_SIZE;
     uint8_t *record = (uint8_t *)calloc(1, record_size);
     if (!record) {
@@ -396,13 +397,13 @@ static int file_object_txn_write_record(const file_object_txn_layout_t *layout, 
     put_uint32_be(len, record + FILE_OBJECT_TXN_PAYLOAD_SIZE_OFFSET);
     put_uint16_be(layout->record_fid[slot], record + FILE_OBJECT_TXN_RECORD_FID_OFFSET);
     if (len > 0) {
-        memcpy(record + FILE_OBJECT_TXN_RECORD_HEADER_SIZE, data, len);
+        memcpy(record + FILE_OBJECT_TXN_RECORD_HEADER_SIZE, data.data, len);
     }
 
-    int r = file_object_txn_auth_buffer(auth, record, FILE_OBJECT_TXN_RECORD_HEADER_SIZE, data, len, record_tag);
+    int r = file_object_txn_auth_buffer(auth, CONST_BYTE_ARRAY(record, FILE_OBJECT_TXN_RECORD_HEADER_SIZE), data, record_tag);
     if (r == PICOKEYS_OK) {
         memcpy(record + FILE_OBJECT_TXN_RECORD_HEADER_SIZE + len, record_tag, FILE_OBJECT_AUTH_TAG_SIZE);
-        r = file_object_txn_replace_file(layout->record_fid[slot], record, record_size);
+        r = file_object_txn_replace_file(layout->record_fid[slot], CONST_BYTE_ARRAY(record, record_size));
     }
     memset(record, 0, record_size);
     free(record);
@@ -432,9 +433,9 @@ static int file_object_txn_write_commit(const file_object_txn_layout_t *layout, 
         memcpy(commit + FILE_OBJECT_TXN_COMMIT_RECORD_TAG_OFFSET, record_tag, FILE_OBJECT_AUTH_TAG_SIZE);
     }
 
-    int r = file_object_txn_auth_buffer(auth, commit, FILE_OBJECT_TXN_COMMIT_HEADER_SIZE, NULL, 0, commit + FILE_OBJECT_TXN_COMMIT_TAG_OFFSET);
+    int r = file_object_txn_auth_buffer(auth, CONST_BYTE_ARRAY(commit, FILE_OBJECT_TXN_COMMIT_HEADER_SIZE), CONST_BYTE_ARRAY(NULL, 0), commit + FILE_OBJECT_TXN_COMMIT_TAG_OFFSET);
     if (r == PICOKEYS_OK) {
-        r = file_object_txn_replace_file(layout->commit_fid[commit_slot], commit, sizeof(commit));
+        r = file_object_txn_replace_file(layout->commit_fid[commit_slot], CONST_BYTE_ARRAY(commit, sizeof(commit)));
     }
     memset(commit, 0, sizeof(commit));
     return r;
@@ -505,8 +506,8 @@ int file_object_txn_get_info(file_object_txn_handle_t handle, const file_object_
     return PICOKEYS_OK;
 }
 
-int file_object_txn_read_at(file_object_txn_handle_t handle, const file_object_authenticator_t *auth, uint32_t offset, uint8_t *data, size_t len) {
-    if (!file_object_txn_auth_valid(auth) || (!data && len > 0)) {
+int file_object_txn_read_at(file_object_txn_handle_t handle, const file_object_authenticator_t *auth, uint32_t offset, byte_array_t data) {
+    if (!file_object_txn_auth_valid(auth) || (!data.data && data.len > 0)) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
 
@@ -516,12 +517,12 @@ int file_object_txn_read_at(file_object_txn_handle_t handle, const file_object_a
     if (r != PICOKEYS_OK) {
         return r;
     }
-    if (offset > state.payload_size || len > state.payload_size - offset) {
+    if (offset > state.payload_size || data.len > state.payload_size - offset) {
         return PICOKEYS_WRONG_LENGTH;
     }
 
     file_t *file = file_search(entry->layout.record_fid[state.record_slot]);
-    return file_read_at(file, FILE_OBJECT_TXN_RECORD_HEADER_SIZE + offset, data, len);
+    return file_read_at(file, FILE_OBJECT_TXN_RECORD_HEADER_SIZE + offset, data);
 }
 
 int file_object_txn_close(file_object_txn_handle_t handle) {
@@ -533,10 +534,15 @@ int file_object_txn_close(file_object_txn_handle_t handle) {
     return PICOKEYS_OK;
 }
 
-int file_object_txn_put(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, const uint8_t *data, uint32_t len) {
-    if (!file_object_txn_layout_valid(layout) || !file_object_txn_auth_valid(auth) || (!data && len > 0)) {
+int file_object_txn_put(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, const_byte_array_t data) {
+    if (!file_object_txn_layout_valid(layout) || !file_object_txn_auth_valid(auth) || (!data.data && data.len > 0)) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
+    if (data.len > UINT32_MAX) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+
+    uint32_t len = (uint32_t) data.len;
 
     uint8_t target_slot = 0;
     uint32_t generation = 0;
@@ -551,7 +557,7 @@ int file_object_txn_put(const file_object_txn_layout_t *layout, const file_objec
 
     uint8_t record_tag[FILE_OBJECT_AUTH_TAG_SIZE] = { 0 };
     if (r == PICOKEYS_OK) {
-        r = file_object_txn_write_record(layout, auth, target_slot, generation, generation, data, len, record_tag);
+        r = file_object_txn_write_record(layout, auth, target_slot, generation, generation, data, record_tag);
     }
     if (r == PICOKEYS_OK && !flash_commit_sync(FILE_OBJECT_TXN_COMMIT_TIMEOUT_MS)) {
         r = PICOKEYS_ERR_MEMORY_FATAL;

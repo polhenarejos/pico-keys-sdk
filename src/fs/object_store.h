@@ -22,6 +22,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "byte_array.h"
+
 #define FILE_OBJECT_FORMAT_VERSION 1u
 #define FILE_OBJECT_HEADER_SIZE 20u
 #define FILE_OBJECT_INVALID_HANDLE 0u
@@ -47,7 +49,7 @@ typedef struct file_object_info {
 typedef struct file_object_authenticator {
     void *ctx;
     int (*start)(void *ctx);
-    int (*update)(void *ctx, const uint8_t *data, size_t len);
+    int (*update)(void *ctx, const_byte_array_t data);
     int (*finish)(void *ctx, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]);
     void (*abort)(void *ctx);
 } file_object_authenticator_t;
@@ -65,17 +67,17 @@ typedef uint32_t file_object_txn_handle_t;
 
 int file_object_open(const file_object_id_t *object_id, file_object_handle_t *handle);
 int file_object_get_info(file_object_handle_t handle, file_object_info_t *info);
-int file_object_read_at(file_object_handle_t handle, uint32_t offset, uint8_t *data, size_t len);
+int file_object_read_at(file_object_handle_t handle, uint32_t offset, byte_array_t data);
 int file_object_close(file_object_handle_t handle);
-int file_object_put(const file_object_id_t *object_id, const uint8_t *data, uint32_t len);
+int file_object_put(const file_object_id_t *object_id, const_byte_array_t data);
 int file_object_delete_no_commit(const file_object_id_t *object_id);
 int file_object_delete(const file_object_id_t *object_id);
 
 int file_object_txn_open(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, file_object_txn_handle_t *handle);
 int file_object_txn_get_info(file_object_txn_handle_t handle, const file_object_authenticator_t *auth, file_object_info_t *info);
-int file_object_txn_read_at(file_object_txn_handle_t handle, const file_object_authenticator_t *auth, uint32_t offset, uint8_t *data, size_t len);
+int file_object_txn_read_at(file_object_txn_handle_t handle, const file_object_authenticator_t *auth, uint32_t offset, byte_array_t data);
 int file_object_txn_close(file_object_txn_handle_t handle);
-int file_object_txn_put(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, const uint8_t *data, uint32_t len);
+int file_object_txn_put(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth, const_byte_array_t data);
 int file_object_txn_delete(const file_object_txn_layout_t *layout, const file_object_authenticator_t *auth);
 
 #endif // _OBJECT_STORE_H_

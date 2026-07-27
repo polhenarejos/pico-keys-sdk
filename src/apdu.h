@@ -21,6 +21,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+
+#include "byte_array.h"
 #include "compat/compat.h"
 
 typedef struct app {
@@ -30,9 +32,9 @@ typedef struct app {
     int (*unload)(void);
 } app_t;
 
-extern bool app_exists(const uint8_t *aid, size_t aid_len);
+extern bool app_exists(const_byte_array_t aid);
 extern int register_app(int (*)(app_t *, uint8_t), const uint8_t *);
-extern int select_app(const uint8_t *aid, size_t aid_len);
+extern int select_app(const_byte_array_t aid);
 
 typedef struct cmd {
     uint8_t ins;
@@ -66,7 +68,7 @@ extern struct apdu apdu;
 
 extern uint16_t set_res_sw(uint8_t sw1, uint8_t sw2);
 extern int process_apdu(void);
-extern uint16_t apdu_process(uint8_t, const uint8_t *buffer, uint16_t buffer_size);
+extern uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer);
 extern void apdu_finish(void);
 extern uint16_t apdu_next(void);
 extern uint16_t apdu_limit_response(uint16_t size_next, uint16_t max_size);

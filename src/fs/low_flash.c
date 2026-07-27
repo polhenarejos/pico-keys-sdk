@@ -319,24 +319,24 @@ static page_flash_t *find_free_page(uintptr_t addr) {
     return NULL;
 }
 
-int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
-    if (!data || len == 0) {
+int flash_program_block(uintptr_t addr, const_byte_array_t data) {
+    if (!data.data || data.len == 0) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
 
-    while (len > 0) {
+    while (data.len > 0) {
         size_t page_offset = addr & (FLASH_SECTOR_SIZE - 1);
-        size_t chunk = MIN(len, FLASH_SECTOR_SIZE - page_offset);
+        size_t chunk = MIN(data.len, FLASH_SECTOR_SIZE - page_offset);
         page_flash_t *p = NULL;
 
         mutex_enter_blocking(&mtx_flash);
         p = find_free_page(addr);
         if (p) {
-            memcpy(&p->page[page_offset], data, chunk);
+            memcpy(&p->page[page_offset], data.data, chunk);
             mutex_exit(&mtx_flash);
             addr += chunk;
-            data += chunk;
-            len -= chunk;
+            data.data += chunk;
+            data.len -= chunk;
             continue;
         }
         mutex_exit(&mtx_flash);
@@ -351,15 +351,15 @@ int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len) {
 }
 
 int flash_program_halfword(uintptr_t addr, uint16_t data) {
-    return flash_program_block(addr, (const uint8_t *) &data, sizeof(uint16_t));
+    return flash_program_block(addr, CONST_BYTE_ARRAY((const uint8_t *)&data, sizeof(uint16_t)));
 }
 
 int flash_program_word(uintptr_t addr, uint32_t data) {
-    return flash_program_block(addr,  (const uint8_t *) &data, sizeof(uint32_t));
+    return flash_program_block(addr, CONST_BYTE_ARRAY((const uint8_t *)&data, sizeof(uint32_t)));
 }
 
 int flash_program_uintptr(uintptr_t addr, uintptr_t data) {
-    return flash_program_block(addr,  (const uint8_t *) &data, sizeof(uintptr_t));
+    return flash_program_block(addr, CONST_BYTE_ARRAY((const uint8_t *)&data, sizeof(uintptr_t)));
 }
 
 uint8_t *flash_read(uintptr_t addr) {
@@ -384,15 +384,15 @@ uint8_t *flash_read(uintptr_t addr) {
     return v;
 }
 
-int flash_read_block(uintptr_t addr, uint8_t *data, size_t len) {
-    if (!data || len == 0) {
+int flash_read_block(uintptr_t addr, byte_array_t data) {
+    if (!data.data || data.len == 0) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
 
-    while (len > 0) {
+    while (data.len > 0) {
         uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
         size_t page_offset = addr & (FLASH_SECTOR_SIZE - 1);
-        size_t chunk = MIN(len, FLASH_SECTOR_SIZE - page_offset);
+        size_t chunk = MIN(data.len, FLASH_SECTOR_SIZE - page_offset);
         const uint8_t *source = NULL;
 
         mutex_enter_blocking(&mtx_flash);
@@ -409,12 +409,12 @@ int flash_read_block(uintptr_t addr, uint8_t *data, size_t len) {
             source = (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (const uint8_t *)(map + addr) : (const uint8_t *)addr;
 #endif
         }
-        memcpy(data, source, chunk);
+        memcpy(data.data, source, chunk);
         mutex_exit(&mtx_flash);
 
         addr += chunk;
-        data += chunk;
-        len -= chunk;
+        data.data += chunk;
+        data.len -= chunk;
     }
     return PICOKEYS_OK;
 }
@@ -423,7 +423,7 @@ uintptr_t flash_read_uintptr(uintptr_t addr) {
     uint8_t p[sizeof(uintptr_t)];
     uintptr_t v = 0x0;
 
-    flash_read_block(addr, p, sizeof(p));
+    flash_read_block(addr, BYTE_ARRAY(p, sizeof(p)));
     for (size_t i = 0; i < sizeof(uintptr_t); i++) {
         v |= (uintptr_t) p[i] << (8 * i);
     }
@@ -434,7 +434,7 @@ uint16_t flash_read_uint16(uintptr_t addr) {
     uint8_t p[sizeof(uint16_t)];
     uint16_t v = 0x0;
 
-    flash_read_block(addr, p, sizeof(p));
+    flash_read_block(addr, BYTE_ARRAY(p, sizeof(p)));
     for (size_t i = 0; i < sizeof(uint16_t); i++) {
         v |= p[i] << (8 * i);
     }
@@ -445,7 +445,7 @@ uint32_t flash_read_uint32(uintptr_t addr) {
     uint8_t p[sizeof(uint32_t)];
     uint32_t v = 0x0;
 
-    flash_read_block(addr, p, sizeof(p));
+    flash_read_block(addr, BYTE_ARRAY(p, sizeof(p)));
     for (size_t i = 0; i < sizeof(uint32_t); i++) {
         v |= (uint32_t)p[i] << (8 * i);
     }
@@ -478,7 +478,9 @@ int flash_erase_page(uintptr_t addr, size_t page_size) {
     return PICOKEYS_OK;
 }
 
-bool flash_check_blank(const uint8_t *p_start, size_t size) {
+bool flash_check_blank(const_byte_array_t data) {
+    const uint8_t *p_start = data.data;
+    size_t size = data.len;
     const uint8_t *p;
 
     for (p = p_start; p < p_start + size; p++) {
@@ -514,7 +516,7 @@ void phymarker_write(void) {
         .crc32 = 0x00000000
     };
     memcpy(pm.uid, pico_serial.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);
-    pm.crc32 = crc32c((const uint8_t *)&pm, sizeof(phymarker_t) - sizeof(uint32_t));
+    pm.crc32 = crc32c(CONST_BYTE_ARRAY((const uint8_t *)&pm, sizeof(phymarker_t) - sizeof(uint32_t)));
 
     uint8_t buf[FLASH_PAGE_SIZE] = {0};
     memcpy(buf, &pm, sizeof(phymarker_t));

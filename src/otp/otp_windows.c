@@ -16,6 +16,7 @@
  */
 
 #include "picokeys.h"
+#include "byte_array.h"
 #include "otp_platform.h"
 
 #if defined(_MSC_VER)
@@ -63,17 +64,17 @@ static const char *ncrypt_status_hint(SECURITY_STATUS st) {
     }
 }
 
-static int read_tpm_pin_prompt(const char *prompt, char *pin_out, size_t pin_out_size) {
+static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t pin_out) {
     const char *pin_env = getenv("PICO_NOVUS_TPM_PIN");
-    if (!pin_out || pin_out_size < 2) {
+    if (!pin_out.data || pin_out.capacity < 2) {
         return -1;
     }
     if (pin_env && pin_env[0] != '\0') {
         size_t n = strlen(pin_env);
-        if (n >= pin_out_size) {
+        if (n >= pin_out.capacity) {
             return -1;
         }
-        memcpy(pin_out, pin_env, n + 1);
+        memcpy(pin_out.data, pin_env, n + 1);
         return 0;
     }
 
@@ -96,21 +97,21 @@ static int read_tpm_pin_prompt(const char *prompt, char *pin_out, size_t pin_out
     if (!SetConsoleMode(h_in, new_mode)) {
         return -1;
     }
-    if (!fgets(pin_out, (int)pin_out_size, stdin)) {
+    if (!fgets((char *)pin_out.data, (int)pin_out.capacity, stdin)) {
         SetConsoleMode(h_in, old_mode);
         fprintf(stderr, "\n");
         return -1;
     }
     SetConsoleMode(h_in, old_mode);
     fprintf(stderr, "\n");
-    size_t n = strlen(pin_out);
-    if (n > 0 && pin_out[n - 1] == '\n') {
-        pin_out[n - 1] = '\0';
+    size_t n = strlen((const char *)pin_out.data);
+    if (n > 0 && pin_out.data[n - 1] == '\n') {
+        pin_out.data[n - 1] = '\0';
     }
-    if (n > 1 && pin_out[n - 2] == '\r') {
-        pin_out[n - 2] = '\0';
+    if (n > 1 && pin_out.data[n - 2] == '\r') {
+        pin_out.data[n - 2] = '\0';
     }
-    return (pin_out[0] != '\0') ? 0 : -1;
+    return (pin_out.data[0] != '\0') ? 0 : -1;
 }
 
 static int key_exists_by_name(NCRYPT_PROV_HANDLE prov, LPCWSTR key_name, int *exists_out) {
@@ -225,7 +226,9 @@ static int probe_tpm_native_pin_support(NCRYPT_PROV_HANDLE prov) {
     return 1;
 }
 
-static int derive_secp256k1_privkey_from_secret(const uint8_t *secret, size_t secret_len, uint8_t out_key32[32]) {
+static int derive_secp256k1_privkey_from_secret(const_byte_array_t secret_data, uint8_t out_key32[32]) {
+    const uint8_t *secret = secret_data.data;
+    size_t secret_len = secret_data.len;
     int rc = -1;
     uint8_t digest[32];
     const uint8_t label[] = "pico-novus/se-ecdh-to-k1-v1";
@@ -398,7 +401,7 @@ static int windows_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
             win_err("NCryptDeriveKey(data/fallback)", st);
             goto cleanup;
         }
-        if (derive_secp256k1_privkey_from_secret(raw_secret, (size_t)raw_secret_len, out_key32) != 0) {
+        if (derive_secp256k1_privkey_from_secret(CONST_BYTE_ARRAY(raw_secret, (size_t)raw_secret_len), out_key32) != 0) {
             fprintf(stderr, "[win-tpm] failed deriving secp256k1 private key in software fallback\n");
             goto cleanup;
         }
@@ -430,13 +433,13 @@ static int windows_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     }
     if (pin_supported) {
         if (!key_exists) {
-            if (read_tpm_pin_prompt("Set TPM key PIN: ", pin, sizeof(pin)) != 0) {
+            if (read_tpm_pin_prompt("Set TPM key PIN: ", BYTE_BUFFER((uint8_t *)pin, sizeof(pin))) != 0) {
                 fprintf(stderr, "[win-tpm] PIN is required to provision TPM key\n");
                 goto cleanup;
             }
             if (!getenv("PICO_NOVUS_TPM_PIN") && _isatty(_fileno(stdin))) {
                 char confirm[128] = {0};
-                if (read_tpm_pin_prompt("Confirm TPM key PIN: ", confirm, sizeof(confirm)) != 0 || strcmp(pin, confirm) != 0) {
+                if (read_tpm_pin_prompt("Confirm TPM key PIN: ", BYTE_BUFFER((uint8_t *)confirm, sizeof(confirm))) != 0 || strcmp(pin, confirm) != 0) {
                     fprintf(stderr, "[win-tpm] PIN confirmation mismatch\n");
                     SecureZeroMemory(confirm, sizeof(confirm));
                     goto cleanup;
@@ -445,7 +448,7 @@ static int windows_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
             }
         }
         else {
-            if (read_tpm_pin_prompt("Enter TPM key PIN: ", pin, sizeof(pin)) != 0) {
+            if (read_tpm_pin_prompt("Enter TPM key PIN: ", BYTE_BUFFER((uint8_t *)pin, sizeof(pin))) != 0) {
                 fprintf(stderr, "[win-tpm] PIN is required to unlock TPM key\n");
                 goto cleanup;
             }
@@ -506,7 +509,7 @@ static int windows_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
         goto cleanup;
     }
 
-    if (derive_secp256k1_privkey_from_secret(raw_secret, (size_t)raw_secret_len, out_key32) != 0) {
+    if (derive_secp256k1_privkey_from_secret(CONST_BYTE_ARRAY(raw_secret, (size_t)raw_secret_len), out_key32) != 0) {
         fprintf(stderr, "[win-tpm] failed deriving secp256k1 private key from ECDH secret\n");
         goto cleanup;
     }

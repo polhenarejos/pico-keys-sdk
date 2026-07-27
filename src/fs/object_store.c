@@ -60,7 +60,7 @@ static int file_object_parse(file_t *file, const file_object_id_t *object_id, fi
     }
 
     uint8_t header[FILE_OBJECT_HEADER_SIZE];
-    if (file_read_at(file, 0, header, sizeof(header)) != PICOKEYS_OK) {
+    if (file_read_at(file, 0, BYTE_ARRAY(header, sizeof(header))) != PICOKEYS_OK) {
         return PICOKEYS_EXEC_ERROR;
     }
     uint32_t payload_size = get_uint32_be(header + FILE_OBJECT_PAYLOAD_SIZE_OFFSET);
@@ -170,8 +170,8 @@ int file_object_get_info(file_object_handle_t handle, file_object_info_t *info) 
     return PICOKEYS_OK;
 }
 
-int file_object_read_at(file_object_handle_t handle, uint32_t offset, uint8_t *data, size_t len) {
-    if (!data && len > 0) {
+int file_object_read_at(file_object_handle_t handle, uint32_t offset, byte_array_t data) {
+    if (!data.data && data.len > 0) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
 
@@ -181,10 +181,10 @@ int file_object_read_at(file_object_handle_t handle, uint32_t offset, uint8_t *d
     if (r != PICOKEYS_OK) {
         return r;
     }
-    if (offset > record.payload_size || len > record.payload_size - offset) {
+    if (offset > record.payload_size || data.len > record.payload_size - offset) {
         return PICOKEYS_WRONG_LENGTH;
     }
-    return file_read_at(file, record.payload_offset + offset, data, len);
+    return file_read_at(file, record.payload_offset + offset, data);
 }
 
 int file_object_close(file_object_handle_t handle) {
@@ -196,10 +196,14 @@ int file_object_close(file_object_handle_t handle) {
     return PICOKEYS_OK;
 }
 
-int file_object_put(const file_object_id_t *object_id, const uint8_t *data, uint32_t len) {
-    if (!file_object_id_valid(object_id) || (!data && len > 0)) {
+int file_object_put(const file_object_id_t *object_id, const_byte_array_t data) {
+    uint32_t len = 0;
+
+    if (!file_object_id_valid(object_id) || (!data.data && data.len > 0) || data.len > UINT32_MAX) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
+
+    len = (uint32_t)data.len;
 
     file_t *file = file_search(object_id->fid);
     uint32_t generation = 1;
@@ -238,10 +242,10 @@ int file_object_put(const file_object_id_t *object_id, const uint8_t *data, uint
     put_uint32_be(generation, record + FILE_OBJECT_GENERATION_OFFSET);
     put_uint32_be(len, record + FILE_OBJECT_PAYLOAD_SIZE_OFFSET);
     if (len > 0) {
-        memcpy(record + FILE_OBJECT_HEADER_SIZE, data, len);
+        memcpy(record + FILE_OBJECT_HEADER_SIZE, data.data, len);
     }
 
-    int r = file_put_data(file, record, record_size);
+    int r = file_put_data(file, CONST_BYTE_ARRAY(record, record_size));
     memset(record, 0, record_size);
     free(record);
     return r;

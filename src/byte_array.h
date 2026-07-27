@@ -15,26 +15,29 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifndef _BYTE_ARRAY_H_
+#define _BYTE_ARRAY_H_
 
-#ifndef _RANDOM_H_
-#define _RANDOM_H_
-
-#include <stdlib.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-
-#include "byte_array.h"
 
 typedef struct {
-    uint8_t index;
-    volatile bool cancel;
-} random_fill_iterator_ctx_t;
+    uint8_t *data;
+    size_t len;
+} byte_array_t;
 
-extern void
-random_init(void);
+typedef struct {
+    uint8_t *data;
+    size_t capacity;
+} byte_buffer_t;
 
-extern const uint8_t *random_bytes_get(size_t);
-extern int random_fill_iterator(void *arg, unsigned char *output, size_t output_len);
-extern int random_fill_buffer(byte_array_t buffer);
+typedef struct {
+    const uint8_t *data;
+    size_t len;
+} const_byte_array_t;
+
+#define BYTE_ARRAY(buffer_, length_) ((byte_array_t){ .data = (buffer_), .len = (length_) })
+#define BYTE_BUFFER(buffer_, capacity_) ((byte_buffer_t){ .data = (buffer_), .capacity = (capacity_) })
+#define CONST_BYTE_ARRAY(buffer_, length_) ((const_byte_array_t){ .data = (buffer_), .len = (length_) })
 
 #endif

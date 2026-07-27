@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "byte_array.h"
+
 #define FLASH_FILE_EXTENDED_LENGTH 0xffffu
 #define FLASH_FILE_LEGACY_LENGTH_SIZE sizeof(uint16_t)
 #define FLASH_FILE_EXTENDED_LENGTH_SIZE (sizeof(uint16_t) + sizeof(uint32_t))
@@ -32,9 +34,9 @@ extern uint32_t flash_num_files(void);
 extern uint32_t flash_size(void);
 
 extern void flash_set_bounds(uintptr_t start, uintptr_t end);
-extern int flash_write_data_to_file(file_t *file, const uint8_t *data, uint32_t len);
-extern int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset);
-extern int flash_program_block(uintptr_t addr, const uint8_t *data, size_t len);
+extern int flash_write_data_to_file(file_t *file, const_byte_array_t data);
+extern int flash_write_data_to_file_offset(file_t *file, const_byte_array_t data, uint32_t offset);
+extern int flash_program_block(uintptr_t addr, const_byte_array_t data);
 extern int flash_program_halfword(uintptr_t addr, uint16_t data);
 extern int flash_program_word(uintptr_t addr, uint32_t data);
 extern int flash_program_uintptr(uintptr_t addr, uintptr_t data);
@@ -43,9 +45,9 @@ extern uint16_t flash_read_uint16(uintptr_t addr);
 extern uint32_t flash_read_uint32(uintptr_t addr);
 extern uint8_t flash_read_uint8(uintptr_t addr);
 extern uint8_t *flash_read(uintptr_t addr);
-extern int flash_read_block(uintptr_t addr, uint8_t *data, size_t len);
+extern int flash_read_block(uintptr_t addr, byte_array_t data);
 extern int flash_erase_page(uintptr_t addr, size_t page_size);
-extern bool flash_check_blank(const uint8_t *p_start, size_t size);
+extern bool flash_check_blank(const_byte_array_t data);
 extern void flash_task(void);
 extern void low_flash_init(void);
 extern void flash_commit(void);

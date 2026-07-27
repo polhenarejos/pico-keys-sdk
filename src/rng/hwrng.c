@@ -94,16 +94,16 @@ static inline void hwrng_unlock(void) {
     }
 }
 
-static void hwrng_buf_init(struct hwrng_buf *rb, uint8_t *p, size_t size) {
-    rb->buf = p;
-    rb->size = size;
+static void hwrng_buf_init(struct hwrng_buf *rb, byte_array_t buffer) {
+    rb->buf = buffer.data;
+    rb->size = buffer.len;
     rb->head = rb->tail = 0;
     rb->count = 0;
 }
 
-static size_t hwrng_buf_add(struct hwrng_buf *rb, const uint8_t *data, size_t len) {
+static size_t hwrng_buf_add(struct hwrng_buf *rb, const_byte_array_t data) {
     size_t room = rb->size - rb->count;
-    size_t n = len < room ? len : room;
+    size_t n = data.len < room ? data.len : room;
     size_t tail = rb->tail;
     size_t first = n;
 
@@ -111,7 +111,7 @@ static size_t hwrng_buf_add(struct hwrng_buf *rb, const uint8_t *data, size_t le
         first = rb->size - tail;
     }
     if (first) {
-        memcpy(rb->buf + tail, data, first);
+        memcpy(rb->buf + tail, data.data, first);
         tail += first;
         if (tail >= rb->size) {
             tail = 0;
@@ -119,7 +119,7 @@ static size_t hwrng_buf_add(struct hwrng_buf *rb, const uint8_t *data, size_t le
     }
     if (n > first) {
         size_t second = n - first;
-        memcpy(rb->buf + tail, data + first, second);
+        memcpy(rb->buf + tail, data.data + first, second);
         tail += second;
     }
     rb->tail = tail;
@@ -127,8 +127,8 @@ static size_t hwrng_buf_add(struct hwrng_buf *rb, const uint8_t *data, size_t le
     return n;
 }
 
-static size_t hwrng_buf_del(struct hwrng_buf *rb, uint8_t *data, size_t len) {
-    size_t n = len < rb->count ? len : rb->count;
+static size_t hwrng_buf_del(struct hwrng_buf *rb, byte_array_t data) {
+    size_t n = data.len < rb->count ? data.len : rb->count;
     size_t head = rb->head;
     size_t first = n;
 
@@ -136,7 +136,7 @@ static size_t hwrng_buf_del(struct hwrng_buf *rb, uint8_t *data, size_t len) {
         first = rb->size - head;
     }
     if (first) {
-        memcpy(data, rb->buf + head, first);
+        memcpy(data.data, rb->buf + head, first);
         head += first;
         if (head >= rb->size) {
             head = 0;
@@ -144,7 +144,7 @@ static size_t hwrng_buf_del(struct hwrng_buf *rb, uint8_t *data, size_t len) {
     }
     if (n > first) {
         size_t second = n - first;
-        memcpy(data + first, rb->buf + head, second);
+        memcpy(data.data + first, rb->buf + head, second);
         head += second;
     }
     rb->head = head;
@@ -167,30 +167,30 @@ void *hwrng_task(void) {
 
     hwrng_lock();
     if (hwrng_buf_space(rb) >= sizeof(random_word) && hwrng_mix_process()) {
-        hwrng_buf_add(rb, (const uint8_t *)&random_word, sizeof(random_word));
+        hwrng_buf_add(rb, CONST_BYTE_ARRAY((const uint8_t *)&random_word, sizeof(random_word)));
     }
     hwrng_unlock();
     return NULL;
 }
 
-void hwrng_init(uint8_t *buf, size_t size) {
+void hwrng_init(byte_array_t buffer) {
     struct hwrng_buf *rb = &ring_buffer;
 
     mutex_init(&hwrng_mutex);
     hwrng_mutex_initialized = true;
-    hwrng_buf_init(rb, buf, size);
+    hwrng_buf_init(rb, buffer);
 
     hwrng_start();
 
     hwrng_mix_init();
 }
 
-size_t hwrng_read(uint8_t *buf, size_t len) {
+size_t hwrng_read(byte_array_t buffer) {
     struct hwrng_buf *rb = &ring_buffer;
     size_t n;
 
     hwrng_lock();
-    n = hwrng_buf_del(rb, buf, len);
+    n = hwrng_buf_del(rb, buffer);
     hwrng_unlock();
     return n;
 }
@@ -209,7 +209,7 @@ uint32_t hwrng_get(void) {
     size_t offset = 0;
 
     while (offset < sizeof(v)) {
-        size_t n = hwrng_read(((uint8_t *)&v) + offset, sizeof(v) - offset);
+        size_t n = hwrng_read(BYTE_ARRAY(((uint8_t *)&v) + offset, sizeof(v) - offset));
         if (n == 0) {
             hwrng_task();
             continue;

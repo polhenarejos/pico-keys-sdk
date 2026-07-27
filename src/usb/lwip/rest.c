@@ -40,7 +40,7 @@
 rest_background_job_t background_jobs[REST_MAX_BACKGROUND_JOBS] = {0};
 
 static rest_session_t rest_sessions[REST_MAX_SESSIONS] = {0};
-static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], const uint8_t *salt, size_t salt_len, const uint8_t *info, size_t info_len, uint8_t out_key[32]);
+static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], const_byte_array_t salt, const_byte_array_t info, uint8_t out_key[32]);
 
 rest_session_t *rest_session_create(const rest_session_role_t role, rest_session_status_t status, const uint8_t public_key[32]) {
     for (int i = 0; i < REST_MAX_SESSIONS; i++) {
@@ -53,11 +53,11 @@ rest_session_t *rest_session_create(const rest_session_role_t role, rest_session
             } else {
                 memset(rest_sessions[i].public_key, 0, sizeof(rest_sessions[i].public_key));
             }
-            random_fill_buffer(rest_sessions[i].id, sizeof(rest_sessions[i].id));
+            random_fill_buffer(BYTE_ARRAY(rest_sessions[i].id, sizeof(rest_sessions[i].id)));
             rest_sessions[i].created_at = board_millis();
             rest_sessions[i].last_activity_timestamp = rest_sessions[i].created_at;
             size_t olen = 0;
-            if (base64url_encode(rest_sessions[i].id_str, sizeof(rest_sessions[i].id_str), &olen, (const unsigned char *)rest_sessions[i].id, sizeof(rest_sessions[i].id)) != 0) {
+            if (base64url_encode(BYTE_BUFFER(rest_sessions[i].id_str, sizeof(rest_sessions[i].id_str)), &olen, CONST_BYTE_ARRAY(rest_sessions[i].id, sizeof(rest_sessions[i].id))) != 0) {
                 memset(&rest_sessions[i], 0, sizeof(rest_session_t));
                 return NULL;
             }
@@ -67,13 +67,13 @@ rest_session_t *rest_session_create(const rest_session_role_t role, rest_session
     return NULL;
 }
 
-rest_session_t *rest_session_get(const uint8_t *id, size_t id_len) {
-    if (id == NULL || id_len != 16) {
+rest_session_t *rest_session_get(const_byte_array_t id) {
+    if (id.data == NULL || id.len != 16) {
         return NULL;
     }
     for (int i = 0; i < REST_MAX_SESSIONS; i++) {
         if (rest_sessions[i].status != REST_SESSION_UNKNOWN && rest_sessions[i].status != REST_SESSION_EXPIRED && rest_sessions[i].status != REST_SESSION_TERMINATED) {
-            if (memcmp(rest_sessions[i].id, id, sizeof(rest_sessions[i].id)) == 0) {
+            if (memcmp(rest_sessions[i].id, id.data, sizeof(rest_sessions[i].id)) == 0) {
                 return &rest_sessions[i];
             }
         }
@@ -95,8 +95,8 @@ rest_session_t *rest_session_get_by_id_str(const char *id_str) {
     return NULL;
 }
 
-int rest_session_terminate(const uint8_t *id, size_t id_len) {
-    rest_session_t *session = rest_session_get(id, id_len);
+int rest_session_terminate(const_byte_array_t id) {
+    rest_session_t *session = rest_session_get(id);
     if (session == NULL) {
         return -1;
     }
@@ -104,8 +104,8 @@ int rest_session_terminate(const uint8_t *id, size_t id_len) {
     return 0;
 }
 
-int rest_session_update_activity(const uint8_t *id, size_t id_len) {
-    rest_session_t *session = rest_session_get(id, id_len);
+int rest_session_update_activity(const_byte_array_t id) {
+    rest_session_t *session = rest_session_get(id);
     if (session == NULL) {
         return -1;
     }
@@ -113,8 +113,8 @@ int rest_session_update_activity(const uint8_t *id, size_t id_len) {
     return 0;
 }
 
-int rest_session_set_status(const uint8_t *id, size_t id_len, rest_session_status_t status) {
-    rest_session_t *session = rest_session_get(id, id_len);
+int rest_session_set_status(const_byte_array_t id, rest_session_status_t status) {
+    rest_session_t *session = rest_session_get(id);
     if (session == NULL) {
         return -1;
     }
@@ -122,8 +122,8 @@ int rest_session_set_status(const uint8_t *id, size_t id_len, rest_session_statu
     return 0;
 }
 
-int rest_session_set_role(const uint8_t *id, size_t id_len, rest_session_role_t role) {
-    rest_session_t *session = rest_session_get(id, id_len);
+int rest_session_set_role(const_byte_array_t id, rest_session_role_t role) {
+    rest_session_t *session = rest_session_get(id);
     if (session == NULL) {
         return -1;
     }
@@ -150,16 +150,16 @@ void rest_session_clear_all(void) {
 }
 
 #if DEBUG_APDU
-void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len) {
+void rest_debug_dump_payload(const char *tag, const_byte_array_t buffer) {
     size_t i;
-    if (buffer == NULL) {
+    if (buffer.data == NULL) {
         printf("[rest] %s: <null>\n", tag);
         return;
     }
 
-    printf("[rest] %s (%lu bytes): \"", tag, (unsigned long)len);
-    for (i = 0; i < len; i++) {
-        unsigned char c = (unsigned char)buffer[i];
+    printf("[rest] %s (%lu bytes): \"", tag, (unsigned long)buffer.len);
+    for (i = 0; i < buffer.len; i++) {
+        unsigned char c = buffer.data[i];
         if (c == '\r') {
             printf("\\r");
         }
@@ -330,7 +330,7 @@ WEAK const rest_route_t *rest_get_routes(size_t *count) {
 }
 #endif
 
-static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], const uint8_t *salt, size_t salt_len, const uint8_t *info, size_t info_len, uint8_t out_key[32]) {
+static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], const_byte_array_t salt, const_byte_array_t info, uint8_t out_key[32]) {
     int ret = -1;
     size_t shared_len = 0;
     uint8_t shared[32] = {0};
@@ -366,7 +366,7 @@ static int x25519_hkdf_derive_key32(const uint8_t sk[32], const uint8_t pk[32], 
         goto cleanup;
     }
 
-    ret = mbedtls_hkdf(md, salt, salt_len, shared, shared_len, info, info_len, out_key, 32);
+    ret = mbedtls_hkdf(md, salt.data, salt.len, shared, shared_len, info.data, info.len, out_key, 32);
 
 cleanup:
     mbedtls_platform_zeroize(shared, sizeof(shared));
@@ -379,7 +379,7 @@ cleanup:
 int rest_session_derive_key(const rest_session_t *session, uint8_t sk[32]) {
     uint8_t kver[32];
     const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    derive_kver(session->id, sizeof(session->id), kver);
+    derive_kver(CONST_BYTE_ARRAY(session->id, sizeof(session->id)), kver);
     mbedtls_hkdf(md_info, pico_serial_hash, sizeof(pico_serial_hash), kver, 32, (const uint8_t *)"REST/SESSION", 12, sk, 32);
     mbedtls_platform_zeroize(kver, sizeof(kver));
     return PICOKEYS_OK;
@@ -388,7 +388,7 @@ int rest_session_derive_key(const rest_session_t *session, uint8_t sk[32]) {
 int rest_session_derive_shared(const rest_session_t *session, uint8_t derived_key[32]) {
     uint8_t sk[32];
     rest_session_derive_key(session, sk);
-    int ret = x25519_hkdf_derive_key32(sk, session->public_key, session->id, sizeof(session->id), (const uint8_t *)"REST/SESSION/DERIVE", 19, derived_key);
+    int ret = x25519_hkdf_derive_key32(sk, session->public_key, CONST_BYTE_ARRAY(session->id, sizeof(session->id)), CONST_BYTE_ARRAY((const uint8_t *)"REST/SESSION/DERIVE", 19), derived_key);
     mbedtls_platform_zeroize(sk, sizeof(sk));
     if (ret != 0) {
         return -1;

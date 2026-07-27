@@ -35,7 +35,7 @@ static file_object_container_candidate_t *file_object_container_current(file_obj
     return &state->candidates[state->current_slot];
 }
 
-static int file_object_container_replace_file(uint16_t fid, const uint8_t *data, uint32_t data_size) {
+static int file_object_container_replace_file(uint16_t fid, const_byte_array_t data) {
     file_t *file = file_search(fid);
     if (file && file_delete_no_commit(file) != PICOKEYS_OK) {
         return PICOKEYS_EXEC_ERROR;
@@ -44,7 +44,7 @@ static int file_object_container_replace_file(uint16_t fid, const uint8_t *data,
     if (!file) {
         return PICOKEYS_ERR_NO_MEMORY;
     }
-    return file_put_data(file, data, data_size);
+    return file_put_data(file, data);
 }
 
 static int file_object_container_parse_slot(const file_object_container_layout_t *layout, uint32_t container_id, uint8_t slot, const file_object_authenticator_t *auth, file_object_container_candidate_t *candidate) {
@@ -54,7 +54,7 @@ static int file_object_container_parse_slot(const file_object_container_layout_t
     if (!file_has_data(file)) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
-    int r = file_object_manifest_parse(file_get_data(file), file_get_size(file), auth, NULL, NULL, &candidate->manifest);
+    int r = file_object_manifest_parse(CONST_BYTE_ARRAY(file_get_data(file), file_get_size(file)), auth, NULL, NULL, &candidate->manifest);
     if (r != PICOKEYS_OK) {
         return r;
     }
@@ -73,7 +73,7 @@ static int file_object_container_parse_slot(const file_object_container_layout_t
         }
         file_t *record = file_search(record_fid);
         file_object_record_info_t info;
-        if (!file_has_data(record) || file_object_record_header_parse(file_get_data(record), file_get_size(record), object, &info) != PICOKEYS_OK) {
+        if (!file_has_data(record) || file_object_record_header_parse(CONST_BYTE_ARRAY(file_get_data(record), file_get_size(record)), object, &info) != PICOKEYS_OK) {
             return PICOKEYS_WRONG_DATA;
         }
     }
@@ -153,7 +153,7 @@ bool file_object_container_references(const file_object_manifest_t *manifest, ui
     return false;
 }
 
-static int file_object_container_unseal(const file_object_container_layout_t *layout, uint32_t container_id, const file_object_manifest_t *manifest, const file_object_descriptor_t *object, const file_object_record_protector_t *protector, uint8_t *data, size_t capacity, size_t *written) {
+static int file_object_container_unseal(const file_object_container_layout_t *layout, uint32_t container_id, const file_object_manifest_t *manifest, const file_object_descriptor_t *object, const file_object_record_protector_t *protector, byte_buffer_t data, size_t *written) {
     file_object_manifest_t record_manifest = *manifest;
     record_manifest.object_count = 1;
     record_manifest.has_object = true;
@@ -173,7 +173,7 @@ static int file_object_container_unseal(const file_object_container_layout_t *la
     if (!file_has_data(record)) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
-    r = file_object_record_unseal(&record_manifest, policy_hash, protector, file_get_data(record), file_get_size(record), data, capacity, written);
+    r = file_object_record_unseal(&record_manifest, policy_hash, protector, CONST_BYTE_ARRAY(file_get_data(record), file_get_size(record)), BYTE_ARRAY(data.data, data.capacity), written);
     memset(policy_hash, 0, sizeof(policy_hash));
     return r;
 }
@@ -192,7 +192,7 @@ int file_object_container_validate(const file_object_container_layout_t *layout,
             }
         }
         size_t written = 0;
-        int r = file_object_container_unseal(layout, container_id, &candidate->manifest, object, protector, plaintext, object->logical_size, &written);
+        int r = file_object_container_unseal(layout, container_id, &candidate->manifest, object, protector, BYTE_BUFFER(plaintext, object->logical_size), &written);
         if (plaintext) {
             memset(plaintext, 0, object->logical_size);
             free(plaintext);
@@ -242,8 +242,8 @@ int file_object_container_object_size(const file_object_container_layout_t *layo
     return PICOKEYS_OK;
 }
 
-int file_object_container_read(const file_object_container_layout_t *layout, uint32_t container_id, uint16_t object_type, uint16_t object_tag, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy, file_object_container_access_t access, void *access_ctx, uint8_t *data, size_t capacity, size_t *written) {
-    if ((!data && capacity > 0) || !written) {
+int file_object_container_read(const file_object_container_layout_t *layout, uint32_t container_id, uint16_t object_type, uint16_t object_tag, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy, file_object_container_access_t access, void *access_ctx, byte_buffer_t data, size_t *written) {
+    if ((!data.data && data.capacity > 0) || !written) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
     *written = 0;
@@ -272,13 +272,13 @@ int file_object_container_read(const file_object_container_layout_t *layout, uin
                 return r;
             }
         }
-        r = file_object_container_unseal(layout, container_id, &candidate->manifest, object, state.crypto.protector, data, capacity, written);
+        r = file_object_container_unseal(layout, container_id, &candidate->manifest, object, state.crypto.protector, data, written);
         if (r == PICOKEYS_OK) {
             return PICOKEYS_OK;
         }
     }
-    if (data && capacity > 0) {
-        memset(data, 0, capacity);
+    if (data.data && data.capacity > 0) {
+        memset(data.data, 0, data.capacity);
     }
     return r;
 }
@@ -305,9 +305,9 @@ static int file_object_container_write_record(const file_object_container_layout
         .object_type = write->object_type,
         .object_tag = write->object_tag,
         .generation = object_generation,
-        .logical_size = write->data_size,
+        .logical_size = (uint32_t)write->data.len,
         .record_id = record_id,
-        .stored_size = write->data_size,
+        .stored_size = (uint32_t)write->data.len,
         .policy_id = write->policy_id,
         .key_domain = write->key_domain,
         .protection = write->protection,
@@ -324,23 +324,23 @@ static int file_object_container_write_record(const file_object_container_layout
     if (r != PICOKEYS_OK) {
         return r;
     }
-    if (write->data_size > UINT32_MAX - FILE_OBJECT_RECORD_HEADER_SIZE - FILE_OBJECT_AUTH_TAG_SIZE) {
+    if (write->data.len > UINT32_MAX - FILE_OBJECT_RECORD_HEADER_SIZE - FILE_OBJECT_AUTH_TAG_SIZE) {
         memset(policy_hash, 0, sizeof(policy_hash));
         return PICOKEYS_WRONG_LENGTH;
     }
-    size_t record_size = FILE_OBJECT_RECORD_HEADER_SIZE + (size_t)write->data_size + FILE_OBJECT_AUTH_TAG_SIZE;
+    size_t record_size = FILE_OBJECT_RECORD_HEADER_SIZE + write->data.len + FILE_OBJECT_AUTH_TAG_SIZE;
     uint8_t *record = (uint8_t *)calloc(1, record_size);
     if (!record) {
         memset(policy_hash, 0, sizeof(policy_hash));
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
     size_t written = 0;
-    r = file_object_record_seal(&record_manifest, policy_hash, crypto->protector, write->data, write->data_size, record, record_size, &written);
+    r = file_object_record_seal(&record_manifest, policy_hash, crypto->protector, write->data, BYTE_BUFFER(record, record_size), &written);
     if (r == PICOKEYS_OK && written != record_size) {
         r = PICOKEYS_WRONG_LENGTH;
     }
     if (r == PICOKEYS_OK) {
-        r = file_object_container_replace_file(*record_fid, record, (uint32_t)record_size);
+        r = file_object_container_replace_file(*record_fid, CONST_BYTE_ARRAY(record, record_size));
     }
     memset(policy_hash, 0, sizeof(policy_hash));
     memset(record, 0, record_size);
@@ -408,7 +408,7 @@ int file_object_container_update(const file_object_container_layout_t *layout, u
 
     for (size_t i = 0; i < write_count; i++) {
         const file_object_container_write_t *write = &writes[i];
-        if ((!write->data && write->data_size > 0) || write->object_type == 0 || write->object_type == UINT16_MAX || (write->flags & FILE_OBJECT_FLAG_INLINE) != 0 || (layout->write_valid && !layout->write_valid(layout->ctx, write))) {
+        if ((!write->data.data && write->data.len > 0) || write->object_type == 0 || write->object_type == UINT16_MAX || (write->flags & FILE_OBJECT_FLAG_INLINE) != 0 || (layout->write_valid && !layout->write_valid(layout->ctx, write))) {
             r = PICOKEYS_WRONG_DATA;
             break;
         }
@@ -460,9 +460,9 @@ int file_object_container_update(const file_object_container_layout_t *layout, u
     qsort(next.objects, next.object_count, sizeof(next.objects[0]), file_object_container_descriptor_compare);
     uint8_t manifest_data[FILE_OBJECT_CONTAINER_MAX_MANIFEST_SIZE];
     size_t manifest_size = 0;
-    r = file_object_manifest_build(&next, NULL, 0, state.crypto.auth, manifest_data, sizeof(manifest_data), &manifest_size);
+    r = file_object_manifest_build(&next, CONST_BYTE_ARRAY(NULL, 0), state.crypto.auth, BYTE_BUFFER(manifest_data, sizeof(manifest_data)), &manifest_size);
     if (r == PICOKEYS_OK) {
-        r = file_object_container_replace_file(layout->manifest_fid(layout->ctx, container_id, target_slot), manifest_data, (uint32_t)manifest_size);
+        r = file_object_container_replace_file(layout->manifest_fid(layout->ctx, container_id, target_slot), CONST_BYTE_ARRAY(manifest_data, manifest_size));
     }
     memset(manifest_data, 0, sizeof(manifest_data));
     if (r == PICOKEYS_OK && !flash_commit_sync(layout->commit_timeout_ms)) {
@@ -521,9 +521,9 @@ int file_object_container_remove(const file_object_container_layout_t *layout, u
     uint8_t target_slot = current->slot ^ 1u;
     uint8_t manifest_data[FILE_OBJECT_CONTAINER_MAX_MANIFEST_SIZE];
     size_t manifest_size = 0;
-    r = file_object_manifest_build(&next, NULL, 0, state.crypto.auth, manifest_data, sizeof(manifest_data), &manifest_size);
+    r = file_object_manifest_build(&next, CONST_BYTE_ARRAY(NULL, 0), state.crypto.auth, BYTE_BUFFER(manifest_data, sizeof(manifest_data)), &manifest_size);
     if (r == PICOKEYS_OK) {
-        r = file_object_container_replace_file(layout->manifest_fid(layout->ctx, container_id, target_slot), manifest_data, (uint32_t)manifest_size);
+        r = file_object_container_replace_file(layout->manifest_fid(layout->ctx, container_id, target_slot), CONST_BYTE_ARRAY(manifest_data, manifest_size));
     }
     memset(manifest_data, 0, sizeof(manifest_data));
     if (r == PICOKEYS_OK && !flash_commit_sync(layout->commit_timeout_ms)) {

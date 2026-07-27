@@ -26,8 +26,7 @@
 typedef struct file_object_container_write {
     uint16_t object_type;
     uint16_t object_tag;
-    const uint8_t *data;
-    uint32_t data_size;
+    const_byte_array_t data;
     uint16_t policy_id;
     uint8_t key_domain;
     uint8_t protection;
@@ -85,7 +84,7 @@ int file_object_container_validate(const file_object_container_layout_t *layout,
 const file_object_descriptor_t *file_object_container_find(const file_object_manifest_t *manifest, uint16_t object_type, uint16_t object_tag);
 bool file_object_container_references(const file_object_manifest_t *manifest, uint64_t record_id);
 int file_object_container_object_size(const file_object_container_layout_t *layout, uint32_t container_id, uint16_t object_type, uint16_t object_tag, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy, file_object_container_access_t access, void *access_ctx, uint32_t *object_size);
-int file_object_container_read(const file_object_container_layout_t *layout, uint32_t container_id, uint16_t object_type, uint16_t object_tag, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy, file_object_container_access_t access, void *access_ctx, uint8_t *data, size_t capacity, size_t *written);
+int file_object_container_read(const file_object_container_layout_t *layout, uint32_t container_id, uint16_t object_type, uint16_t object_tag, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy, file_object_container_access_t access, void *access_ctx, byte_buffer_t data, size_t *written);
 int file_object_container_update(const file_object_container_layout_t *layout, uint32_t container_id, const file_object_container_write_t *writes, size_t write_count, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy);
 int file_object_container_remove(const file_object_container_layout_t *layout, uint32_t container_id, uint16_t object_type, uint16_t object_tag, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy);
 int file_object_container_delete(const file_object_container_layout_t *layout, uint32_t container_id, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy);

@@ -187,12 +187,12 @@ bool rest_supported_content_type(const char *content_type);
 const rest_route_t *rest_get_routes(size_t *count);
 
 extern rest_session_t *rest_session_create(const rest_session_role_t role, rest_session_status_t status, const uint8_t public_key[32]);
-extern rest_session_t *rest_session_get(const uint8_t *id, size_t id_len);
+extern rest_session_t *rest_session_get(const_byte_array_t id);
 extern rest_session_t *rest_session_get_by_id_str(const char *id_str);
-extern int rest_session_terminate(const uint8_t *id, size_t id_len);
-extern int rest_session_update_activity(const uint8_t *id, size_t id_len);
-extern int rest_session_set_status(const uint8_t *id, size_t id_len, rest_session_status_t status);
-extern int rest_session_set_role(const uint8_t *id, size_t id_len, rest_session_role_t role);
+extern int rest_session_terminate(const_byte_array_t id);
+extern int rest_session_update_activity(const_byte_array_t id);
+extern int rest_session_set_status(const_byte_array_t id, rest_session_status_t status);
+extern int rest_session_set_role(const_byte_array_t id, rest_session_role_t role);
 extern int rest_session_cleanup_expired(time_t expiration_time);
 extern void rest_session_clear_all(void);
 extern int rest_session_derive_key(const rest_session_t *session, uint8_t sk[32]);
@@ -200,10 +200,10 @@ extern int rest_session_derive_shared(const rest_session_t *session, uint8_t der
 extern rest_query_t *rest_query_get(const rest_request_t *request, const char *key);
 
 #if DEBUG_APDU
-extern void rest_debug_dump_payload(const char *tag, const char *buffer, size_t len);
+extern void rest_debug_dump_payload(const char *tag, const_byte_array_t buffer);
 #define REST_DEBUG_LOG(...) printf(__VA_ARGS__)
 #else
-#define rest_debug_dump_payload(tag, buffer, len) do { (void)(tag); (void)(buffer); (void)(len); } while (0)
+#define rest_debug_dump_payload(tag, buffer) do { (void)(tag); (void)(buffer); } while (0)
 #define REST_DEBUG_LOG(...) do {} while (0)
 #endif
 

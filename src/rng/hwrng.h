@@ -20,8 +20,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
-void hwrng_init(uint8_t *buf, size_t size);
-size_t hwrng_read(uint8_t *buf, size_t len);
+#include "byte_array.h"
+
+void hwrng_init(byte_array_t buffer);
+size_t hwrng_read(byte_array_t buffer);
 void hwrng_flush(void);
 void hwrng_wait_full(void);
 void *hwrng_task(void);

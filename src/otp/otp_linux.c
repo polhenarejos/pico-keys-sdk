@@ -24,6 +24,7 @@
 #include <termios.h>
 
 #include "picokeys.h"
+#include "byte_array.h"
 #include "otp_platform.h"
 #include "random.h"
 
@@ -39,17 +40,17 @@
 #define OTP_LINUX_DEFAULT_TPM_HANDLE "0x81010001"
 #define OTP_LINUX_DEFAULT_PEER_KEY_FILE ".config/pico-novus/otp_peer_p256.bin"
 
-static int read_tpm_pin_prompt(const char *prompt, char *pin_out, size_t pin_out_size) {
+static int read_tpm_pin_prompt(const char *prompt, byte_buffer_t pin_out) {
     const char *pin_env = getenv("PICO_NOVUS_TPM_PIN");
-    if (!pin_out || pin_out_size < 2) {
+    if (!pin_out.data || pin_out.capacity < 2) {
         return -1;
     }
     if (pin_env && pin_env[0] != '\0') {
         size_t n = strlen(pin_env);
-        if (n >= pin_out_size) {
+        if (n >= pin_out.capacity) {
             return -1;
         }
-        memcpy(pin_out, pin_env, n + 1);
+        memcpy(pin_out.data, pin_env, n + 1);
         return 0;
     }
     if (!isatty(STDIN_FILENO)) {
@@ -68,7 +69,7 @@ static int read_tpm_pin_prompt(const char *prompt, char *pin_out, size_t pin_out
     if (tcsetattr(STDIN_FILENO, TCSANOW, &newt) != 0) {
         return -1;
     }
-    if (!fgets(pin_out, (int)pin_out_size, stdin)) {
+    if (!fgets((char *)pin_out.data, (int)pin_out.capacity, stdin)) {
         tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
         fprintf(stderr, "\n");
         return -1;
@@ -76,15 +77,17 @@ static int read_tpm_pin_prompt(const char *prompt, char *pin_out, size_t pin_out
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
     fprintf(stderr, "\n");
     {
-        size_t n = strlen(pin_out);
-        if (n > 0 && pin_out[n - 1] == '\n') {
-            pin_out[n - 1] = '\0';
+        size_t n = strlen((const char *)pin_out.data);
+        if (n > 0 && pin_out.data[n - 1] == '\n') {
+            pin_out.data[n - 1] = '\0';
         }
     }
-    return (pin_out[0] != '\0') ? 0 : -1;
+    return (pin_out.data[0] != '\0') ? 0 : -1;
 }
 
-static int derive_secp256k1_privkey_from_secret(const uint8_t *secret, size_t secret_len, uint8_t out_key32[32]) {
+static int derive_secp256k1_privkey_from_secret(const_byte_array_t secret_data, uint8_t out_key32[32]) {
+    const uint8_t *secret = secret_data.data;
+    size_t secret_len = secret_data.len;
     int rc = -1;
     uint8_t digest[32];
     const uint8_t label[] = "pico-novus/se-ecdh-to-k1-v1";
@@ -165,7 +168,7 @@ static int ensure_parent_dir(const char *path) {
 
 static int random_fill_buffer_rng(void *ctx, unsigned char *output, size_t output_len) {
     (void)ctx;
-    random_fill_buffer(output, output_len);
+    random_fill_buffer(BYTE_ARRAY(output, output_len));
     return 0;
 }
 
@@ -507,7 +510,7 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
         goto cleanup;
     }
     unsigned long handle_num = strtoul(handle_hex, NULL, 0);
-    if (read_tpm_pin_prompt("Enter or set TPM key PIN: ", pin, sizeof(pin)) != 0) {
+    if (read_tpm_pin_prompt("Enter or set TPM key PIN: ", BYTE_BUFFER((uint8_t *)pin, sizeof(pin))) != 0) {
         fprintf(stderr, "[otp-linux] PIN is required to unlock/provision TPM key\n");
         goto cleanup;
     }
@@ -517,7 +520,7 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     }
     if (created_now && !getenv("PICO_NOVUS_TPM_PIN") && isatty(STDIN_FILENO)) {
         char confirm[128] = {0};
-        if (read_tpm_pin_prompt("Confirm TPM key PIN: ", confirm, sizeof(confirm)) != 0 || strcmp(pin, confirm) != 0) {
+        if (read_tpm_pin_prompt("Confirm TPM key PIN: ", BYTE_BUFFER((uint8_t *)confirm, sizeof(confirm))) != 0 || strcmp(pin, confirm) != 0) {
             fprintf(stderr, "[otp-linux] PIN confirmation mismatch\n");
             memset(confirm, 0, sizeof(confirm));
             goto cleanup;
@@ -565,7 +568,7 @@ static int linux_tpm_vault_load_or_create_key(uint8_t out_key32[32]) {
     memcpy(ecdh_secret + ecdh_secret_len, z_point->point.y.buffer, z_point->point.y.size);
     ecdh_secret_len += z_point->point.y.size;
 
-    if (derive_secp256k1_privkey_from_secret(ecdh_secret, ecdh_secret_len, out_key32) != 0) {
+    if (derive_secp256k1_privkey_from_secret(CONST_BYTE_ARRAY(ecdh_secret, ecdh_secret_len), out_key32) != 0) {
         fprintf(stderr, "[otp-linux] Failed deriving secp256k1 key\n");
         goto cleanup;
     }

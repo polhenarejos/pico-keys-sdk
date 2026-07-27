@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "byte_array.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -156,8 +158,8 @@ typedef struct {
 #define CTAP1_ERR_INVALID_CHANNEL     0x0b    // CID not valid
 #define CTAP1_ERR_OTHER               0x7f    // Other unspecified error
 
-extern void add_keyboard_buffer(const uint8_t *, size_t, bool);
-extern void append_keyboard_buffer(const uint8_t *data, size_t data_len);
+extern void add_keyboard_buffer(const_byte_array_t data, bool encode);
+extern void append_keyboard_buffer(const_byte_array_t data);
 extern int driver_init_hid(void);
 extern int ctap_error(uint8_t error);
 extern uint16_t *get_send_buffer_size(uint8_t itf);

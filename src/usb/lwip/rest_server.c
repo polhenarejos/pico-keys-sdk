@@ -136,7 +136,7 @@ static const rest_header_descriptor_t rest_http_headers[REST_HEADER_TOTAL_COUNT]
 };
 
 static void *rest_core1_thread(void *arg);
-static bool send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const char *body, size_t body_len, char *headers[REST_HEADER_TOTAL_COUNT], bool body_owned);
+static bool send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const_byte_array_t body, char *headers[REST_HEADER_TOTAL_COUNT], bool body_owned);
 void rest_close_conn(rest_conn_t *conn);
 #ifndef ENABLE_EMULATION
 static err_t rest_lwip_continue_send(rest_conn_t *conn);
@@ -198,7 +198,7 @@ static void *rest_core1_thread(void *arg) {
 }
 
 static void send_json(rest_conn_t *conn, int status_code, const char *status_text, const char *json_body) {
-    (void)send_response(conn, status_code, status_text, "application/json", json_body, strlen(json_body), NULL, false);
+    (void)send_response(conn, status_code, status_text, "application/json", CONST_BYTE_ARRAY((const uint8_t *)json_body, strlen(json_body)), NULL, false);
 }
 
 static void send_json_error(rest_conn_t *conn, int status_code, const char *error_message) {
@@ -259,7 +259,7 @@ void rest_task(void) {
 
     if (conn != NULL) {
         if (ready && body != NULL && content_type != NULL) {
-            bool body_transferred = send_response(conn, code, rest_status_text_from_code(code), content_type, body, body_len, headers, true);
+            bool body_transferred = send_response(conn, code, rest_status_text_from_code(code), content_type, CONST_BYTE_ARRAY((const uint8_t *)body, body_len), headers, true);
             if (body_transferred) {
                 body = NULL;
             }
@@ -372,7 +372,7 @@ void rest_close_conn(rest_conn_t *conn) {
 #endif
 }
 
-static bool send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const char *body, size_t body_len, char *headers[REST_HEADER_TOTAL_COUNT], bool body_owned) {
+static bool send_response(rest_conn_t *conn, int status_code, const char *status_text, const char *content_type, const_byte_array_t body, char *headers[REST_HEADER_TOTAL_COUNT], bool body_owned) {
     char headers_buf[256];
     int header_len;
 #ifdef ENABLE_EMULATION
@@ -398,9 +398,9 @@ static bool send_response(rest_conn_t *conn, int status_code, const char *status
         (conn->conn_type == REST_CONN_TLS) ? "TLS" : "PLAIN",
         status_code,
         (content_type != NULL) ? content_type : "(null)",
-        (unsigned long)body_len
+        (unsigned long)body.len
     );
-    rest_debug_dump_payload("response-body", body, body_len);
+    rest_debug_dump_payload("response-body", body);
 
     char *p = headers_buf;
     header_len = snprintf(p, sizeof(headers_buf),
@@ -408,7 +408,7 @@ static bool send_response(rest_conn_t *conn, int status_code, const char *status
                           "Content-Type: %s\r\n"
                           "Content-Length: %lu\r\n"
                           "Connection: close\r\n",
-                          status_code, status_text, content_type, (unsigned long)body_len);
+                          status_code, status_text, content_type, (unsigned long)body.len);
     if (headers) {
         for (int i = 0; i < REST_HEADER_TOTAL_COUNT; i++) {
             if (headers[i] != NULL) {
@@ -457,8 +457,8 @@ static bool send_response(rest_conn_t *conn, int status_code, const char *status
         }
 
         written = 0;
-        while (written < body_len) {
-            ret = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)body + written, body_len - written);
+        while (written < body.len) {
+            ret = mbedtls_ssl_write(&conn->ssl, body.data + written, body.len - written);
             if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) {
                 if (++want_retries > 2048) {
                     rest_close_conn(conn);
@@ -488,8 +488,8 @@ static bool send_response(rest_conn_t *conn, int status_code, const char *status
         sent_total += (size_t)n;
     }
     sent_total = 0;
-    while (sent_total < body_len) {
-        ssize_t n = send((socket_t)conn->sock, body + sent_total, (int)(body_len - sent_total), 0);
+    while (sent_total < body.len) {
+        ssize_t n = send((socket_t)conn->sock, (const char *)body.data + sent_total, (int)(body.len - sent_total), 0);
         if (n <= 0) {
             rest_close_conn(conn);
             return false;
@@ -509,7 +509,7 @@ static bool send_response(rest_conn_t *conn, int status_code, const char *status
     }
     retries = 0;
     while (true) {
-        err = tcp_write(conn->pcb, headers_buf, (uint16_t)header_len, TCP_WRITE_FLAG_COPY | (body_len > 0 ? TCP_WRITE_FLAG_MORE : 0));
+        err = tcp_write(conn->pcb, headers_buf, (uint16_t)header_len, TCP_WRITE_FLAG_COPY | (body.len > 0 ? TCP_WRITE_FLAG_MORE : 0));
         if (err == ERR_OK) {
             break;
         }
@@ -521,23 +521,23 @@ static bool send_response(rest_conn_t *conn, int status_code, const char *status
         retries++;
     }
 
-    if (body_len > 0) {
-        if (body_len > 1024) {
+    if (body.len > 0) {
+        if (body.len > 1024) {
             if (body_owned) {
-                conn->tx_body = body;
+                conn->tx_body = (char *)body.data;
                 conn->tx_body_owned = true;
             }
             else {
-                char *tx_copy = (char *)malloc(body_len);
+                char *tx_copy = (char *)malloc(body.len);
                 if (tx_copy == NULL) {
                     rest_close_conn(conn);
                     return false;
                 }
-                memcpy(tx_copy, body, body_len);
+                memcpy(tx_copy, body.data, body.len);
                 conn->tx_body = tx_copy;
                 conn->tx_body_owned = true;
             }
-            conn->tx_body_len = body_len;
+            conn->tx_body_len = body.len;
             conn->tx_body_sent = 0;
             conn->tx_pending = true;
             if (rest_lwip_continue_send(conn) != ERR_OK) {
@@ -548,7 +548,7 @@ static bool send_response(rest_conn_t *conn, int status_code, const char *status
         else {
             retries = 0;
             while (true) {
-                err = tcp_write(conn->pcb, body, (uint16_t)body_len, TCP_WRITE_FLAG_COPY);
+                err = tcp_write(conn->pcb, body.data, (uint16_t)body.len, TCP_WRITE_FLAG_COPY);
                 if (err == ERR_OK) {
                     break;
                 }
@@ -788,7 +788,7 @@ static int rest_verify_request_signature(const rest_request_t *request, const re
     if (md_info == NULL) {
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
-    if (base64url_decode(hmac_x, sizeof(hmac_x), &olen, (const unsigned char *)request->headers[REST_HEADER_X_SIGNATURE], strlen(request->headers[REST_HEADER_X_SIGNATURE])) != 0) {
+    if (base64url_decode(BYTE_BUFFER(hmac_x, sizeof(hmac_x)), &olen, CONST_BYTE_ARRAY((const uint8_t *)request->headers[REST_HEADER_X_SIGNATURE], strlen(request->headers[REST_HEADER_X_SIGNATURE]))) != 0) {
         return PICOKEYS_EXEC_ERROR;
     }
     mbedtls_md_init(&ctx);
@@ -916,7 +916,7 @@ void rest_handle_request(rest_conn_t *conn) {
         rest_method_to_string(request->method),
         request->path
     );
-    rest_debug_dump_payload("request-body", request->body, request->body_len);
+    rest_debug_dump_payload("request-body", CONST_BYTE_ARRAY((const uint8_t *)request->body, request->body_len));
 
     if (request->method == REST_HTTP_POST || request->method == REST_HTTP_PUT) {
         if (!rest_supported_content_type(request->content_type)) {
@@ -999,10 +999,10 @@ void rest_handle_request(rest_conn_t *conn) {
             }
             uint16_t code = response.status_code == 0 ? 200 : response.status_code;
             if (code == 204) {
-                (void)send_response(conn, code, rest_status_text_from_code(code), "application/json", "", 0, response.headers, false);
+                (void)send_response(conn, code, rest_status_text_from_code(code), "application/json", CONST_BYTE_ARRAY(NULL, 0), response.headers, false);
             }
             else if (response.body != NULL && response.content_type != NULL) {
-                (void)send_response(conn, code, rest_status_text_from_code(code), response.content_type, response.body, response.body_len, response.headers, false);
+                (void)send_response(conn, code, rest_status_text_from_code(code), response.content_type, CONST_BYTE_ARRAY((const uint8_t *)response.body, response.body_len), response.headers, false);
             }
             else {
                 send_json_error(conn, 500, "internal_error");
@@ -1037,7 +1037,7 @@ void rest_handle_request(rest_conn_t *conn) {
 
 int x509_set_random_serial(mbedtls_x509write_cert *crt) {
     uint8_t serial[16];
-    random_fill_buffer(serial, sizeof(serial));
+    random_fill_buffer(BYTE_ARRAY(serial, sizeof(serial)));
     serial[0] &= 0x7F;
 
     size_t off = 0;
@@ -1059,7 +1059,7 @@ static void rest_check_and_load_credentials(void) {
             mbedtls_ecp_write_key_ext(&ecdsa, &olen, pkey, sizeof(pkey));
             mbedtls_ecdsa_free(&ecdsa);
         }
-        file_put_data(ef, pkey, (uint16_t)olen);
+        file_put_data(ef, CONST_BYTE_ARRAY(pkey, (uint16_t)olen));
         mbedtls_platform_zeroize(pkey, sizeof(pkey));
         printf("TLS key generated and stored, length: %u bytes\n", (unsigned)olen);
     }
@@ -1107,7 +1107,7 @@ static void rest_check_and_load_credentials(void) {
 
         ret = mbedtls_x509write_crt_pem(&crt, cert_pem, sizeof(cert_pem), random_fill_iterator, NULL);
         if (ret == 0) {
-            file_put_data(ef, cert_pem, (uint16_t)strlen((char *)cert_pem) + 1);
+        file_put_data(ef, CONST_BYTE_ARRAY(cert_pem, (uint16_t)strlen((char *)cert_pem) + 1));
             printf("TLS certificate generated and stored, length: %u bytes\n", (unsigned)strlen((char *)cert_pem));
         }
 out:

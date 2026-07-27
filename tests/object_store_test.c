@@ -21,6 +21,7 @@
 #include "fs/object_store.h"
 
 #include <assert.h>
+#include <setjmp.h>
 #include <stdio.h>
 
 #define TEST_FILE_COUNT 16u
@@ -51,6 +52,10 @@ static uint16_t test_fail_write_fid;
 static size_t test_fail_write_after = SIZE_MAX;
 static size_t test_commit_count;
 static size_t test_fail_commit = SIZE_MAX;
+static jmp_buf test_power_loss_env;
+static size_t test_power_loss_event;
+static size_t test_power_loss_at = SIZE_MAX;
+static bool test_power_loss_armed;
 
 static const file_object_txn_layout_t test_txn_layout = {
     .namespace_id = 0x1001,
@@ -83,14 +88,14 @@ static int test_auth_start(void *ctx) {
     return PICOKEYS_OK;
 }
 
-static int test_auth_update(void *ctx, const uint8_t *data, size_t len) {
+static int test_auth_update(void *ctx, const_byte_array_t data) {
     test_auth_context_t *auth = (test_auth_context_t *)ctx;
-    if (!auth->active || (!data && len > 0)) {
+    if (!auth->active || (!data.data && data.len > 0)) {
         return PICOKEYS_EXEC_ERROR;
     }
-    for (size_t i = 0; i < len; i++) {
+    for (size_t i = 0; i < data.len; i++) {
         for (size_t word = 0; word < 4; word++) {
-            auth->state[word] ^= data[i] + (uint8_t)word;
+            auth->state[word] ^= data.data[i] + (uint8_t)word;
             auth->state[word] *= 0x01000193u + (uint32_t)(word * 2u);
             auth->state[word] = (auth->state[word] << 5) | (auth->state[word] >> 27);
         }
@@ -124,19 +129,19 @@ static const file_object_authenticator_t test_auth = {
     .abort = test_auth_abort
 };
 
-static int test_record_tag(test_record_protector_context_t *protector, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const uint8_t *stored, size_t len, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
+static int test_record_tag(test_record_protector_context_t *protector, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const_byte_array_t stored, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
     int r = test_auth_start(&test_auth_context);
     if (r == PICOKEYS_OK) {
-        r = test_auth_update(&test_auth_context, &protector->key, sizeof(protector->key));
+        r = test_auth_update(&test_auth_context, CONST_BYTE_ARRAY(&protector->key, sizeof(protector->key)));
     }
     if (r == PICOKEYS_OK) {
-        r = test_auth_update(&test_auth_context, aad, FILE_OBJECT_RECORD_AAD_SIZE);
+        r = test_auth_update(&test_auth_context, CONST_BYTE_ARRAY(aad, FILE_OBJECT_RECORD_AAD_SIZE));
     }
     if (r == PICOKEYS_OK) {
-        r = test_auth_update(&test_auth_context, nonce, FILE_OBJECT_RECORD_NONCE_SIZE);
+        r = test_auth_update(&test_auth_context, CONST_BYTE_ARRAY(nonce, FILE_OBJECT_RECORD_NONCE_SIZE));
     }
     if (r == PICOKEYS_OK) {
-        r = test_auth_update(&test_auth_context, stored, len);
+        r = test_auth_update(&test_auth_context, stored);
     }
     if (r == PICOKEYS_OK) {
         r = test_auth_finish(&test_auth_context, tag);
@@ -147,21 +152,24 @@ static int test_record_tag(test_record_protector_context_t *protector, const uin
     return r;
 }
 
-static int test_record_seal(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const uint8_t *plaintext, size_t len, uint8_t *stored, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
+static int test_record_seal(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const_byte_array_t plaintext, byte_buffer_t stored, uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE]) {
     test_record_protector_context_t *protector = (test_record_protector_context_t *)ctx;
-    if (!protector || !identity || !nonce || !aad || (!plaintext && len > 0) || !stored || !tag) {
+    if (!protector || !identity || !nonce || !aad || (!plaintext.data && plaintext.len > 0) || (!stored.data && plaintext.len > 0) || stored.capacity < plaintext.len || !tag) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    for (size_t i = 0; i < len; i++) {
-        stored[i] = identity->protection == FILE_OBJECT_PROTECTION_AEAD_SECRET ? plaintext[i] ^ protector->key ^ nonce[i % FILE_OBJECT_RECORD_NONCE_SIZE] : plaintext[i];
+    for (size_t i = 0; i < plaintext.len; i++) {
+        stored.data[i] = identity->protection == FILE_OBJECT_PROTECTION_AEAD_SECRET ? plaintext.data[i] ^ protector->key ^ nonce[i % FILE_OBJECT_RECORD_NONCE_SIZE] : plaintext.data[i];
     }
-    return test_record_tag(protector, nonce, aad, stored, len, tag);
+    return test_record_tag(protector, nonce, aad, CONST_BYTE_ARRAY(stored.data, plaintext.len), tag);
 }
 
-static int test_record_unseal(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const uint8_t *stored, size_t len, const uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE], uint8_t *plaintext) {
+static int test_record_unseal(void *ctx, const file_object_record_identity_t *identity, const uint8_t nonce[FILE_OBJECT_RECORD_NONCE_SIZE], const uint8_t aad[FILE_OBJECT_RECORD_AAD_SIZE], const_byte_array_t stored, const uint8_t tag[FILE_OBJECT_AUTH_TAG_SIZE], byte_buffer_t plaintext) {
     test_record_protector_context_t *protector = (test_record_protector_context_t *)ctx;
     uint8_t calculated_tag[FILE_OBJECT_AUTH_TAG_SIZE];
-    int r = test_record_tag(protector, nonce, aad, stored, len, calculated_tag);
+    if ((!plaintext.data && stored.len > 0) || plaintext.capacity < stored.len) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    int r = test_record_tag(protector, nonce, aad, stored, calculated_tag);
     uint8_t difference = 0;
     if (r == PICOKEYS_OK) {
         for (size_t i = 0; i < sizeof(calculated_tag); i++) {
@@ -175,8 +183,8 @@ static int test_record_unseal(void *ctx, const file_object_record_identity_t *id
     if (r != PICOKEYS_OK) {
         return r;
     }
-    for (size_t i = 0; i < len; i++) {
-        plaintext[i] = identity->protection == FILE_OBJECT_PROTECTION_AEAD_SECRET ? stored[i] ^ protector->key ^ nonce[i % FILE_OBJECT_RECORD_NONCE_SIZE] : stored[i];
+    for (size_t i = 0; i < stored.len; i++) {
+        plaintext.data[i] = identity->protection == FILE_OBJECT_PROTECTION_AEAD_SECRET ? stored.data[i] ^ protector->key ^ nonce[i % FILE_OBJECT_RECORD_NONCE_SIZE] : stored.data[i];
     }
     return PICOKEYS_OK;
 }
@@ -192,11 +200,11 @@ static bool test_extension_supported(void *ctx, uint8_t kind) {
     return supported_kind && kind == *supported_kind;
 }
 
-static void test_manifest_retag(uint8_t *data, size_t len) {
-    assert(len >= FILE_OBJECT_AUTH_TAG_SIZE);
+static void test_manifest_retag(byte_array_t data) {
+    assert(data.len >= FILE_OBJECT_AUTH_TAG_SIZE);
     assert(test_auth_start(&test_auth_context) == PICOKEYS_OK);
-    assert(test_auth_update(&test_auth_context, data, len - FILE_OBJECT_AUTH_TAG_SIZE) == PICOKEYS_OK);
-    assert(test_auth_finish(&test_auth_context, data + len - FILE_OBJECT_AUTH_TAG_SIZE) == PICOKEYS_OK);
+    assert(test_auth_update(&test_auth_context, CONST_BYTE_ARRAY(data.data, data.len - FILE_OBJECT_AUTH_TAG_SIZE)) == PICOKEYS_OK);
+    assert(test_auth_finish(&test_auth_context, data.data + data.len - FILE_OBJECT_AUTH_TAG_SIZE) == PICOKEYS_OK);
 }
 
 static file_object_manifest_t test_manifest_value(void) {
@@ -237,6 +245,9 @@ static void test_files_reset(void) {
     test_fail_write_after = SIZE_MAX;
     test_commit_count = 0;
     test_fail_commit = SIZE_MAX;
+    test_power_loss_event = 0;
+    test_power_loss_at = SIZE_MAX;
+    test_power_loss_armed = false;
     test_auth_abort(&test_auth_context);
 }
 
@@ -261,6 +272,7 @@ static void test_reboot(void) {
     test_fail_write_fid = 0;
     test_fail_write_after = SIZE_MAX;
     test_fail_commit = SIZE_MAX;
+    test_power_loss_armed = false;
     test_auth_abort(&test_auth_context);
 }
 
@@ -310,29 +322,29 @@ uint8_t *file_get_data(const file_t *file) {
     return test_file ? test_file->file.data : NULL;
 }
 
-int file_read_at(const file_t *file, uint32_t offset, uint8_t *data, size_t len) {
+int file_read_at(const file_t *file, uint32_t offset, byte_array_t data) {
     test_file_t *test_file = test_file_from_handle(file);
-    if (!test_file || (!data && len > 0) || offset > test_file->size || len > test_file->size - offset) {
+    if (!test_file || (!data.data && data.len > 0) || offset > test_file->size || data.len > test_file->size - offset) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    if (len > 0) {
-        memcpy(data, test_file->storage + offset, len);
+    if (data.len > 0) {
+        memcpy(data.data, test_file->storage + offset, data.len);
     }
     return PICOKEYS_OK;
 }
 
-int file_put_data(file_t *file, const uint8_t *data, uint32_t len) {
+int file_put_data(file_t *file, const_byte_array_t data) {
     test_file_t *test_file = test_file_from_handle(file);
-    if (!test_file || (!data && len > 0) || len > sizeof(test_file->storage)) {
+    if (!test_file || (!data.data && data.len > 0) || data.len > sizeof(test_file->storage)) {
         return PICOKEYS_ERR_NO_MEMORY;
     }
-    size_t written = len;
-    bool fail = file->fid == test_fail_write_fid && test_fail_write_after < len;
+    size_t written = data.len;
+    bool fail = file->fid == test_fail_write_fid && test_fail_write_after < data.len;
     if (fail) {
         written = test_fail_write_after;
     }
     if (written > 0) {
-        memcpy(test_file->storage, data, written);
+        memcpy(test_file->storage, data.data, written);
     }
     test_file->size = (uint32_t)written;
     test_file->file.data = written > 0 ? test_file->storage : NULL;
@@ -356,6 +368,11 @@ int file_delete(file_t *file) {
 
 bool flash_commit_sync(uint32_t timeout_ms) {
     (void)timeout_ms;
+    test_power_loss_event++;
+    if (test_power_loss_armed && test_power_loss_event == test_power_loss_at) {
+        test_power_loss_armed = false;
+        longjmp(test_power_loss_env, 1);
+    }
     test_commit_count++;
     if (test_commit_count == test_fail_commit) {
         return false;
@@ -365,21 +382,26 @@ bool flash_commit_sync(uint32_t timeout_ms) {
 }
 
 void flash_commit(void) {
+    test_power_loss_event++;
+    if (test_power_loss_armed && test_power_loss_event == test_power_loss_at) {
+        test_power_loss_armed = false;
+        longjmp(test_power_loss_env, 1);
+    }
     test_persist_files();
 }
 
-static void test_txn_read(const file_object_txn_layout_t *layout, const uint8_t *expected, size_t expected_len, uint32_t expected_generation) {
+static void test_txn_read(const file_object_txn_layout_t *layout, const_byte_array_t expected, uint32_t expected_generation) {
     file_object_txn_handle_t handle = FILE_OBJECT_TXN_INVALID_HANDLE;
     file_object_info_t info;
     uint8_t output[32] = { 0 };
 
-    assert(expected_len <= sizeof(output));
+    assert(expected.len <= sizeof(output));
     assert(file_object_txn_open(layout, &test_auth, &handle) == PICOKEYS_OK);
     assert(file_object_txn_get_info(handle, &test_auth, &info) == PICOKEYS_OK);
     assert(info.generation == expected_generation);
-    assert(info.payload_size == expected_len);
-    assert(file_object_txn_read_at(handle, &test_auth, 0, output, expected_len) == PICOKEYS_OK);
-    assert(memcmp(output, expected, expected_len) == 0);
+    assert(info.payload_size == expected.len);
+    assert(file_object_txn_read_at(handle, &test_auth, 0, BYTE_ARRAY(output, expected.len)) == PICOKEYS_OK);
+    assert(memcmp(output, expected.data, expected.len) == 0);
     assert(file_object_txn_close(handle) == PICOKEYS_OK);
 }
 
@@ -394,7 +416,7 @@ static void test_identity_and_stale_handles(void) {
     file_object_info_t info;
     uint8_t output[sizeof(first)] = { 0 };
 
-    assert(file_object_put(&object_id, first, sizeof(first)) == PICOKEYS_OK);
+    assert(file_object_put(&object_id, CONST_BYTE_ARRAY(first, sizeof(first))) == PICOKEYS_OK);
     assert(file_object_open(&wrong_namespace, &first_handle) == PICOKEYS_WRONG_DATA);
     assert(first_handle == FILE_OBJECT_INVALID_HANDLE);
     assert(file_object_open(&wrong_type, &first_handle) == PICOKEYS_WRONG_DATA);
@@ -402,25 +424,25 @@ static void test_identity_and_stale_handles(void) {
     assert(file_object_get_info(first_handle, &info) == PICOKEYS_OK);
     assert(info.generation == 1);
     assert(info.payload_size == sizeof(first));
-    assert(file_object_read_at(first_handle, 1, output, 2) == PICOKEYS_OK);
+    assert(file_object_read_at(first_handle, 1, BYTE_ARRAY(output, 2)) == PICOKEYS_OK);
     assert(memcmp(output, first + 1, 2) == 0);
-    assert(file_object_read_at(first_handle, sizeof(first), output, 1) == PICOKEYS_WRONG_LENGTH);
+    assert(file_object_read_at(first_handle, sizeof(first), BYTE_ARRAY(output, 1)) == PICOKEYS_WRONG_LENGTH);
 
-    assert(file_object_put(&object_id, second, sizeof(second)) == PICOKEYS_OK);
-    assert(file_object_read_at(first_handle, 0, output, 1) == PICOKEYS_ERR_STALE_HANDLE);
+    assert(file_object_put(&object_id, CONST_BYTE_ARRAY(second, sizeof(second))) == PICOKEYS_OK);
+    assert(file_object_read_at(first_handle, 0, BYTE_ARRAY(output, 1)) == PICOKEYS_ERR_STALE_HANDLE);
     assert(file_object_close(first_handle) == PICOKEYS_OK);
-    assert(file_object_read_at(first_handle, 0, output, 1) == PICOKEYS_ERR_STALE_HANDLE);
+    assert(file_object_read_at(first_handle, 0, BYTE_ARRAY(output, 1)) == PICOKEYS_ERR_STALE_HANDLE);
 
     assert(file_object_open(&object_id, &second_handle) == PICOKEYS_OK);
     assert(file_object_get_info(second_handle, &info) == PICOKEYS_OK);
     assert(info.generation == 2);
     assert(info.payload_size == sizeof(second));
     memset(output, 0, sizeof(output));
-    assert(file_object_read_at(second_handle, 0, output, sizeof(second)) == PICOKEYS_OK);
+    assert(file_object_read_at(second_handle, 0, BYTE_ARRAY(output, sizeof(second))) == PICOKEYS_OK);
     assert(memcmp(output, second, sizeof(second)) == 0);
 
     assert(file_object_delete_no_commit(&object_id) == PICOKEYS_OK);
-    assert(file_object_read_at(second_handle, 0, output, 1) == PICOKEYS_ERR_STALE_HANDLE);
+    assert(file_object_read_at(second_handle, 0, BYTE_ARRAY(output, 1)) == PICOKEYS_ERR_STALE_HANDLE);
     assert(file_object_close(second_handle) == PICOKEYS_OK);
 }
 
@@ -430,11 +452,11 @@ static void test_fid_binding_and_malformed_header(void) {
     const file_object_id_t copied_id = { .namespace_id = 1, .object_type = 2, .fid = 0xc712 };
     file_object_handle_t handle = FILE_OBJECT_INVALID_HANDLE;
 
-    assert(file_object_put(&source_id, payload, sizeof(payload)) == PICOKEYS_OK);
+    assert(file_object_put(&source_id, CONST_BYTE_ARRAY(payload, sizeof(payload))) == PICOKEYS_OK);
     file_t *source = file_search(source_id.fid);
     file_t *copied = file_new(copied_id.fid);
     assert(source && copied);
-    assert(file_put_data(copied, test_file_from_handle(source)->storage, file_get_size(source)) == PICOKEYS_OK);
+    assert(file_put_data(copied, CONST_BYTE_ARRAY(test_file_from_handle(source)->storage, file_get_size(source))) == PICOKEYS_OK);
     assert(file_object_open(&copied_id, &handle) == PICOKEYS_WRONG_DATA);
     assert(handle == FILE_OBJECT_INVALID_HANDLE);
 
@@ -449,7 +471,7 @@ static void test_handle_capacity(void) {
     file_object_handle_t handles[FILE_OBJECT_MAX_HANDLES];
     file_object_handle_t extra = FILE_OBJECT_INVALID_HANDLE;
 
-    assert(file_object_put(&object_id, payload, sizeof(payload)) == PICOKEYS_OK);
+    assert(file_object_put(&object_id, CONST_BYTE_ARRAY(payload, sizeof(payload))) == PICOKEYS_OK);
     for (size_t i = 0; i < FILE_OBJECT_MAX_HANDLES; i++) {
         assert(file_object_open(&object_id, &handles[i]) == PICOKEYS_OK);
     }
@@ -467,41 +489,41 @@ static void test_transaction_replacement_and_delete(void) {
     file_object_txn_handle_t stale_handle = FILE_OBJECT_TXN_INVALID_HANDLE;
     uint8_t output = 0;
 
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, first, sizeof(first)) == PICOKEYS_OK);
-    test_txn_read(&test_txn_layout, first, sizeof(first), 1);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(first, sizeof(first))) == PICOKEYS_OK);
+    test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(first, sizeof(first)), 1);
     assert(file_object_txn_open(&test_txn_layout, &test_auth, &stale_handle) == PICOKEYS_OK);
 
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, second, sizeof(second)) == PICOKEYS_OK);
-    assert(file_object_txn_read_at(stale_handle, &test_auth, 0, &output, 1) == PICOKEYS_ERR_STALE_HANDLE);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(second, sizeof(second))) == PICOKEYS_OK);
+    assert(file_object_txn_read_at(stale_handle, &test_auth, 0, BYTE_ARRAY(&output, 1)) == PICOKEYS_ERR_STALE_HANDLE);
     assert(file_object_txn_close(stale_handle) == PICOKEYS_OK);
-    test_txn_read(&test_txn_layout, second, sizeof(second), 2);
+    test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(second, sizeof(second)), 2);
 
     assert(file_object_txn_open(&test_txn_layout, &test_auth, &stale_handle) == PICOKEYS_OK);
     assert(file_object_txn_delete(&test_txn_layout, &test_auth) == PICOKEYS_OK);
-    assert(file_object_txn_read_at(stale_handle, &test_auth, 0, &output, 1) == PICOKEYS_ERR_STALE_HANDLE);
+    assert(file_object_txn_read_at(stale_handle, &test_auth, 0, BYTE_ARRAY(&output, 1)) == PICOKEYS_ERR_STALE_HANDLE);
     assert(file_object_txn_close(stale_handle) == PICOKEYS_OK);
     assert(file_object_txn_open(&test_txn_layout, &test_auth, &stale_handle) == PICOKEYS_ERR_FILE_NOT_FOUND);
 
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, third, sizeof(third)) == PICOKEYS_OK);
-    test_txn_read(&test_txn_layout, third, sizeof(third), 4);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(third, sizeof(third))) == PICOKEYS_OK);
+    test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(third, sizeof(third)), 4);
 }
 
 static void test_transaction_commit_boundaries(void) {
     static const uint8_t first[] = { 0x10, 0x11, 0x12 };
     static const uint8_t second[] = { 0x20, 0x21, 0x22, 0x23 };
 
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, first, sizeof(first)) == PICOKEYS_OK);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(first, sizeof(first))) == PICOKEYS_OK);
     test_fail_commit = test_commit_count + 1;
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, second, sizeof(second)) == PICOKEYS_ERR_MEMORY_FATAL);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(second, sizeof(second))) == PICOKEYS_ERR_MEMORY_FATAL);
     test_reboot();
-    test_txn_read(&test_txn_layout, first, sizeof(first), 1);
+    test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(first, sizeof(first)), 1);
 
     test_files_reset();
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, first, sizeof(first)) == PICOKEYS_OK);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(first, sizeof(first))) == PICOKEYS_OK);
     test_fail_commit = test_commit_count + 2;
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, second, sizeof(second)) == PICOKEYS_ERR_MEMORY_FATAL);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(second, sizeof(second))) == PICOKEYS_ERR_MEMORY_FATAL);
     test_reboot();
-    test_txn_read(&test_txn_layout, first, sizeof(first), 1);
+    test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(first, sizeof(first)), 1);
 }
 
 static void test_transaction_record_write_boundaries(void) {
@@ -511,13 +533,13 @@ static void test_transaction_record_write_boundaries(void) {
 
     for (size_t written = 0; written < record_size; written++) {
         test_files_reset();
-        assert(file_object_txn_put(&test_txn_layout, &test_auth, first, sizeof(first)) == PICOKEYS_OK);
+        assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(first, sizeof(first))) == PICOKEYS_OK);
         test_fail_write_fid = test_txn_layout.record_fid[1];
         test_fail_write_after = written;
-        assert(file_object_txn_put(&test_txn_layout, &test_auth, second, sizeof(second)) == PICOKEYS_EXEC_ERROR);
+        assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(second, sizeof(second))) == PICOKEYS_EXEC_ERROR);
         test_persist_files();
         test_reboot();
-        test_txn_read(&test_txn_layout, first, sizeof(first), 1);
+        test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(first, sizeof(first)), 1);
     }
 }
 
@@ -527,13 +549,13 @@ static void test_transaction_commit_write_boundaries(void) {
 
     for (size_t written = 0; written < TEST_TXN_COMMIT_SIZE; written++) {
         test_files_reset();
-        assert(file_object_txn_put(&test_txn_layout, &test_auth, first, sizeof(first)) == PICOKEYS_OK);
+        assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(first, sizeof(first))) == PICOKEYS_OK);
         test_fail_write_fid = test_txn_layout.commit_fid[1];
         test_fail_write_after = written;
-        assert(file_object_txn_put(&test_txn_layout, &test_auth, second, sizeof(second)) == PICOKEYS_EXEC_ERROR);
+        assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(second, sizeof(second))) == PICOKEYS_EXEC_ERROR);
         test_persist_files();
         test_reboot();
-        test_txn_read(&test_txn_layout, first, sizeof(first), 1);
+        test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(first, sizeof(first)), 1);
     }
 }
 
@@ -541,24 +563,24 @@ static void test_transaction_corruption_falls_back(void) {
     static const uint8_t first[] = { 0x71, 0x72, 0x73 };
     static const uint8_t second[] = { 0x81, 0x82, 0x83, 0x84 };
 
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, first, sizeof(first)) == PICOKEYS_OK);
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, second, sizeof(second)) == PICOKEYS_OK);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(first, sizeof(first))) == PICOKEYS_OK);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(second, sizeof(second))) == PICOKEYS_OK);
     test_file_t *record = test_file_from_handle(file_search(test_txn_layout.record_fid[1]));
     assert(record && record->size > TEST_TXN_RECORD_HEADER_SIZE);
     record->storage[TEST_TXN_RECORD_HEADER_SIZE] ^= 0x80;
     test_persist_files();
     test_reboot();
-    test_txn_read(&test_txn_layout, first, sizeof(first), 1);
+    test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(first, sizeof(first)), 1);
 
     test_files_reset();
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, first, sizeof(first)) == PICOKEYS_OK);
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, second, sizeof(second)) == PICOKEYS_OK);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(first, sizeof(first))) == PICOKEYS_OK);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(second, sizeof(second))) == PICOKEYS_OK);
     test_file_t *commit = test_file_from_handle(file_search(test_txn_layout.commit_fid[1]));
     assert(commit && commit->size == TEST_TXN_COMMIT_SIZE);
     commit->storage[TEST_TXN_COMMIT_SIZE - 1] ^= 0x01;
     test_persist_files();
     test_reboot();
-    test_txn_read(&test_txn_layout, first, sizeof(first), 1);
+    test_txn_read(&test_txn_layout, CONST_BYTE_ARRAY(first, sizeof(first)), 1);
 }
 
 static void test_transaction_identity_isolation(void) {
@@ -566,7 +588,7 @@ static void test_transaction_identity_isolation(void) {
     file_object_txn_layout_t wrong_layout = test_txn_layout;
     file_object_txn_handle_t handle = FILE_OBJECT_TXN_INVALID_HANDLE;
 
-    assert(file_object_txn_put(&test_txn_layout, &test_auth, payload, sizeof(payload)) == PICOKEYS_OK);
+    assert(file_object_txn_put(&test_txn_layout, &test_auth, CONST_BYTE_ARRAY(payload, sizeof(payload))) == PICOKEYS_OK);
     wrong_layout.namespace_id++;
     assert(file_object_txn_open(&wrong_layout, &test_auth, &handle) == PICOKEYS_ERR_FILE_NOT_FOUND);
     wrong_layout = test_txn_layout;
@@ -586,9 +608,9 @@ static void test_manifest_round_trip(void) {
 
     source.object.extension_offset = FILE_OBJECT_MANIFEST_HEADER_SIZE + FILE_OBJECT_DESCRIPTOR_SIZE;
     source.object.extension_size = sizeof(extensions);
-    assert(file_object_manifest_build(&source, extensions, sizeof(extensions), &test_auth, data, sizeof(data), &written) == PICOKEYS_OK);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(extensions, sizeof(extensions)), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_OK);
     assert(written == FILE_OBJECT_MANIFEST_HEADER_SIZE + FILE_OBJECT_DESCRIPTOR_SIZE + sizeof(extensions) + FILE_OBJECT_AUTH_TAG_SIZE);
-    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_OK);
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, NULL, NULL, &parsed) == PICOKEYS_OK);
     assert(parsed.namespace_id == source.namespace_id);
     assert(parsed.container_kind == source.container_kind);
     assert(parsed.container_id == source.container_id);
@@ -603,13 +625,13 @@ static void test_manifest_round_trip(void) {
     assert(parsed.extension_size == sizeof(extensions));
     assert(memcmp(data + parsed.extension_offset, extensions, sizeof(extensions)) == 0);
     for (size_t truncated = 0; truncated < written; truncated++) {
-        assert(file_object_manifest_parse(data, truncated, &test_auth, NULL, NULL, &parsed) != PICOKEYS_OK);
+        assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, truncated), &test_auth, NULL, NULL, &parsed) != PICOKEYS_OK);
     }
 
     data[8] ^= 0x01;
-    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_SIGNATURE);
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_SIGNATURE);
     data[8] ^= 0x01;
-    assert(file_object_manifest_build(&source, extensions, sizeof(extensions), &test_auth, data, written - 1, &written) == PICOKEYS_WRONG_LENGTH);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(extensions, sizeof(extensions)), &test_auth, BYTE_BUFFER(data, written - 1), &written) == PICOKEYS_WRONG_LENGTH);
     assert(written == 0);
 }
 
@@ -628,9 +650,9 @@ static void test_multi_object_manifest_round_trip(void) {
     source.objects[2].object_tag = 1;
     source.objects[2].record_id++;
 
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_OK);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_OK);
     assert(written == FILE_OBJECT_MANIFEST_HEADER_SIZE + 3 * FILE_OBJECT_DESCRIPTOR_SIZE + FILE_OBJECT_AUTH_TAG_SIZE);
-    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_OK);
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, NULL, NULL, &parsed) == PICOKEYS_OK);
     assert(parsed.object_count == 3);
     assert(parsed.has_object);
     assert(parsed.objects[0].record_id == source.objects[0].record_id);
@@ -640,11 +662,11 @@ static void test_multi_object_manifest_round_trip(void) {
     file_object_descriptor_t unordered = source.objects[0];
     source.objects[0] = source.objects[1];
     source.objects[1] = unordered;
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_WRONG_DATA);
 
     source.objects[0] = source.objects[1];
     source.objects[0].record_id--;
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_WRONG_DATA);
 }
 
 static void test_manifest_extension_compatibility(void) {
@@ -658,18 +680,18 @@ static void test_manifest_extension_compatibility(void) {
 
     source.object.extension_offset = FILE_OBJECT_MANIFEST_HEADER_SIZE + FILE_OBJECT_DESCRIPTOR_SIZE;
     source.object.extension_size = sizeof(critical_extension);
-    assert(file_object_manifest_build(&source, critical_extension, sizeof(critical_extension), &test_auth, data, sizeof(data), &written) == PICOKEYS_OK);
-    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
-    assert(file_object_manifest_parse(data, written, &test_auth, test_extension_supported, (void *)&supported_kind, &parsed) == PICOKEYS_OK);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(critical_extension, sizeof(critical_extension)), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_OK);
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, test_extension_supported, (void *)&supported_kind, &parsed) == PICOKEYS_OK);
     assert(memcmp(data + parsed.extension_offset, critical_extension, sizeof(critical_extension)) == 0);
 
     source.object.extension_offset++;
     source.object.extension_size--;
-    assert(file_object_manifest_build(&source, critical_extension, sizeof(critical_extension), &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(critical_extension, sizeof(critical_extension)), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_WRONG_DATA);
 
     source.object.extension_offset = FILE_OBJECT_MANIFEST_HEADER_SIZE + FILE_OBJECT_DESCRIPTOR_SIZE;
     source.object.extension_size = sizeof(malformed_extension);
-    assert(file_object_manifest_build(&source, malformed_extension, sizeof(malformed_extension), &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(malformed_extension, sizeof(malformed_extension)), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_WRONG_DATA);
 }
 
 static void test_manifest_malformed_fields(void) {
@@ -679,33 +701,33 @@ static void test_manifest_malformed_fields(void) {
     size_t written = 0;
 
     source.object.flags |= 0x8000;
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_WRONG_DATA);
     source = test_manifest_value();
     source.object.flags |= FILE_OBJECT_FLAG_INLINE;
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_WRONG_DATA);
     source = test_manifest_value();
     source.object.flags |= FILE_OBJECT_FLAG_TRANSACTION_GROUP;
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_WRONG_DATA);
 
     source = test_manifest_value();
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_OK);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_OK);
     put_uint16_be(2, data + 24);
-    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
 
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_OK);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_OK);
     put_uint16_be(0x8000, data + TEST_MANIFEST_DESCRIPTOR_FLAGS_OFFSET);
-    test_manifest_retag(data, written);
-    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
+    test_manifest_retag(BYTE_ARRAY(data, written));
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
 
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_OK);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_OK);
     put_uint16_be(1, data + TEST_MANIFEST_DESCRIPTOR_EXTENSION_OFFSET);
-    test_manifest_retag(data, written);
-    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
+    test_manifest_retag(BYTE_ARRAY(data, written));
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
 
-    assert(file_object_manifest_build(&source, NULL, 0, &test_auth, data, sizeof(data), &written) == PICOKEYS_OK);
+    assert(file_object_manifest_build(&source, CONST_BYTE_ARRAY(NULL, 0), &test_auth, BYTE_BUFFER(data, sizeof(data)), &written) == PICOKEYS_OK);
     put_uint16_be(1, data + TEST_MANIFEST_EXTENSION_SIZE_OFFSET);
-    test_manifest_retag(data, written);
-    assert(file_object_manifest_parse(data, written, &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
+    test_manifest_retag(BYTE_ARRAY(data, written));
+    assert(file_object_manifest_parse(CONST_BYTE_ARRAY(data, written), &test_auth, NULL, NULL, &parsed) == PICOKEYS_WRONG_DATA);
 }
 
 static void test_object_record_header_binding(void) {
@@ -717,18 +739,18 @@ static void test_object_record_header_binding(void) {
     record[FILE_OBJECT_RECORD_HEADER_SIZE] = 1;
     record[FILE_OBJECT_RECORD_HEADER_SIZE + 1] = 2;
     record[FILE_OBJECT_RECORD_HEADER_SIZE + 2] = 3;
-    assert(file_object_record_header_parse(record, sizeof(record), &manifest.object, &info) == PICOKEYS_OK);
+    assert(file_object_record_header_parse(CONST_BYTE_ARRAY(record, sizeof(record)), &manifest.object, &info) == PICOKEYS_OK);
     assert(info.record_id == manifest.object.record_id);
     assert(info.generation == manifest.object.generation);
     assert(info.payload_offset == FILE_OBJECT_RECORD_HEADER_SIZE);
     assert(info.tag_offset == FILE_OBJECT_RECORD_HEADER_SIZE + manifest.object.stored_size);
-    assert(file_object_record_header_parse(record, sizeof(record) - 1, &manifest.object, &info) == PICOKEYS_WRONG_LENGTH);
+    assert(file_object_record_header_parse(CONST_BYTE_ARRAY(record, sizeof(record) - 1), &manifest.object, &info) == PICOKEYS_WRONG_LENGTH);
 
     record[FILE_OBJECT_RECORD_HEADER_SIZE - 1] ^= 0x01;
-    assert(file_object_record_header_parse(record, sizeof(record), &manifest.object, &info) == PICOKEYS_WRONG_DATA);
+    assert(file_object_record_header_parse(CONST_BYTE_ARRAY(record, sizeof(record)), &manifest.object, &info) == PICOKEYS_WRONG_DATA);
     record[FILE_OBJECT_RECORD_HEADER_SIZE - 1] ^= 0x01;
     record[8] ^= 0x01;
-    assert(file_object_record_header_parse(record, sizeof(record), &manifest.object, &info) == PICOKEYS_WRONG_DATA);
+    assert(file_object_record_header_parse(CONST_BYTE_ARRAY(record, sizeof(record)), &manifest.object, &info) == PICOKEYS_WRONG_DATA);
 }
 
 static void test_object_record_protection(void) {
@@ -741,37 +763,37 @@ static void test_object_record_protection(void) {
     uint8_t wrong_policy_hash[FILE_OBJECT_POLICY_HASH_SIZE];
     size_t written = 0;
 
-    assert(file_object_record_seal(&manifest, policy_hash, &test_record_protector, plaintext, sizeof(plaintext), record, sizeof(record), &written) == PICOKEYS_OK);
+    assert(file_object_record_seal(&manifest, policy_hash, &test_record_protector, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), BYTE_BUFFER(record, sizeof(record)), &written) == PICOKEYS_OK);
     assert(written == sizeof(record));
     assert(memcmp(record + FILE_OBJECT_RECORD_HEADER_SIZE, plaintext, sizeof(plaintext)) == 0);
-    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, record, sizeof(record), output, sizeof(output), &written) == PICOKEYS_OK);
+    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, CONST_BYTE_ARRAY(record, sizeof(record)), BYTE_ARRAY(output, sizeof(output)), &written) == PICOKEYS_OK);
     assert(written == sizeof(plaintext));
     assert(memcmp(output, plaintext, sizeof(plaintext)) == 0);
-    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, record, sizeof(record), output, sizeof(output) - 1, &written) == PICOKEYS_WRONG_LENGTH);
+    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, CONST_BYTE_ARRAY(record, sizeof(record)), BYTE_ARRAY(output, sizeof(output) - 1), &written) == PICOKEYS_WRONG_LENGTH);
 
     relocated = manifest;
     relocated.container_id++;
     memset(output, 0xa5, sizeof(output));
-    assert(file_object_record_unseal(&relocated, policy_hash, &test_record_protector, record, sizeof(record), output, sizeof(output), &written) == PICOKEYS_WRONG_SIGNATURE);
+    assert(file_object_record_unseal(&relocated, policy_hash, &test_record_protector, CONST_BYTE_ARRAY(record, sizeof(record)), BYTE_ARRAY(output, sizeof(output)), &written) == PICOKEYS_WRONG_SIGNATURE);
     assert(memcmp(output, (uint8_t[sizeof(output)]) { 0 }, sizeof(output)) == 0);
 
     memcpy(wrong_policy_hash, policy_hash, sizeof(wrong_policy_hash));
     wrong_policy_hash[0] ^= 0x80;
-    assert(file_object_record_unseal(&manifest, wrong_policy_hash, &test_record_protector, record, sizeof(record), output, sizeof(output), &written) == PICOKEYS_WRONG_SIGNATURE);
+    assert(file_object_record_unseal(&manifest, wrong_policy_hash, &test_record_protector, CONST_BYTE_ARRAY(record, sizeof(record)), BYTE_ARRAY(output, sizeof(output)), &written) == PICOKEYS_WRONG_SIGNATURE);
 
     record[FILE_OBJECT_RECORD_HEADER_SIZE] ^= 0x01;
-    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, record, sizeof(record), output, sizeof(output), &written) == PICOKEYS_WRONG_SIGNATURE);
+    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, CONST_BYTE_ARRAY(record, sizeof(record)), BYTE_ARRAY(output, sizeof(output)), &written) == PICOKEYS_WRONG_SIGNATURE);
     record[FILE_OBJECT_RECORD_HEADER_SIZE] ^= 0x01;
 
     manifest.object.protection = FILE_OBJECT_PROTECTION_AEAD_SECRET;
     manifest.object.flags = FILE_OBJECT_FLAG_NON_EXPORTABLE;
-    assert(file_object_record_seal(&manifest, policy_hash, &test_record_protector, plaintext, sizeof(plaintext), record, sizeof(record), &written) == PICOKEYS_OK);
+    assert(file_object_record_seal(&manifest, policy_hash, &test_record_protector, CONST_BYTE_ARRAY(plaintext, sizeof(plaintext)), BYTE_BUFFER(record, sizeof(record)), &written) == PICOKEYS_OK);
     assert(memcmp(record + FILE_OBJECT_RECORD_HEADER_SIZE, plaintext, sizeof(plaintext)) != 0);
-    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, record, sizeof(record), output, sizeof(output), &written) == PICOKEYS_OK);
+    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, CONST_BYTE_ARRAY(record, sizeof(record)), BYTE_ARRAY(output, sizeof(output)), &written) == PICOKEYS_OK);
     assert(memcmp(output, plaintext, sizeof(plaintext)) == 0);
 
     test_record_protector_context.key ^= 0x01;
-    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, record, sizeof(record), output, sizeof(output), &written) == PICOKEYS_WRONG_SIGNATURE);
+    assert(file_object_record_unseal(&manifest, policy_hash, &test_record_protector, CONST_BYTE_ARRAY(record, sizeof(record)), BYTE_ARRAY(output, sizeof(output)), &written) == PICOKEYS_WRONG_SIGNATURE);
     test_record_protector_context.key ^= 0x01;
 }
 
@@ -921,11 +943,10 @@ static const file_object_container_layout_t test_container_layout = {
     .rollback_new_records = true
 };
 
-static file_object_container_write_t test_container_write(uint16_t object_type, const uint8_t *data, uint32_t data_size) {
+static file_object_container_write_t test_container_write(uint16_t object_type, const_byte_array_t data) {
     return (file_object_container_write_t) {
         .object_type = object_type,
         .data = data,
-        .data_size = data_size,
         .policy_id = 0x0100u,
         .protection = FILE_OBJECT_PROTECTION_AEAD_SECRET,
         .flags = FILE_OBJECT_FLAG_MUTABLE
@@ -943,8 +964,8 @@ static void test_container_store_lifecycle(void) {
         .protector = &test_record_protector
     };
     file_object_container_write_t initial[] = {
-        test_container_write(2, second, sizeof(second)),
-        test_container_write(1, first, sizeof(first))
+        test_container_write(2, CONST_BYTE_ARRAY(second, sizeof(second))),
+        test_container_write(1, CONST_BYTE_ARRAY(first, sizeof(first)))
     };
     uint8_t output[16] = { 0 };
     size_t written = 0;
@@ -953,7 +974,7 @@ static void test_container_store_lifecycle(void) {
     test_container_context.next_record_fid = 0xe100u;
     assert(file_object_container_update(&test_container_layout, container_id, initial, sizeof(initial) / sizeof(initial[0]), &crypto, NULL) == PICOKEYS_OK);
     assert(test_container_context.activate_count == 1);
-    assert(file_object_container_read(&test_container_layout, container_id, 1, 0, &crypto, NULL, NULL, NULL, output, sizeof(output), &written) == PICOKEYS_OK);
+    assert(file_object_container_read(&test_container_layout, container_id, 1, 0, &crypto, NULL, NULL, NULL, BYTE_BUFFER(output, sizeof(output)), &written) == PICOKEYS_OK);
     assert(written == sizeof(first));
     assert(memcmp(output, first, sizeof(first)) == 0);
 
@@ -964,7 +985,7 @@ static void test_container_store_lifecycle(void) {
     assert(state.candidates[0].manifest.objects[1].object_type == 2);
     test_reboot();
 
-    file_object_container_write_t update = test_container_write(1, replacement, sizeof(replacement));
+    file_object_container_write_t update = test_container_write(1, CONST_BYTE_ARRAY(replacement, sizeof(replacement)));
     assert(file_object_container_update(&test_container_layout, container_id, &update, 1, &crypto, NULL) == PICOKEYS_OK);
     test_file_t *new_record = test_file_from_handle(file_search(0xe102u));
     assert(new_record && new_record->size > FILE_OBJECT_RECORD_HEADER_SIZE);
@@ -972,15 +993,15 @@ static void test_container_store_lifecycle(void) {
     test_persist_files();
     test_reboot();
 
-    assert(file_object_container_read(&test_container_layout, container_id, 1, 0, &crypto, NULL, NULL, NULL, output, sizeof(output), &written) == PICOKEYS_OK);
+    assert(file_object_container_read(&test_container_layout, container_id, 1, 0, &crypto, NULL, NULL, NULL, BYTE_BUFFER(output, sizeof(output)), &written) == PICOKEYS_OK);
     assert(written == sizeof(first));
     assert(memcmp(output, first, sizeof(first)) == 0);
 
-    file_object_container_write_t second_update = test_container_write(2, second_replacement, sizeof(second_replacement));
+    file_object_container_write_t second_update = test_container_write(2, CONST_BYTE_ARRAY(second_replacement, sizeof(second_replacement)));
     assert(file_object_container_update(&test_container_layout, container_id, &second_update, 1, &crypto, NULL) == PICOKEYS_OK);
     assert(!file_has_data(file_search(0xe102u)));
     assert(file_object_container_remove(&test_container_layout, container_id, 2, 0, &crypto, NULL) == PICOKEYS_OK);
-    assert(file_object_container_read(&test_container_layout, container_id, 2, 0, &crypto, NULL, NULL, NULL, output, sizeof(output), &written) == PICOKEYS_ERR_FILE_NOT_FOUND);
+    assert(file_object_container_read(&test_container_layout, container_id, 2, 0, &crypto, NULL, NULL, NULL, BYTE_BUFFER(output, sizeof(output)), &written) == PICOKEYS_ERR_FILE_NOT_FOUND);
 
     uint32_t object_size = 0;
     assert(file_object_container_object_size(&test_container_layout, container_id, 1, 0, &crypto, NULL, NULL, NULL, &object_size) == PICOKEYS_OK);
@@ -989,6 +1010,140 @@ static void test_container_store_lifecycle(void) {
     assert(test_container_context.deactivate_count == 1);
     assert(!file_has_data(file_search(test_container_manifest_fid(NULL, container_id, 0))));
     assert(!file_has_data(file_search(test_container_manifest_fid(NULL, container_id, 1))));
+}
+
+static void test_container_expect(uint32_t container_id, const file_object_container_crypto_t *crypto, const_byte_array_t expected) {
+    uint8_t output[16] = { 0 };
+    size_t written = 0;
+    assert(expected.len <= sizeof(output));
+    assert(file_object_container_read(&test_container_layout, container_id, 1, 0, crypto, NULL, NULL, NULL, BYTE_BUFFER(output, sizeof(output)), &written) == PICOKEYS_OK);
+    assert(written == expected.len);
+    assert(memcmp(output, expected.data, expected.len) == 0);
+}
+
+static void test_container_power_loss_create(size_t failed_event) {
+    static const uint8_t first[] = { 0x11, 0x12 };
+    static const uint8_t second[] = { 0x21, 0x22, 0x23 };
+    static const const_byte_array_t first_array = {
+        .data = first,
+        .len = sizeof(first)
+    };
+    const uint32_t container_id = 0x42u;
+    const file_object_container_crypto_t crypto = {
+        .auth = &test_auth,
+        .protector = &test_record_protector
+    };
+    file_object_container_write_t writes[] = {
+        test_container_write(1, first_array),
+        test_container_write(2, CONST_BYTE_ARRAY(second, sizeof(second)))
+    };
+
+    test_files_reset();
+    memset(&test_container_context, 0, sizeof(test_container_context));
+    test_container_context.next_record_fid = 0xe200u;
+    if (setjmp(test_power_loss_env) == 0) {
+        test_power_loss_event = 0;
+        test_power_loss_at = failed_event;
+        test_power_loss_armed = true;
+        (void)file_object_container_update(&test_container_layout, container_id, writes, sizeof(writes) / sizeof(writes[0]), &crypto, NULL);
+        assert(false);
+    }
+    test_reboot();
+
+    file_object_container_state_t state;
+    assert(file_object_container_load(&test_container_layout, container_id, &crypto, NULL, &state) == PICOKEYS_ERR_FILE_NOT_FOUND);
+    assert(file_object_container_update(&test_container_layout, container_id, writes, sizeof(writes) / sizeof(writes[0]), &crypto, NULL) == PICOKEYS_OK);
+    test_container_expect(container_id, &crypto, first_array);
+}
+
+static void test_container_power_loss_update(size_t failed_event) {
+    static const uint8_t first[] = { 0x31, 0x32 };
+    static const uint8_t second[] = { 0x41, 0x42 };
+    static const uint8_t replacement[] = { 0x51, 0x52, 0x53 };
+    static const uint8_t final[] = { 0x61, 0x62, 0x63, 0x64 };
+    static const const_byte_array_t replacement_array = {
+        .data = replacement,
+        .len = sizeof(replacement)
+    };
+    static const const_byte_array_t final_array = {
+        .data = final,
+        .len = sizeof(final)
+    };
+    const uint32_t container_id = 0x43u;
+    const file_object_container_crypto_t crypto = {
+        .auth = &test_auth,
+        .protector = &test_record_protector
+    };
+    file_object_container_write_t initial[] = {
+        test_container_write(1, CONST_BYTE_ARRAY(first, sizeof(first))),
+        test_container_write(2, CONST_BYTE_ARRAY(second, sizeof(second)))
+    };
+    file_object_container_write_t replacement_write = test_container_write(1, replacement_array);
+    file_object_container_write_t final_write = test_container_write(1, final_array);
+
+    test_files_reset();
+    memset(&test_container_context, 0, sizeof(test_container_context));
+    test_container_context.next_record_fid = 0xe300u;
+    assert(file_object_container_update(&test_container_layout, container_id, initial, sizeof(initial) / sizeof(initial[0]), &crypto, NULL) == PICOKEYS_OK);
+    assert(file_object_container_update(&test_container_layout, container_id, &replacement_write, 1, &crypto, NULL) == PICOKEYS_OK);
+
+    if (setjmp(test_power_loss_env) == 0) {
+        test_power_loss_event = 0;
+        test_power_loss_at = failed_event;
+        test_power_loss_armed = true;
+        (void)file_object_container_update(&test_container_layout, container_id, &final_write, 1, &crypto, NULL);
+        assert(false);
+    }
+    test_reboot();
+
+    if (failed_event < 3) {
+        test_container_expect(container_id, &crypto, replacement_array);
+    }
+    else {
+        test_container_expect(container_id, &crypto, final_array);
+    }
+    assert(file_object_container_update(&test_container_layout, container_id, &final_write, 1, &crypto, NULL) == PICOKEYS_OK);
+    test_container_expect(container_id, &crypto, final_array);
+}
+
+static void test_container_power_loss_delete(void) {
+    static const uint8_t first[] = { 0x71, 0x72 };
+    static const const_byte_array_t first_array = {
+        .data = first,
+        .len = sizeof(first)
+    };
+    const uint32_t container_id = 0x44u;
+    const file_object_container_crypto_t crypto = {
+        .auth = &test_auth,
+        .protector = &test_record_protector
+    };
+    file_object_container_write_t write = test_container_write(1, first_array);
+
+    test_files_reset();
+    memset(&test_container_context, 0, sizeof(test_container_context));
+    test_container_context.next_record_fid = 0xe400u;
+    assert(file_object_container_update(&test_container_layout, container_id, &write, 1, &crypto, NULL) == PICOKEYS_OK);
+    if (setjmp(test_power_loss_env) == 0) {
+        test_power_loss_event = 0;
+        test_power_loss_at = 1;
+        test_power_loss_armed = true;
+        (void)file_object_container_delete(&test_container_layout, container_id, &crypto, NULL);
+        assert(false);
+    }
+    test_reboot();
+
+    test_container_expect(container_id, &crypto, first_array);
+    assert(file_object_container_delete(&test_container_layout, container_id, &crypto, NULL) == PICOKEYS_OK);
+}
+
+static void test_container_power_loss_boundaries(void) {
+    for (size_t failed_event = 1; failed_event <= 2; failed_event++) {
+        test_container_power_loss_create(failed_event);
+    }
+    for (size_t failed_event = 1; failed_event <= 3; failed_event++) {
+        test_container_power_loss_update(failed_event);
+    }
+    test_container_power_loss_delete();
 }
 
 int main(void) {
@@ -1030,6 +1185,7 @@ int main(void) {
     test_record_id_allocator_single_slot_corruption();
     test_files_reset();
     test_container_store_lifecycle();
+    test_container_power_loss_boundaries();
     puts("object_store_test: OK");
     return 0;
 }

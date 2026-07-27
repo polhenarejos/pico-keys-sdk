@@ -22,11 +22,11 @@
 
 phy_data_t phy_data;
 
-int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
-    if (!phy || !data || !len) {
+int phy_serialize_data(const phy_data_t *phy, byte_buffer_t data, uint16_t *len) {
+    if (!phy || !data.data || data.capacity < PHY_MAX_SIZE || !len) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
-    uint8_t *p = data;
+    uint8_t *p = data.data;
     if (phy->vidpid_present) {
         *p++ = PHY_VIDPID;
         *p++ = 4;
@@ -79,17 +79,17 @@ int phy_serialize_data(const phy_data_t *phy, uint8_t *data, uint16_t *len) {
         }
     }
 
-    *len = (uint8_t)(p - data);
+    *len = (uint8_t)(p - data.data);
     return PICOKEYS_OK;
 }
 
-int phy_unserialize_data(const uint8_t *data, uint16_t len, phy_data_t *phy) {
-    if (!phy || !data || !len) {
+int phy_unserialize_data(const_byte_array_t data, phy_data_t *phy) {
+    if (!phy || !data.data || data.len == 0 || data.len > UINT16_MAX) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
     memset(phy, 0, sizeof(*phy));
-    const uint8_t *p = data;
-    const uint8_t *end = data + len;
+    const uint8_t *p = data.data;
+    const uint8_t *end = data.data + data.len;
     uint8_t tag, tlen;
     while (p + 2 <= end) {
         tag = *p++;
@@ -189,18 +189,18 @@ int phy_init(void) {
 int phy_save(void) {
     uint8_t tmp[PHY_MAX_SIZE] = {0};
     uint16_t tmp_len = 0;
-    int ret = phy_serialize_data(&phy_data, tmp, &tmp_len);
+    int ret = phy_serialize_data(&phy_data, BYTE_BUFFER(tmp, sizeof(tmp)), &tmp_len);
     if (ret != PICOKEYS_OK) {
         return ret;
     }
-    file_put_data(ef_phy, tmp, tmp_len);
+    file_put_data(ef_phy, CONST_BYTE_ARRAY(tmp, tmp_len));
     flash_commit();
     return PICOKEYS_OK;
 }
 
 int phy_load(void) {
     if (file_has_data(ef_phy)) {
-        return phy_unserialize_data(file_get_data(ef_phy), file_get_size(ef_phy), &phy_data);
+        return phy_unserialize_data(CONST_BYTE_ARRAY(file_get_data(ef_phy), file_get_size(ef_phy)), &phy_data);
     }
     return PICOKEYS_OK;
 }

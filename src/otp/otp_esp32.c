@@ -25,6 +25,7 @@
 
 #include "esp_efuse.h"
 #include "esp_efuse_table.h"
+#include "byte_array.h"
 
 #define OTP_KEY_1    EFUSE_BLK_KEY3
 #define OTP_KEY_2    EFUSE_BLK_KEY4
@@ -166,12 +167,12 @@ static esp_err_t esp_disable_debug_interfaces(void) {
     return err;
 }
 
-static esp_err_t read_key_from_efuse(esp_efuse_block_t block, uint8_t *key, size_t key_len) {
+static esp_err_t read_key_from_efuse(esp_efuse_block_t block, byte_array_t key) {
     const esp_efuse_desc_t **key_desc = esp_efuse_get_key(block);
     if (!key_desc) {
         return ESP_FAIL;
     }
-    return esp_efuse_read_field_blob(key_desc, key, key_len * 8);
+    return esp_efuse_read_field_blob(key_desc, key.data, key.len * 8);
 }
 
 bool otp_platform_is_secure_boot_enabled(uint8_t *bootkey) {
@@ -288,7 +289,7 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
 
     if (esp_efuse_key_block_unused(OTP_KEY_1)) {
         uint8_t mkek[32] = {0};
-        random_fill_buffer(mkek, sizeof(mkek));
+        random_fill_buffer(BYTE_ARRAY(mkek, sizeof(mkek)));
         ret = esp_efuse_write_key(OTP_KEY_1, ESP_EFUSE_KEY_PURPOSE_USER, mkek, sizeof(mkek));
         if (ret != 0) {
             printf("Error writing OTP key 1 [%d]\n", ret);
@@ -296,7 +297,7 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
         mbedtls_platform_zeroize(mkek, sizeof(mkek));
         write_otp[0] = OTP_KEY_1;
     }
-    ret = read_key_from_efuse(OTP_KEY_1, _otp_key_1, sizeof(_otp_key_1));
+    ret = read_key_from_efuse(OTP_KEY_1, BYTE_ARRAY(_otp_key_1, sizeof(_otp_key_1)));
     if (ret != ESP_OK) {
         printf("Error reading OTP key 1 [%d]\n", ret);
     }
@@ -320,7 +321,7 @@ void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_
         mbedtls_platform_zeroize(pkey, sizeof(pkey));
         write_otp[1] = OTP_KEY_2;
     }
-    ret = read_key_from_efuse(OTP_KEY_2, _otp_key_2, sizeof(_otp_key_2));
+    ret = read_key_from_efuse(OTP_KEY_2, BYTE_ARRAY(_otp_key_2, sizeof(_otp_key_2)));
     if (ret != ESP_OK) {
         printf("Error reading OTP key 2 [%d]\n", ret);
     }

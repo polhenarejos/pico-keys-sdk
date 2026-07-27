@@ -16,6 +16,7 @@
  */
 
 #include "picokeys.h"
+#include "byte_array.h"
 #include "otp_platform.h"
 
 #if defined(MACOS_APP) && MACOS_APP
@@ -37,7 +38,9 @@ static int sec_err(const char *ctx, OSStatus st) {
     return -1;
 }
 
-static int derive_secp256k1_privkey_from_secret(const uint8_t *secret, size_t secret_len, uint8_t out_key32[32]) {
+static int derive_secp256k1_privkey_from_secret(const_byte_array_t secret_data, uint8_t out_key32[32]) {
+    const uint8_t *secret = secret_data.data;
+    size_t secret_len = secret_data.len;
     int rc = -1;
     uint8_t digest[32];
     const uint8_t label[] = "pico-novus/se-ecdh-to-k1-v1";
@@ -222,7 +225,7 @@ static int macos_se_vault_load_or_create_key(uint8_t out_key32[32]) {
         goto cleanup;
     }
 
-    if (derive_secp256k1_privkey_from_secret(CFDataGetBytePtr(shared_secret), (size_t)CFDataGetLength(shared_secret), out_key32) != 0) {
+    if (derive_secp256k1_privkey_from_secret(CONST_BYTE_ARRAY(CFDataGetBytePtr(shared_secret), (size_t)CFDataGetLength(shared_secret)), out_key32) != 0) {
         fprintf(stderr, "[macos-se] failed deriving secp256k1 private key from ECDH secret\n");
         goto cleanup;
     }

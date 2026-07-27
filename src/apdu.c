@@ -74,7 +74,7 @@ int process_apdu(void) {
         }
     }
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
-        if (select_app(apdu.data, apdu.nc) == PICOKEYS_OK) {
+        if (select_app(CONST_BYTE_ARRAY(apdu.data, apdu.nc)) == PICOKEYS_OK) {
             return SW_OK();
         }
         return SW_FILE_NOT_FOUND();
@@ -85,13 +85,15 @@ int process_apdu(void) {
     return SW_FILE_NOT_FOUND();
 }
 
-uint16_t apdu_process(uint8_t itf, const uint8_t *buffer, uint16_t buffer_size) {
+uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer) {
     uint32_t expected_size;
+    uint16_t buffer_size = 0;
 
-    if (buffer_size < 4) {
+    if (buffer.len < 4 || buffer.len > UINT16_MAX || buffer.data == NULL) {
         return 0;
     }
-    apdu.header = (uint8_t *) buffer;
+    buffer_size = (uint16_t)buffer.len;
+    apdu.header = (uint8_t *)buffer.data;
     apdu.nc = apdu.ne = 0;
     if (buffer_size == 4) {
         apdu.nc = apdu.ne = 0;

@@ -18,6 +18,8 @@
 #ifndef _CRYPTO_UTILS_H_
 #define _CRYPTO_UTILS_H_
 
+#include "byte_array.h"
+
 #include "mbedtls/ecp.h"
 #include "mbedtls/md.h"
 
@@ -48,25 +50,25 @@ typedef enum {
 
 // Newer and safe functions
 extern void derive_kbase(uint8_t kbase[32]);
-extern void derive_kver(const uint8_t *pin, size_t pin_len, uint8_t kver[32]);
+extern void derive_kver(const_byte_array_t pin, uint8_t kver[32]);
 extern void pin_derive_kenc(const uint8_t pin_token[32], uint8_t kenc[32]);
 extern void pin_derive_kenc2(const uint8_t pin_token[32], uint8_t kenc[32]);
-extern void pin_derive_session(const uint8_t *pin, size_t pin_len, uint8_t pin_token[32]);
-extern void pin_derive_verifier(const uint8_t *pin, size_t pin_len, uint8_t verifier[32]);
-extern int encrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, const pin_kdf_version_t version, uint8_t *out_buf);
-extern int decrypt_with_aad(const uint8_t key[32], const uint8_t *in_buf, size_t in_len, const pin_kdf_version_t version, uint8_t *out_buf);
-extern void double_hash_pin(const uint8_t *pin, uint16_t len, uint8_t output[32]);
-extern void hash_multi(const uint8_t *input, uint16_t len, uint8_t output[32]);
-extern void hash256(const uint8_t *input, size_t len, uint8_t output[32]);
-extern void generic_hash(mbedtls_md_type_t md, const uint8_t *input, size_t len, uint8_t *output);
-extern int aes_encrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mode, uint8_t *data, uint16_t len);
-extern int aes_decrypt(const uint8_t *key, const uint8_t *iv, uint16_t key_size, int mode, uint8_t *data, uint16_t len);
-extern int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len);
-extern int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, uint8_t *data, uint16_t len);
-extern mbedtls_ecp_group_id ec_get_curve_from_prime(const uint8_t *prime, size_t prime_len);
-extern uint32_t crc32c(const uint8_t *buf, size_t len);
-extern int base64url_encode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen);
-extern int base64url_decode(unsigned char *dst, size_t dlen, size_t *olen, const unsigned char *src, size_t slen);
+extern void pin_derive_session(const_byte_array_t pin, uint8_t pin_token[32]);
+extern void pin_derive_verifier(const_byte_array_t pin, uint8_t verifier[32]);
+extern int encrypt_with_aad(const uint8_t key[32], const_byte_array_t input, pin_kdf_version_t version, uint8_t *out_buf);
+extern int decrypt_with_aad(const uint8_t key[32], const_byte_array_t input, pin_kdf_version_t version, uint8_t *out_buf);
+extern void double_hash_pin(const_byte_array_t pin, uint8_t output[32]);
+extern void hash_multi(const_byte_array_t input, uint8_t output[32]);
+extern void hash256(const_byte_array_t input, uint8_t output[32]);
+extern void generic_hash(mbedtls_md_type_t md, const_byte_array_t input, uint8_t *output);
+extern int aes_encrypt(const_byte_array_t key, const uint8_t *iv, int mode, byte_array_t data);
+extern int aes_decrypt(const_byte_array_t key, const uint8_t *iv, int mode, byte_array_t data);
+extern int aes_encrypt_cfb_256(const uint8_t *key, const uint8_t *iv, byte_array_t data);
+extern int aes_decrypt_cfb_256(const uint8_t *key, const uint8_t *iv, byte_array_t data);
+extern mbedtls_ecp_group_id ec_get_curve_from_prime(const_byte_array_t prime);
+extern uint32_t crc32c(const_byte_array_t data);
+extern int base64url_encode(byte_buffer_t dst, size_t *written, const_byte_array_t src);
+extern int base64url_decode(byte_buffer_t dst, size_t *written, const_byte_array_t src);
 extern int b64url_decoded_len(size_t n, size_t *out_len);
 
 #define PIN_KDF_SIZE(x)  (12 + (x) + 16)

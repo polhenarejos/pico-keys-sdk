@@ -110,10 +110,10 @@ static int encrypt_internal_keydev(file_t *ef_devcert_key, const uint8_t pkey[DE
     uint8_t kbase[32] = { 0 };
     record[0] = DEVCERT_KEY_FORMAT_GCM;
     derive_kbase(kbase);
-    int ret = encrypt_with_aad(kbase, pkey, DEVCERT_KEY_PLAIN_SIZE, PIN_KDF_V2, record + 1);
+    int ret = encrypt_with_aad(kbase, CONST_BYTE_ARRAY(pkey, DEVCERT_KEY_PLAIN_SIZE), PIN_KDF_V2, record + 1);
     mbedtls_platform_zeroize(kbase, sizeof(kbase));
     if (ret == PICOKEYS_OK) {
-        ret = file_put_data(ef_devcert_key, record, sizeof(record));
+        ret = file_put_data(ef_devcert_key, CONST_BYTE_ARRAY(record, sizeof(record)));
     }
     mbedtls_platform_zeroize(record, sizeof(record));
     return ret;
@@ -127,12 +127,12 @@ static int decrypt_internal_keydev(file_t *ef_devcert_key, uint8_t pkey[DEVCERT_
     int ret = PICOKEYS_EXEC_ERROR;
 
     if (record_len == DEVCERT_KEY_GCM_SIZE && record[0] == DEVCERT_KEY_FORMAT_GCM) {
-        ret = decrypt_with_aad(kbase, record + 1, record_len - 1, PIN_KDF_V2, pkey);
+        ret = decrypt_with_aad(kbase, CONST_BYTE_ARRAY(record + 1, record_len - 1), PIN_KDF_V2, pkey);
         *legacy = false;
     }
     else if (record_len == DEVCERT_KEY_PLAIN_SIZE) {
         memcpy(pkey, record, DEVCERT_KEY_PLAIN_SIZE);
-        ret = aes_decrypt(kbase, pico_serial_hash, 32 * 8, PICOKEYS_AES_MODE_CBC, pkey, DEVCERT_KEY_PLAIN_SIZE);
+        ret = aes_decrypt(CONST_BYTE_ARRAY(kbase, sizeof(kbase)), pico_serial_hash, PICOKEYS_AES_MODE_CBC, BYTE_ARRAY(pkey, DEVCERT_KEY_PLAIN_SIZE));
         *legacy = true;
     }
     mbedtls_platform_zeroize(kbase, sizeof(kbase));
@@ -309,7 +309,7 @@ static int cmd_keydev_sign(void) {
         if (!ef_devcert) {
             return SW_FILE_NOT_FOUND();
         }
-        file_put_data(ef_devcert, apdu.data, (uint16_t)apdu.nc);
+        file_put_data(ef_devcert, CONST_BYTE_ARRAY(apdu.data, (uint16_t)apdu.nc));
         res_APDU_size = 0;
         flash_commit();
     }
@@ -337,7 +337,7 @@ static int cmd_write(void) {
             return SW_CONDITIONS_NOT_SATISFIED();
         }
 #ifndef ENABLE_EMULATION
-        int ret = phy_unserialize_data(apdu.data, (uint16_t)apdu.nc, &phy_data);
+        int ret = phy_unserialize_data(CONST_BYTE_ARRAY(apdu.data, (uint16_t)apdu.nc), &phy_data);
         if (ret == PICOKEYS_OK) {
             if (phy_save() != PICOKEYS_OK) {
                 return SW_EXEC_ERROR();
@@ -386,7 +386,7 @@ static int cmd_read(void) {
     if (p1 == 0x1) { // PHY
 #ifndef ENABLE_EMULATION
         uint16_t len = 0;
-        int ret = phy_serialize_data(&phy_data, apdu.rdata, &len);
+        int ret = phy_serialize_data(&phy_data, BYTE_BUFFER(apdu.rdata, PHY_MAX_SIZE), &len);
         if (ret != PICOKEYS_OK) {
             return SW_EXEC_ERROR();
         }

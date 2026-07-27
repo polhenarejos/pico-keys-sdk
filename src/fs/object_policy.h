@@ -64,8 +64,8 @@ typedef struct file_object_authorization_context {
     uint16_t caller_namespace;
 } file_object_authorization_context_t;
 
-int file_object_policy_validate(const uint8_t *policy, size_t policy_size);
-int file_object_policy_hash(const uint8_t *policy, size_t policy_size, uint8_t hash[FILE_OBJECT_POLICY_HASH_SIZE]);
-bool file_object_policy_authorize(const uint8_t *policy, size_t policy_size, uint16_t operation, const file_object_authorization_context_t *context);
+int file_object_policy_validate(const_byte_array_t policy);
+int file_object_policy_hash(const_byte_array_t policy, uint8_t hash[FILE_OBJECT_POLICY_HASH_SIZE]);
+bool file_object_policy_authorize(const_byte_array_t policy, uint16_t operation, const file_object_authorization_context_t *context);
 
 #endif // _OBJECT_POLICY_H_

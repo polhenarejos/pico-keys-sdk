@@ -156,11 +156,11 @@ static int copy_file_range(const file_t *source, uint32_t source_offset, uintptr
 
     while (len > 0) {
         size_t chunk = MIN(sizeof(buffer), len);
-        int r = file_read_at(source, source_offset, buffer, chunk);
+        int r = file_read_at(source, source_offset, BYTE_ARRAY(buffer, chunk));
         if (r != PICOKEYS_OK) {
             return r;
         }
-        r = flash_program_block(destination, buffer, chunk);
+        r = flash_program_block(destination, CONST_BYTE_ARRAY(buffer, chunk));
         if (r != PICOKEYS_OK) {
             return r;
         }
@@ -171,10 +171,14 @@ static int copy_file_range(const file_t *source, uint32_t source_offset, uintptr
     return PICOKEYS_OK;
 }
 
-static int flash_write_data_to_file_internal(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset, bool partial) {
-    if (!file || (!data && len > 0)) {
+static int flash_write_data_to_file_internal(file_t *file, const_byte_array_t data, uint32_t offset, bool partial) {
+    uint32_t len = 0;
+
+    if (!file || (!data.data && data.len > 0) || data.len > UINT32_MAX) {
         return PICOKEYS_ERR_NULL_PARAM;
     }
+
+    len = (uint32_t)data.len;
 
     uint32_t old_size = file_get_size(file);
     if (offset > UINT32_MAX - len || (partial && offset > old_size)) {
@@ -191,7 +195,7 @@ static int flash_write_data_to_file_internal(file_t *file, const uint8_t *data, 
             r = extended_size ? flash_program_word((uintptr_t)file->data + sizeof(uint16_t), len) : flash_program_halfword((uintptr_t)file->data, (uint16_t)len);
         }
         if (r == PICOKEYS_OK && len > 0) {
-            r = flash_program_block((uintptr_t)file->data + length_size + offset, data, len);
+            r = flash_program_block((uintptr_t)file->data + length_size + offset, data);
         }
         if (r == PICOKEYS_OK && old_size > FLASH_SECTOR_SIZE && !flash_commit_sync(5000u)) {
             return PICOKEYS_ERR_MEMORY_FATAL;
@@ -226,7 +230,7 @@ static int flash_write_data_to_file_internal(file_t *file, const uint8_t *data, 
         r = copy_file_range(&old_file, 0, payload, offset);
     }
     if (r == PICOKEYS_OK && len > 0) {
-        r = flash_program_block(payload + offset, data, len);
+        r = flash_program_block(payload + offset, data);
     }
     if (r == PICOKEYS_OK && partial && replacing && write_end < old_size) {
         r = copy_file_range(&old_file, write_end, payload + write_end, old_size - write_end);
@@ -249,12 +253,12 @@ static int flash_write_data_to_file_internal(file_t *file, const uint8_t *data, 
     return PICOKEYS_OK;
 }
 
-int flash_write_data_to_file(file_t *file, const uint8_t *data, uint32_t len) {
-    return flash_write_data_to_file_internal(file, data, len, 0, false);
+int flash_write_data_to_file(file_t *file, const_byte_array_t data) {
+    return flash_write_data_to_file_internal(file, data, 0, false);
 }
 
-int flash_write_data_to_file_offset(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset) {
-    return flash_write_data_to_file_internal(file, data, len, offset, true);
+int flash_write_data_to_file_offset(file_t *file, const_byte_array_t data, uint32_t offset) {
+    return flash_write_data_to_file_internal(file, data, offset, true);
 }
 
 uint32_t flash_free_space(void) {

@@ -134,23 +134,23 @@ static int get_system_uuid(char *out) {
 #include <string.h>
 #include <ctype.h>
 
-static int read_first_line(const char *path, char *out, size_t out_len) {
+static int read_first_line(const char *path, byte_buffer_t out) {
     FILE *f;
-    if (!out || out_len == 0) {
+    if (!out.data || out.capacity == 0) {
         return -1;
     }
-    out[0] = '\0';
+    out.data[0] = '\0';
     f = fopen(path, "r");
     if (!f) {
         return -2;
     }
-    if (!fgets(out, out_len, f)) {
+    if (!fgets((char *)out.data, out.capacity, f)) {
         fclose(f);
         return -3;
     }
     fclose(f);
-    out[strcspn(out, "\r\n")] = '\0';
-    return out[0] ? 0 : -4;
+    out.data[strcspn((const char *)out.data, "\r\n")] = '\0';
+    return out.data[0] ? 0 : -4;
 }
 
 static int is_bad_value(const char *s) {
@@ -171,17 +171,17 @@ static int is_bad_value(const char *s) {
     return 0;
 }
 
-static int append_field(char *out, size_t out_len, const char *prefix,const char *path) {
+static int append_field(byte_buffer_t out, const char *prefix, const char *path) {
     char value[256];
-    if (read_first_line(path, value, sizeof(value)) != 0) {
+    if (read_first_line(path, BYTE_BUFFER((uint8_t *)value, sizeof(value))) != 0) {
         return -1;
     }
     if (is_bad_value(value)) {
         return -2;
     }
-    strncat(out, prefix, out_len - strlen(out) - 1);
-    strncat(out, value, out_len - strlen(out) - 1);
-    strncat(out, ";", out_len - strlen(out) - 1);
+    strncat((char *)out.data, prefix, out.capacity - strlen((const char *)out.data) - 1);
+    strncat((char *)out.data, value, out.capacity - strlen((const char *)out.data) - 1);
+    strncat((char *)out.data, ";", out.capacity - strlen((const char *)out.data) - 1);
     return 0;
 }
 
@@ -190,11 +190,11 @@ static int get_linux_hardware_id(char *out) {
         return -1;
     }
     char serial[256] = {0};
-    append_field(serial, sizeof(serial), "UUID=", "/sys/class/dmi/id/product_uuid");
-    append_field(serial, sizeof(serial), "BOARD=", "/sys/class/dmi/id/board_serial");
-    append_field(serial, sizeof(serial), "PRODUCT=", "/sys/class/dmi/id/product_serial");
-    append_field(serial, sizeof(serial), "CHASSIS=", "/sys/class/dmi/id/chassis_serial");
-    append_field(serial, sizeof(serial), "MACHINE=", "/etc/machine-id");
+    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "UUID=", "/sys/class/dmi/id/product_uuid");
+    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "BOARD=", "/sys/class/dmi/id/board_serial");
+    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "PRODUCT=", "/sys/class/dmi/id/product_serial");
+    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "CHASSIS=", "/sys/class/dmi/id/chassis_serial");
+    append_field(BYTE_BUFFER((uint8_t *)serial, sizeof(serial)), "MACHINE=", "/etc/machine-id");
     if (serial[0]) {
         mbedtls_sha256((const unsigned char *)serial, strlen(serial), pico_serial_hash, false);
         memcpy(out, pico_serial_hash, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);
@@ -219,9 +219,9 @@ static int get_ci_device_id(uint8_t *out) {
 }
 #endif
 
-static int serial_id_is_zero(const uint8_t *id, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-        if (id[i] != 0) {
+static int serial_id_is_zero(const_byte_array_t id) {
+    for (size_t i = 0; i < id.len; i++) {
+        if (id.data[i] != 0) {
             return 0;
         }
     }
@@ -249,7 +249,7 @@ void serial_init(void) {
     pico_get_unique_board_id(&pico_serial);
 #endif
 
-    if (serial_rc != 0 || serial_id_is_zero(pico_serial.id, sizeof(pico_serial.id))) {
+    if (serial_rc != 0 || serial_id_is_zero(CONST_BYTE_ARRAY(pico_serial.id, sizeof(pico_serial.id)))) {
         printf("serial init: failed to read stable hardware id (rc=%d); using fallback id\n", serial_rc);
         memset(pico_serial.id, 0, sizeof(pico_serial.id));
     }

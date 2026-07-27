@@ -127,8 +127,8 @@ extern bool card_terminated;
 
 extern file_t *file_search_by_fid(const uint16_t fid, const file_t *parent, const uint8_t sp);
 extern file_t *file_search(const uint16_t fid);
-extern file_t *file_search_by_name(uint8_t *name, uint16_t namelen);
-extern file_t *file_search_by_path(const uint8_t *pe_path, uint8_t pathlen, const file_t *parent);
+extern file_t *file_search_by_name(const_byte_array_t name);
+extern file_t *file_search_by_path(const_byte_array_t path, const file_t *parent);
 extern bool file_authenticate_action(const file_t *ef, uint8_t op);
 extern void file_process_fci(const file_t *pe, int fmd);
 extern void file_scan_flash(void);
@@ -144,10 +144,10 @@ extern uint8_t file_read_uint8_offset(const file_t *ef, const uint16_t offset);
 extern bool file_has_data(const file_t *);
 extern uint8_t *file_get_data(const file_t *tf);
 extern uint32_t file_get_size(const file_t *tf);
-extern int file_read_at(const file_t *tf, uint32_t offset, uint8_t *data, size_t len);
+extern int file_read_at(const file_t *tf, uint32_t offset, byte_array_t data);
 extern uint8_t file_get_type(const file_t *tf);
-extern int file_put_data(file_t *file, const uint8_t *data, uint32_t len);
-extern int file_put_data_offset(file_t *file, const uint8_t *data, uint32_t len, uint32_t offset);
+extern int file_put_data(file_t *file, const_byte_array_t data);
+extern int file_put_data_offset(file_t *file, const_byte_array_t data, uint32_t offset);
 extern file_t *file_new(uint16_t);
 extern int flash_clear_file(file_t *file);
 typedef bool (*file_iter_cb)(file_t *file, void *ctx);
@@ -158,10 +158,10 @@ file_t *get_parent(file_t *f);
 
 extern bool isUserAuthenticated;
 
-extern uint16_t meta_find(uint16_t, uint8_t **out);
+extern byte_array_t meta_find(uint16_t fid);
 extern int meta_delete_no_commit(uint16_t fid);
 extern int meta_delete(uint16_t fid);
-extern int meta_add(uint16_t fid, const uint8_t *data, uint16_t len);
+extern int meta_add(uint16_t fid, const_byte_array_t data);
 
 #ifndef ENABLE_EMULATION
 extern file_t *ef_phy;

@@ -15,8 +15,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <string.h>
-
 #include "picokeys.h"
 #include "otp_platform.h"
 
@@ -36,12 +34,6 @@ bool otp_platform_is_secure_boot_locked(void) {
 }
 
 void otp_platform_init(const uint8_t **otp_key_1_out, const uint8_t **otp_key_2_out) {
-    static uint8_t _otp1[32] = {0};
-    static uint8_t _otp2[32] = {0};
-
-    memset(_otp1, 0xDF, sizeof(_otp1));
-    memset(_otp2, 0x93, sizeof(_otp2));
-
-    *otp_key_1_out = _otp1;
-    *otp_key_2_out = _otp2;
+    *otp_key_1_out = NULL;
+    *otp_key_2_out = NULL;
 }

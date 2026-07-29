@@ -136,7 +136,7 @@ static int file_object_txn_auth_record(const file_object_authenticator_t *auth, 
     uint8_t buffer[FILE_OBJECT_TXN_READ_CHUNK_SIZE];
     uint32_t offset = 0;
     while (r == PICOKEYS_OK && offset < payload_size) {
-        size_t chunk = MIN(sizeof(buffer), payload_size - offset);
+        uint32_t chunk = MIN((uint32_t)sizeof(buffer), payload_size - offset);
         r = file_read_at(file, FILE_OBJECT_TXN_RECORD_HEADER_SIZE + offset, BYTE_ARRAY(buffer, chunk));
         if (r == PICOKEYS_OK) {
             r = auth->update(auth->ctx, CONST_BYTE_ARRAY(buffer, chunk));

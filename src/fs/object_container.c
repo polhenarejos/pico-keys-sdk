@@ -230,14 +230,14 @@ int file_object_manifest_build(const file_object_manifest_t *manifest, const_byt
     }
     uint32_t descriptor_bytes = (uint32_t)object_count * FILE_OBJECT_DESCRIPTOR_SIZE;
     uint32_t total_size = FILE_OBJECT_MANIFEST_HEADER_SIZE + descriptor_bytes + extensions_size + FILE_OBJECT_AUTH_TAG_SIZE;
-    uint16_t extension_start = FILE_OBJECT_MANIFEST_HEADER_SIZE + descriptor_bytes;
-    uint16_t extension_end = extension_start + extensions_size;
     if (manifest->generation == 0 || manifest->previous_generation >= manifest->generation) {
         return PICOKEYS_WRONG_DATA;
     }
     if (total_size > UINT16_MAX || output->capacity - output->len < total_size) {
         return PICOKEYS_WRONG_LENGTH;
     }
+    uint16_t extension_start = (uint16_t)(FILE_OBJECT_MANIFEST_HEADER_SIZE + descriptor_bytes);
+    uint16_t extension_end = (uint16_t)(extension_start + extensions_size);
     if (!file_object_descriptors_valid(manifest->objects, object_count, extension_start, extension_end)) {
         return PICOKEYS_WRONG_DATA;
     }
@@ -313,8 +313,8 @@ int file_object_manifest_parse(const_byte_array_t data, const file_object_authen
         return r;
     }
 
-    uint16_t extension_start = FILE_OBJECT_MANIFEST_HEADER_SIZE + descriptor_bytes;
-    uint16_t extension_end = extension_start + extensions_size;
+    uint16_t extension_start = (uint16_t)(FILE_OBJECT_MANIFEST_HEADER_SIZE + descriptor_bytes);
+    uint16_t extension_end = (uint16_t)(extension_start + extensions_size);
     r = file_object_extensions_validate(CONST_BYTE_ARRAY(data.data + extension_start, extensions_size), extension_supported, extension_ctx);
     if (r != PICOKEYS_OK) {
         return r;

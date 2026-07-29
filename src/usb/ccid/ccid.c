@@ -180,10 +180,14 @@ void tud_vendor_rx_cb(uint8_t itf, const uint8_t *buffer, uint16_t bufsize) {
 }
 
 static int driver_write_ccid(uint8_t itf, const_byte_array_t buffer) {
+    if (buffer.len > UINT16_MAX) {
+        return 0;
+    }
+    uint16_t buffer_len = (uint16_t)buffer.len;
     if (buffer.len > 0 && buffer.data[0] != 0x81) {
         DEBUG_PAYLOAD(buffer.data, buffer.len);
     }
-    uint32_t written = tud_vendor_n_write(itf, buffer.data, buffer.len);
+    uint32_t written = tud_vendor_n_write(itf, buffer.data, buffer_len);
     if (written > 0) {
         tud_vendor_n_write_flush(itf);
 

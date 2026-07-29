@@ -220,7 +220,11 @@ bool tud_hid_n_report(uint8_t itf, uint8_t report_id, const uint8_t *buffer, uin
 #endif
 
 uint16_t driver_write_emul(uint8_t itf, const_byte_array_t buffer) {
-    uint16_t size = htons((uint16_t)buffer.len);
+    if (buffer.len > UINT16_MAX) {
+        return 0;
+    }
+    uint16_t buffer_len = (uint16_t)buffer.len;
+    uint16_t size = htons(buffer_len);
     socket_t sock = get_sock_itf(itf);
     if (sock == INVALID_SOCKET) {
         return 0;
@@ -238,13 +242,13 @@ uint16_t driver_write_emul(uint8_t itf, const_byte_array_t buffer) {
         }
     } while (ret <= 0);
     do {
-        ret = send(sock, (const char *)buffer.data, buffer.len, 0);
+        ret = send(sock, (const char *)buffer.data, (int)buffer_len, 0);
         if (ret == SOCKET_ERROR) {
             msleep(10);
         }
     } while (ret <= 0);
-    emul_tx_size = (uint16_t)buffer.len;
-    return (uint16_t)buffer.len;
+    emul_tx_size = buffer_len;
+    return buffer_len;
 }
 
 void driver_exec_finished_cont_emul(uint8_t itf, uint16_t size_next, uint16_t offset) {
@@ -268,7 +272,11 @@ uint16_t emul_read(uint8_t itf) {
         socklen_t client_socklen = sizeof client_sockaddr;
 
         int timeout;
+#ifdef _MSC_VER
+        WSAPOLLFD pfd;
+#else
         struct pollfd pfd;
+#endif
 
         pfd.fd = hid_server_sock;
         pfd.events = POLLIN;
@@ -276,7 +284,11 @@ uint16_t emul_read(uint8_t itf) {
 
         timeout = (0 * 1000 + 1000 / 1000);
 
+#ifdef _MSC_VER
+        if (WSAPoll(&pfd, 1, timeout) == SOCKET_ERROR) {
+#else
         if (poll(&pfd, 1, timeout) == -1) {
+#endif
             return 0;
         }
 
@@ -286,7 +298,7 @@ uint16_t emul_read(uint8_t itf) {
             }
             hid_client_sock = accept(hid_server_sock, (struct sockaddr *) &client_sockaddr, &client_socklen);
             if (hid_client_sock != INVALID_SOCKET) {
-                printf("hid_client connected! %d\n", hid_client_sock);
+                printf("hid_client connected! %llu\n", (unsigned long long)hid_client_sock);
             }
         }
         /*if (send_buffer_size > 0) {

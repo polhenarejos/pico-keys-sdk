@@ -120,7 +120,7 @@ static int encrypt_internal_keydev(file_t *ef_devcert_key, const uint8_t pkey[DE
 }
 
 static int decrypt_internal_keydev(file_t *ef_devcert_key, uint8_t pkey[DEVCERT_KEY_PLAIN_SIZE], bool *legacy) {
-    uint16_t record_len = file_get_size(ef_devcert_key);
+    uint32_t record_len = file_get_size(ef_devcert_key);
     const uint8_t *record = file_get_data(ef_devcert_key);
     uint8_t kbase[32] = { 0 };
     derive_kbase(kbase);

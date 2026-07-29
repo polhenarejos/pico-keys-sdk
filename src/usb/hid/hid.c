@@ -256,18 +256,22 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_
 }
 
 int driver_write_hid(uint8_t itf, const_byte_array_t buffer) {
+    if ((!buffer.data && buffer.len > 0) || buffer.len > UINT16_MAX) {
+        return 0;
+    }
+    uint16_t buffer_len = (uint16_t)buffer.len;
     if (last_write_result[itf] == WRITE_PENDING) {
         return 0;
     }
-    bool r = tud_hid_n_report(itf, 0, buffer.data, buffer.len);
+    bool r = tud_hid_n_report(itf, 0, buffer.data, buffer_len);
     last_write_result[itf] = r ? WRITE_PENDING : WRITE_FAILED;
     if (last_write_result[itf] == WRITE_FAILED) {
         return 0;
     }
 #ifdef ENABLE_EMULATION
-    tud_hid_report_complete_cb(ITF_HID_CTAP, buffer.data, buffer.len);
+    tud_hid_report_complete_cb(ITF_HID_CTAP, buffer.data, buffer_len);
 #endif
-    return MIN(64u, buffer.len);
+    return buffer_len > 64 ? 64 : buffer_len;
 }
 
 int (*hid_set_report_cb)(uint8_t, uint8_t, hid_report_type_t, uint8_t const *, uint16_t) = NULL;

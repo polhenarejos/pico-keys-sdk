@@ -122,12 +122,13 @@ void file_process_fci(const file_t *pe, int fmd) {
     memcpy(res_APDU + res_APDU_size, "\x8A\x01\x05", 3); //life-cycle (5 -> activated)
     res_APDU_size += 3;
     byte_array_t metadata = meta_find(pe->fid);
-    if (metadata.len > 0 && metadata.data != NULL) {
+    if (metadata.len > 0 && metadata.len <= UINT8_MAX && metadata.data != NULL) {
+        uint16_t metadata_len = (uint16_t)metadata.len;
         res_APDU[res_APDU_size++] = 0xA5;
         res_APDU[res_APDU_size++] = 0x81;
-        res_APDU[res_APDU_size++] = (uint8_t)metadata.len;
-        memcpy(res_APDU + res_APDU_size, metadata.data, metadata.len);
-        res_APDU_size += metadata.len;
+        res_APDU[res_APDU_size++] = (uint8_t)metadata_len;
+        memcpy(res_APDU + res_APDU_size, metadata.data, metadata_len);
+        res_APDU_size += metadata_len;
     }
     res_APDU[1] = (uint8_t)res_APDU_size - 2;
     if (fmd) {
@@ -517,7 +518,7 @@ static int meta_delete_internal(uint16_t fid, bool commit) {
         }
         uint16_t cfid = get_uint16_be(tag_data);
         if (cfid == fid) {
-            uint16_t new_len = ctxi.len - 1 - tag_len - tlv_format_len(tag_len, NULL);
+            size_t new_len = ctxi.len - 1 - tag_len - tlv_format_len(tag_len, NULL);
             if (new_len == 0) {
                 flash_clear_file(ef);
             }
@@ -564,7 +565,7 @@ int meta_add(uint16_t fid, const_byte_array_t data) {
     if (!ef) {
         return PICOKEYS_ERR_FILE_NOT_FOUND;
     }
-    uint16_t ef_size = file_get_size(ef);
+    uint32_t ef_size = file_get_size(ef);
     uint8_t *fdata = (uint8_t *) calloc(1, ef_size);
     memcpy(fdata, file_get_data(ef), ef_size);
     uint8_t *p = NULL;
@@ -680,7 +681,7 @@ int flash_clear_file(file_t *file) {
         if (flash_program_block(payload_addr + offset, CONST_BYTE_ARRAY(zeros, chunk)) != PICOKEYS_OK) {
             return PICOKEYS_EXEC_ERROR;
         }
-        offset += chunk;
+        offset += (uint32_t)chunk;
     }
     if (next_addr > 0) {
         flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);

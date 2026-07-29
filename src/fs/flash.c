@@ -155,7 +155,7 @@ static int copy_file_range(const file_t *source, uint32_t source_offset, uintptr
     uint8_t buffer[256];
 
     while (len > 0) {
-        size_t chunk = MIN(sizeof(buffer), len);
+        uint32_t chunk = MIN((uint32_t)sizeof(buffer), len);
         int r = file_read_at(source, source_offset, BYTE_ARRAY(buffer, chunk));
         if (r != PICOKEYS_OK) {
             return r;

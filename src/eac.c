@@ -264,7 +264,7 @@ void sm_update_iv(void) {
 int sm_verify(void) {
     uint8_t input[USB_BUFFER_SIZE];
     memset(input, 0, sizeof(input));
-    uint16_t input_len = 0;
+    size_t input_len = 0;
     int r = 0;
     bool add_header = (CLA(apdu) & 0xC) == 0xC;
     size_t data_len = (size_t)(apdu.nc / sm_blocksize) * sm_blocksize;
@@ -294,7 +294,7 @@ int sm_verify(void) {
     }
     bool some_added = false;
     const uint8_t *mac = NULL;
-    uint16_t mac_len = 0;
+    size_t mac_len = 0;
     uint8_t *p = NULL;
     tlv_item_t item;
     tlv_ctx_t ctxi;

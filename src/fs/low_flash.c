@@ -105,6 +105,45 @@ void low_flash_task(void);
 void low_flash_commit(void);
 bool low_flash_commit_sync(uint32_t timeout_ms);
 
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+/* Erase a multi-sector range ONE SECTOR PER CRITICAL SECTION.
+ *
+ * WHY: USB on RP2040 is interrupt-driven. flash_range_erase() has to run with interrupts
+ * disabled — XIP is unavailable while flash is being erased, so any ISR resident in flash would
+ * fault mid-erase — which means the USB stack is not serviced for the duration of the CALL, not
+ * the duration of a sector. INITIALIZE DEVICE erases the whole file region, so the old code
+ * handed flash_range_erase() a many-sector range and the device went silent on the bus long
+ * enough for the host to give up and drop it. The symptom is a Pico that "hangs" on
+ * `sc-hsm-tool --initialize` and needs a PHYSICAL REPLUG to come back — see
+ * polhenarejos/pico-hsm#9 (LIBUSB_ERROR_TIMEOUT / "Card not transacted").
+ *
+ * That behaviour also makes the device unusable in a remote/datacenter deployment, where nobody
+ * can walk over and reseat the USB connector.
+ *
+ * Erasing a single sector per critical section bounds each blackout to one sector erase
+ * (~30-45ms on RP2040, well inside what a host tolerates) and gives the USB IRQ a window between
+ * sectors, so the device stays enumerated across an erase of any size. TOTAL erase time is
+ * unchanged — this only changes how the blackout is distributed.
+ *
+ * The caller keeps the multicore lockout held across the whole range: the lockout parks core 1,
+ * while save_and_disable_interrupts() is per-core (PRIMASK), so restoring here re-enables the
+ * USB IRQ on core 0 without letting core 1 loose against flash mid-erase.
+ *
+ * On ESP_PLATFORM the interrupt macros above are no-ops and esp_partition_erase_range() does not
+ * block the USB stack, so this is simply a chunked erase there and behaviour is unchanged.
+ */
+static void flash_range_erase_chunked(uint32_t offset, size_t total_bytes) {
+    if (total_bytes < FLASH_SECTOR_SIZE) {
+        total_bytes = FLASH_SECTOR_SIZE;
+    }
+    for (size_t done = 0; done < total_bytes; done += FLASH_SECTOR_SIZE) {
+        uint32_t ints = save_and_disable_interrupts();
+        flash_range_erase(offset + done, FLASH_SECTOR_SIZE);
+        restore_interrupts(ints);
+    }
+}
+#endif
+
 void low_flash_task(void){
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
         if (locked_out == true && flash_available == true && ready_pages > 0) {
@@ -140,9 +179,10 @@ void low_flash_task(void){
                         continue;
                     }
                     //printf("WRITTING\n");
-                    uint32_t ints = save_and_disable_interrupts();
-                    flash_range_erase(flash_pages[r].address - XIP_BASE, flash_pages[r].page_size ? ((int) (flash_pages[r].page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
-                    restore_interrupts(ints);
+                    /* Chunked: a whole-region erase here is what drops the device off the USB
+                     * bus during INITIALIZE DEVICE. See flash_range_erase_chunked() above. */
+                    flash_range_erase_chunked(flash_pages[r].address - XIP_BASE,
+                                              flash_pages[r].page_size ? ((size_t) (flash_pages[r].page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
                     if (multicore_lockout_end_timeout_us(1000) == false) {
                         printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
                         continue;

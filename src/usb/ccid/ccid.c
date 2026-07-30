@@ -30,6 +30,16 @@
 #include "ccid.h"
 #include "apdu.h"
 #include "usb.h"
+#if defined(PICO_PLATFORM) && defined(PICOKEYS_REMOTE_RESET)
+#include "pico/usb_reset_interface.h"
+#include "pico/bootrom.h"
+#include "hardware/watchdog.h"
+/* Grace period before the reset fires, so the control transfer is acknowledged first and the
+ * host sees the request succeed rather than a bare disconnect. */
+#ifndef PICOKEYS_REMOTE_RESET_DELAY_MS
+#define PICOKEYS_REMOTE_RESET_DELAY_MS 100
+#endif
+#endif
 
 #if MAX_RES_APDU_DATA_SIZE > MAX_CMD_APDU_DATA_SIZE
 #define USB_BUF_SIZE (MAX_RES_APDU_DATA_SIZE + 20 + 9)
@@ -443,30 +453,36 @@ static bool ccid_control_xfer_cb(uint8_t __unused rhport,
                 request->bRequest,
                 request->wValue,
                 request->wLength);
-/*
- #if PICO_STDIO_USB_RESET_INTERFACE_SUPPORT_RESET_TO_BOOTSEL
+#if defined(PICO_PLATFORM) && defined(PICOKEYS_REMOTE_RESET)
+        /* Remote reset over USB. OFF unless the build explicitly opts in — see the CMake option
+         * PICOKEYS_REMOTE_RESET. This block shipped commented out, which is why the ONLY way to
+         * recover a wedged device was to physically reseat the connector. That is fine on a desk
+         * and impossible in a datacenter.
+         *
+         * SECURITY — read before enabling. RESET_REQUEST_BOOTSEL drops the device into the
+         * bootloader, i.e. it allows REMOTE FIRMWARE REPLACEMENT by any process that can reach
+         * the USB device. On a development or staging token that is the point: firmware updates
+         * and recovery without hands on the hardware. On a token holding anything of value it is
+         * an unauthenticated code-load path and must stay off. Neither request is authenticated
+         * — there is no PIN check here, by construction, because a wedged device cannot verify a
+         * PIN. That is precisely why this is opt-in at BUILD time rather than runtime: the
+         * decision is made when the firmware is produced, not by whatever is talking to it.
+         *
+         * Reboot only exposes no key material by itself; BOOTSEL does, indirectly, by allowing
+         * firmware that could then read flash. Enable accordingly. */
         if (request->bRequest == RESET_REQUEST_BOOTSEL) {
- #ifdef PICO_STDIO_USB_RESET_BOOTSEL_ACTIVITY_LED
-            uint gpio_mask = 1u << PICO_STDIO_USB_RESET_BOOTSEL_ACTIVITY_LED;
- #else
-            uint gpio_mask = 0u;
- #endif
- #if !PICO_STDIO_USB_RESET_BOOTSEL_FIXED_ACTIVITY_LED
-            if (request->wValue & 0x100) {
-                gpio_mask = 1u << (request->wValue >> 9u);
-            }
- #endif
-            reset_usb_boot(gpio_mask, (request->wValue & 0x7f) | PICO_STDIO_USB_RESET_BOOTSEL_INTERFACE_DISABLE_MASK);
-            // does not return, otherwise we'd return true
+            reset_usb_boot(0, 0);
+            // does not return
         }
- #endif
- #if PICO_STDIO_USB_RESET_INTERFACE_SUPPORT_RESET_TO_FLASH_BOOT
         if (request->bRequest == RESET_REQUEST_FLASH) {
-            watchdog_reboot(0, 0, PICO_STDIO_USB_RESET_RESET_TO_FLASH_DELAY_MS);
+            /* Plain watchdog reset, deliberately NOT usb_secure_reboot_now(): the latter zeroes
+             * heap and stack first and was measured to HANG an RP2350 outright, leaving the bus
+             * without re-enumerating. A recovery path that can itself wedge the device is worse
+             * than none. */
+            watchdog_reboot(0, 0, PICOKEYS_REMOTE_RESET_DELAY_MS);
             return true;
         }
- #endif
- */
+#endif
         return true;
     }
     return false;

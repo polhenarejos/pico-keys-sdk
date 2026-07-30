@@ -244,7 +244,7 @@ uint16_t sm_get_le(void) {
     while (tlv_walk(&ctxi, &p, &item)) {
         if (item.tag == 0x97) {
             uint16_t le = 0;
-            for (uint16_t t = 1; t <= item.value.len; t++) {
+            for (size_t t = 1; t <= item.value.len; t++) {
                 le |= (item.value.data[t - 1]) << ((item.value.len - t) * 8);
             }
             return le;

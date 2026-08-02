@@ -106,7 +106,8 @@ static inline uint32_t urgb_ordered_u32(uint8_t first, uint8_t second, uint8_t t
 }
 
 static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
-    switch (phy_data.led_order) {
+    uint8_t order = phy_data.led_order_present ? phy_data.led_order : PHY_LED_ORDER_GRB;
+    switch (order) {
         case PHY_LED_ORDER_RBG:
             return urgb_ordered_u32(r, b, g);
         case PHY_LED_ORDER_GRB:

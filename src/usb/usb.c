@@ -23,7 +23,10 @@
 #if defined(PICO_PLATFORM)
 #include "pico/bootrom.h"
 #include "pico/multicore.h"
+#include "pico/time.h"
 #include "hardware/sync.h"
+#include "hardware/watchdog.h"
+#include "hardware/structs/scb.h"
 #define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
 #endif
 #include "apdu.h"
@@ -242,6 +245,23 @@ bool is_busy(void) {
     return timeout > 0;
 }
 
+#if defined(PICO_PLATFORM)
+/* State for the core1 dead-man's switch (card_watchdog_task(), bottom of file). */
+#define EV_PING                 0x10000u
+#define EV_PING_ECHO            (EV_PING + 1)
+#define CARD_PING_INTERVAL_MS   2000
+#define CARD_PING_TIMEOUT_MS    1000
+#define CMD_DEADLINE_MS         300000u   /* 180s commit cap + erase margin */
+
+static volatile bool cmd_in_flight = false;
+static uint64_t cmd_started_ms = 0;
+static uint64_t ping_sent_ms = 0;         /* 0 = no ping outstanding */
+static uint64_t core1_last_ok_ms = 0;
+static uint64_t wd_last_run_ms = 0;
+
+static void card_note_core1_alive(void);
+#endif
+
 void usb_send_event(uint32_t flag) {
 #ifndef ENABLE_EMULATION
     mutex_enter_blocking(&mutex);
@@ -249,6 +269,10 @@ void usb_send_event(uint32_t flag) {
     queue_add_blocking(&usb_to_card_q, &flag);
     if (flag == EV_CMD_AVAILABLE) {
         timeout_start();
+#if defined(PICO_PLATFORM)
+        cmd_in_flight = true;
+        cmd_started_ms = board_millis();
+#endif
     }
 #ifndef ENABLE_EMULATION
     mutex_exit(&mutex);
@@ -260,11 +284,70 @@ void usb_send_event(uint32_t flag) {
     }
 }
 
+/* Core1 liveness flag, cleared by card_start() before each launch and set by
+ * card_init_core1() — the first thing every launched card function runs (apdu.c).
+ * Exists because the SDK's multicore launch handshake CAN report success while core1
+ * never starts: measured 2026-08-02 via SWD on a live failure — core1 parked in the
+ * bootrom's wait-for-launch loop (polling SIO FIFO_ST), one unread word in the FIFO
+ * (VLD=1), core0 convinced the launch succeeded. The card then enumerates USB (TinyUSB
+ * runs on core0) but never answers an APDU. */
+static volatile bool core1_alive = false;
+
 void card_init_core1(void) {
+    core1_alive = true;
     low_flash_init_core1();
 }
 
 volatile uint16_t finished_data_size = 0;
+
+#if defined(PICO_PLATFORM)
+/* Hard reset via AIRCR.SYSRESETREQ, with a bounded attempt budget kept in watchdog
+ * scratch[1] (survives warm resets). Used when core1 cannot be launched: each boot is
+ * an independent dice roll, so resetting again converges — but a device that NEVER
+ * gets core1 back must stop rolling and stay alive-dark (enumerated, not answering)
+ * rather than reset-loop forever. */
+#define CORE1_BOOT_ATTEMPTS_MAX 5
+
+static void chip_reset_bounded(void) {
+    watchdog_hw->scratch[4] += 1;
+    uint32_t attempts = watchdog_hw->scratch[1] + 1;
+    watchdog_hw->scratch[1] = attempts;
+    if (attempts > CORE1_BOOT_ATTEMPTS_MAX) {
+        printf("CARD: core1 unrecoverable after %lu boots — staying alive-dark\n",
+               (unsigned long) attempts);
+        return;
+    }
+    printf("CARD: core1 launch failed, resetting chip (attempt %lu)\n", (unsigned long) attempts);
+    __asm volatile("dsb sy" ::: "memory");
+    scb_hw->aircr = (0x05FAu << M33_AIRCR_VECTKEY_LSB)
+                    | M33_AIRCR_SYSRESETREQ_BITS | M33_AIRCR_SYSRESETREQS_BITS;
+    __asm volatile("dsb sy" ::: "memory");
+    busy_wait_ms(2000);
+    printf("CARD: ERROR SYSRESETREQ did not reset — staying alive-dark\n");
+}
+
+/* Launch func on core1 and VERIFY it actually started (the launch handshake can
+ * complete against stale FIFO data while core1 stays parked in the bootrom — the
+ * failure core1_alive exists to catch). Returns core1_alive. */
+static bool card_launch_verified(void *(*func)(void *)) {
+    for (int attempt = 0; attempt < 3 && !core1_alive; attempt++) {
+        if (attempt > 0) {
+            printf("CARD: core1 did not start, relaunching (attempt %d)\n", attempt + 1);
+        }
+        watchdog_hw->scratch[3] += 1;
+        core1_alive = false;
+        multicore_reset_core1();
+        multicore_launch_func_core1(func);
+        for (int waited = 0; waited < 500 && !core1_alive; waited += 10) {
+            busy_wait_ms(10);
+        }
+    }
+    if (core1_alive) {
+        watchdog_hw->scratch[1] = 0;
+    }
+    return core1_alive;
+}
+#endif
 
 void card_start(uint8_t itf, void *(*func)(void *)) {
     timeout_start();
@@ -273,8 +356,17 @@ void card_start(uint8_t itf, void *(*func)(void *)) {
             card_exit();
         }
         if (func) {
+#if defined(PICO_PLATFORM)
+            if (!card_launch_verified(func)) {
+                chip_reset_bounded();
+                /* If the reset fired, unreachable. If it didn't (budget exhausted or the
+                 * AIRCR write failed), fall through and stay alive-dark: the host will
+                 * time out, which is honest. */
+            }
+#else
             multicore_reset_core1();
             multicore_launch_func_core1(func);
+#endif
         }
         led_set_mode(MODE_MOUNTED);
         card_locked_itf = itf;
@@ -344,8 +436,17 @@ int card_status(uint8_t itf) {
             if (m == EV_EXEC_FINISHED) {
                 timeout_stop();
                 led_set_mode(MODE_MOUNTED);
+#if defined(PICO_PLATFORM)
+                cmd_in_flight = false;
+                card_note_core1_alive();
+#endif
                 return PICOKEYS_OK;
             }
+#if defined(PICO_PLATFORM)
+            else if (m == EV_PING_ECHO) {
+                card_note_core1_alive();
+            }
+#endif
 #ifndef ENABLE_EMULATION
             else if (m == EV_PRESS_BUTTON) {
                 int ret = button_wait();
@@ -377,6 +478,88 @@ int card_status(uint8_t itf) {
     }
     return PICOKEYS_ERR_FILE_NOT_FOUND;
 }
+
+#if defined(PICO_PLATFORM)
+/* ---- Core1 dead-man's switch ----------------------------------------------------
+ * The launch-time check in card_start() catches a core1 that never starts, but core1
+ * can ALSO be lost mid-session (measured 2026-08-02 via SWD: core1 parked in a bootrom
+ * FIFO wait after it had been serving APDUs, core0 healthy, card mute). So: while a
+ * card function is active and NO command is in flight, ping core1 through the existing
+ * queue protocol (apdu_thread echoes any non-EV_CMD_AVAILABLE message back +1) and
+ * treat a missing echo as death. While a command IS in flight — an INITIALIZE wipe
+ * legitimately runs 60-90s+ — never probe; but a command outstanding beyond
+ * CMD_DEADLINE_MS is death too, since even the 180s commit cap bounds real work.
+ * Recovery is the same ladder as launch: relaunch, then bounded chip reset. */
+
+static void card_note_core1_alive(void) {
+    core1_last_ok_ms = board_millis();
+    ping_sent_ms = 0;
+}
+
+/* Recover a lost core1. Measured 2026-08-02: relaunching core1 alone is NOT enough —
+ * core0's CCID slot state (TPDU sequencing, block state) belongs to the dead session,
+ * so the card connects but every APDU transmit fails ("Transmit failed" at PC/SC).
+ * The only coherent recovery from a mid-session core1 death is a full chip reset:
+ * both sides reinitialise, the host re-enumerates and reconnects. */
+static void card_recover_core1(void) {
+    watchdog_hw->scratch[2] += 1;
+    printf("CARD: core1 lost mid-session, resetting chip\n");
+    cmd_in_flight = false;
+    ping_sent_ms = 0;
+    chip_reset_bounded();
+}
+
+void card_watchdog_task(void) {
+    uint64_t now = board_millis();
+    if (now - wd_last_run_ms < 50) {
+        return;
+    }
+    wd_last_run_ms = now;
+
+    if (card_locked_itf == ITF_TOTAL || card_locked_func == NULL) {
+        ping_sent_ms = 0;
+        cmd_in_flight = false;
+        return;
+    }
+
+    /* Consume anything core1 sent — every message is proof of life. The CCID layer
+     * does the same via card_status(); both run on core0, so whoever pops first wins
+     * and the handling is identical. */
+    uint32_t m = 0;
+    if (queue_try_remove(&card_to_usb_q, &m)) {
+        if (m == EV_PING_ECHO || m == EV_EXEC_FINISHED) {
+            cmd_in_flight = false;
+        }
+        else if (m == EV_RESET) {
+            usb_secure_reboot_now();
+        }
+        card_note_core1_alive();
+    }
+
+    if (cmd_in_flight) {
+        if (now - cmd_started_ms > CMD_DEADLINE_MS) {
+            printf("CARD: command outstanding >%lus — core1 presumed dead\n",
+                   (unsigned long) (CMD_DEADLINE_MS / 1000));
+            card_recover_core1();
+        }
+        return;
+    }
+
+    if (ping_sent_ms != 0) {
+        if (now - ping_sent_ms > CARD_PING_TIMEOUT_MS) {
+            card_recover_core1();
+        }
+        return;
+    }
+
+    if (now - core1_last_ok_ms > CARD_PING_INTERVAL_MS) {
+        uint32_t ping = EV_PING;
+        if (queue_try_add(&usb_to_card_q, &ping)) {
+            ping_sent_ms = now;
+        }
+    }
+}
+#endif
 
 #ifndef USB_ITF_CCID
 #include "device/usbd_pvt.h"

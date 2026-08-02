@@ -117,6 +117,9 @@ void execute_tasks(void) {
     rest_task();
 #endif
     usb_task();
+#ifdef PICO_PLATFORM
+    card_watchdog_task();
+#endif
     led_blinking_task();
 #ifdef ENABLE_LVGL_UI
     platform_ui_task();

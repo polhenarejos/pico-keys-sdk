@@ -31,6 +31,25 @@
 #include "bsp/board.h"
 #include "hardware/structs/ioqspi.h"
 #include "pico/stdio.h"
+#include "pico/bootrom.h"
+#include "boot/picoboot_constants.h"
+#endif
+
+#if defined(PICO_PLATFORM)
+/* The SDK's hard_assertion_failure() is __weak; override it. The default path is
+ * panic() -> __breakpoint -> _exit: a silent, permanent brick that needs a physical
+ * replug — measured 2026-08-03 (a corrupt flash_pages entry hit
+ * hard_assert(flash_offs + count <= PICO_FLASH_SIZE_BYTES) and the device sat
+ * catatonic for a day). A smartcard that cannot recover itself is not one. Reboot
+ * via the bootrom instead: each boot is a fresh roll, and the core1 launch-verify
+ * and dead-man's switch do their jobs from there. */
+void hard_assertion_failure(void) {
+    printf("PANIC: hard assert failed — rebooting via rom_reboot\n");
+    rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_NORMAL, 1, 0, 0);
+    while (1) {
+        tight_loop_contents();
+    }
+}
 #endif
 
 #include "random.h"

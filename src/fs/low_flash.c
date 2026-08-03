@@ -149,10 +149,22 @@ void low_flash_task(void){
         if (locked_out == true && flash_available == true && ready_pages > 0) {
             //printf(" DO_FLASH AVAILABLE\n");
             for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
+                if (flash_pages[r].ready == true || flash_pages[r].erase == true) {
+                    uintptr_t a = flash_pages[r].address;
+                    uint32_t off = a - XIP_BASE;
+                    if (a < XIP_BASE || off < (FLASH_SIZE_BYTES >> 1) || off >= FLASH_SIZE_BYTES) {
+                        printf("ERROR: flash_pages[%d] has out-of-region address %p — dropping entry, NOT erasing\n",
+                               r, (void *) a);
+                        flash_pages[r].ready = false;
+                        flash_pages[r].erase = false;
+                        ready_pages--;
+                        continue;
+                    }
+                }
                 if (flash_pages[r].ready == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
                     //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
-                    if (multicore_lockout_start_timeout_us(1000) == false) {
+                    if (multicore_lockout_start_timeout_us(100000) == false) {
                         printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
                         continue;
                     }
@@ -161,8 +173,16 @@ void low_flash_task(void){
                     flash_range_erase(flash_pages[r].address - XIP_BASE, FLASH_SECTOR_SIZE);
                     flash_range_program(flash_pages[r].address - XIP_BASE, flash_pages[r].page, FLASH_SECTOR_SIZE);
                     restore_interrupts(ints);
-                    if (multicore_lockout_end_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
+                    if (multicore_lockout_end_timeout_us(100000) == false) {
+                        /* A timed-out END can orphan core1 in the lockout victim handler
+                         * forever (measured 2026-08-02: core1 parked in
+                         * multicore_lockout_handler, card mute). The 1ms default was far
+                         * inside normal IRQ/entry latency. Re-sync with a full start+end
+                         * pair: start on an already-locked victim returns immediately,
+                         * and the end then releases it. */
+                        printf("WARN: FLASH LOCKOUT END TIMEOUT — resyncing core1\n");
+                        multicore_lockout_start_timeout_us(100000);
+                        multicore_lockout_end_timeout_us(100000);
                         continue;
                     }
                     //printf("WRITEN %X !\n",flash_pages[r].address);
@@ -174,7 +194,7 @@ void low_flash_task(void){
                 }
                 else if (flash_pages[r].erase == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    if (multicore_lockout_start_timeout_us(1000) == false) {
+                    if (multicore_lockout_start_timeout_us(100000) == false) {
                         printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
                         continue;
                     }
@@ -183,8 +203,16 @@ void low_flash_task(void){
                      * bus during INITIALIZE DEVICE. See flash_range_erase_chunked() above. */
                     flash_range_erase_chunked(flash_pages[r].address - XIP_BASE,
                                               flash_pages[r].page_size ? ((size_t) (flash_pages[r].page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
-                    if (multicore_lockout_end_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
+                    if (multicore_lockout_end_timeout_us(100000) == false) {
+                        /* A timed-out END can orphan core1 in the lockout victim handler
+                         * forever (measured 2026-08-02: core1 parked in
+                         * multicore_lockout_handler, card mute). The 1ms default was far
+                         * inside normal IRQ/entry latency. Re-sync with a full start+end
+                         * pair: start on an already-locked victim returns immediately,
+                         * and the end then releases it. */
+                        printf("WARN: FLASH LOCKOUT END TIMEOUT — resyncing core1\n");
+                        multicore_lockout_start_timeout_us(100000);
+                        multicore_lockout_end_timeout_us(100000);
                         continue;
                     }
 #else

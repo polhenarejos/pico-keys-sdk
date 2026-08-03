@@ -22,6 +22,7 @@
 #include "pico_time.h"
 #if defined(PICO_PLATFORM)
 #include "pico/bootrom.h"
+#include "boot/picoboot_constants.h"
 #include "pico/multicore.h"
 #include "pico/time.h"
 #include "hardware/sync.h"
@@ -301,6 +302,37 @@ void card_init_core1(void) {
 volatile uint16_t finished_data_size = 0;
 
 #if defined(PICO_PLATFORM)
+/* Full-chip reset via the BOOTROM's own reboot facility. Why not the alternatives:
+ *  - AIRCR.SYSRESETREQ: resets only the asserting core on RP2040/RP2350 (the datasheet's
+ *    generic ARM text is wrong for these parts; measured here 2026-08-02 as a complete
+ *    no-op — RAM statics survived the write).
+ *  - SDK watchdog_reboot(): full-chip, but measured to wedge the post-reset boot ~7% of
+ *    cycles (shapes A/B in the forensic record).
+ *  - rom_reboot(): still watchdog-based, but it is the bootrom's own sequenced path — the
+ *    same mechanism every UF2 flash-update reboot uses, the most field-exercised warm
+ *    reset this chip has.
+ * Quiesce flash first: no flash op may be in flight when the reset lands. */
+static void chip_reset_now(void) {
+    low_flash_quiesce();
+    printf("CARD: rebooting via bootrom rom_reboot\n");
+    int rc = rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_NORMAL, 1, 0, 0);
+    /* The reboot is armed asynchronously; if the call returned an error, stay alive. */
+    if (rc != 0) {
+        low_flash_unquiesce();
+        printf("CARD: ERROR rom_reboot refused (%d) — staying alive\n", rc);
+    }
+}
+
+/* Deferred chip reset, fired by card_watchdog_task() from core0's main loop. Exists
+ * because a reset must never run inside an APDU handler: the response is transmitted
+ * after the handler returns, so a synchronous reset lands mid-command (measured:
+ * Transmit failed on the host). */
+static uint64_t scheduled_reset_at_ms = 0;   /* 0 = none pending */
+
+void schedule_chip_reset(uint32_t delay_ms) {
+    scheduled_reset_at_ms = board_millis() + delay_ms;
+}
+
 /* Hard reset via AIRCR.SYSRESETREQ, with a bounded attempt budget kept in watchdog
  * scratch[1] (survives warm resets). Used when core1 cannot be launched: each boot is
  * an independent dice roll, so resetting again converges — but a device that NEVER
@@ -318,12 +350,7 @@ static void chip_reset_bounded(void) {
         return;
     }
     printf("CARD: core1 launch failed, resetting chip (attempt %lu)\n", (unsigned long) attempts);
-    __asm volatile("dsb sy" ::: "memory");
-    scb_hw->aircr = (0x05FAu << M33_AIRCR_VECTKEY_LSB)
-                    | M33_AIRCR_SYSRESETREQ_BITS | M33_AIRCR_SYSRESETREQS_BITS;
-    __asm volatile("dsb sy" ::: "memory");
-    busy_wait_ms(2000);
-    printf("CARD: ERROR SYSRESETREQ did not reset — staying alive-dark\n");
+    chip_reset_now();
 }
 
 /* Launch func on core1 and VERIFY it actually started (the launch handshake can
@@ -515,6 +542,14 @@ void card_watchdog_task(void) {
         return;
     }
     wd_last_run_ms = now;
+
+    /* A scheduled chip reset outranks everything else on this pass. */
+    if (scheduled_reset_at_ms != 0 && (long long) (now - scheduled_reset_at_ms) >= 0) {
+        scheduled_reset_at_ms = 0;
+        printf("CARD: scheduled reset firing\n");
+        chip_reset_now();
+        return;
+    }
 
     if (card_locked_itf == ITF_TOTAL || card_locked_func == NULL) {
         ping_sent_ms = 0;

@@ -96,6 +96,7 @@ extern volatile uint16_t finished_data_size;
 extern void usb_set_timeout_counter(uint8_t itf, uint32_t v);
 extern void card_init_core1(void);
 extern void card_watchdog_task(void);
+extern void schedule_chip_reset(uint32_t delay_ms);
 
 extern void usb_send_event(uint32_t flag);
 extern void timeout_stop(void);

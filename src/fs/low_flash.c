@@ -151,8 +151,7 @@ void low_flash_task(void){
             for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
                 if (flash_pages[r].ready == true || flash_pages[r].erase == true) {
                     uintptr_t a = flash_pages[r].address;
-                    uint32_t off = a - XIP_BASE;
-                    if (a < XIP_BASE || off < (FLASH_SIZE_BYTES >> 1) || off >= FLASH_SIZE_BYTES) {
+                    if (!flash_addr_in_fs(a)) {
                         printf("ERROR: flash_pages[%d] has out-of-region address %p — dropping entry, NOT erasing\n",
                                r, (void *) a);
                         flash_pages[r].ready = false;

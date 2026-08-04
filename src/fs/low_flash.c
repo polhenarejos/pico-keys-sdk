@@ -343,6 +343,17 @@ static bool low_flash_available(void) {
     return available;
 }
 
+/* Public idle check for reset scheduling: true while the flash layer has queued or
+ * in-flight work. A reset that lands while lazy writes are still pending leaves a
+ * half-written file system and the next boot may fail to present the card (measured
+ * 2026-08-03: boot mute after init-on-blank-fs, repeatedly). */
+bool low_flash_busy(void) {
+    mutex_enter_blocking(&mtx_flash);
+    bool busy = flash_available || ready_pages > 0;
+    mutex_exit(&mtx_flash);
+    return busy;
+}
+
 bool low_flash_commit_sync(uint32_t timeout_ms) {
 #if defined(PICO_PLATFORM)
     // Core 0 owns low_flash_task(). Waiting for it from core 0 would prevent

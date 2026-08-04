@@ -28,6 +28,7 @@
 #include "hardware/sync.h"
 #include "hardware/watchdog.h"
 #include "hardware/structs/scb.h"
+#include "hardware/powman.h"
 #define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
 #endif
 #include "apdu.h"
@@ -310,15 +311,32 @@ volatile uint16_t finished_data_size = 0;
  *    same mechanism every UF2 flash-update reboot uses, the most field-exercised warm
  *    reset this chip has.
  * Quiesce flash first: no flash op may be in flight when the reset lands. */
-static void chip_reset_now(void) {
+static void chip_reset_now(bool deep) {
+    /* Two measured-good configurations (2026-08-03/04):
+     *  - deep == false (scheduled reset after INITIALIZE): drain-guarded, then
+     *    rom_reboot with the POWMAN_WDSEL deep-reset bits CLEARED. This combination
+     *    ran 22/23 post-wipe recovery cycles; deep resets after a wipe came back
+     *    mute in 4/4 attempts. main.c re-arms WDSEL on every boot.
+     *  - deep == true (recovery resets): watchdog_reboot with WDSEL armed —
+     *    power-cycles the switched core domain; hammered 100/100 on an idle card.
+     * Quiesce flash first either way: no flash op may be in flight at the reset. */
     low_flash_quiesce();
-    printf("CARD: rebooting via bootrom rom_reboot\n");
-    int rc = rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_NORMAL, 1, 0, 0);
-    /* The reboot is armed asynchronously; if the call returned an error, stay alive. */
-    if (rc != 0) {
-        low_flash_unquiesce();
-        printf("CARD: ERROR rom_reboot refused (%d) — staying alive\n", rc);
+    if (deep) {
+        printf("CARD: rebooting via watchdog (deep: SWCORE power-cycle)\n");
+        watchdog_reboot(0, 0, 0);
     }
+    else {
+        powman_clear_bits(&powman_hw->wdsel,
+                          POWMAN_WDSEL_RESET_POWMAN_ASYNC_BITS |
+                          POWMAN_WDSEL_RESET_SWCORE_BITS |
+                          POWMAN_WDSEL_RESET_PSM_BITS);
+        printf("CARD: rebooting via rom_reboot (shallow)\n");
+        rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_NORMAL, 1, 0, 0);
+    }
+    /* Unreachable if the reset took. Stay alive and working if it did not. */
+    busy_wait_ms(2000);
+    low_flash_unquiesce();
+    printf("CARD: ERROR reset did not fire (deep=%d) — staying alive\n", (int) deep);
 }
 
 /* Deferred chip reset, fired by card_watchdog_task() from core0's main loop. Exists
@@ -348,7 +366,7 @@ static void chip_reset_bounded(void) {
         return;
     }
     printf("CARD: core1 launch failed, resetting chip (attempt %lu)\n", (unsigned long) attempts);
-    chip_reset_now();
+    chip_reset_now(true);
 }
 
 /* Launch func on core1 and VERIFY it actually started (the launch handshake can
@@ -541,11 +559,17 @@ void card_watchdog_task(void) {
     }
     wd_last_run_ms = now;
 
-    /* A scheduled chip reset outranks everything else on this pass. */
+    /* A scheduled chip reset outranks everything else on this pass — but never fire
+     * it while the flash layer still has lazy work queued: a reset landing mid-drain
+     * leaves a half-written file system and the next boot can fail to present the
+     * card. Wait for the drain, bounded so a stuck queue cannot defer it forever. */
     if (scheduled_reset_at_ms != 0 && (long long) (now - scheduled_reset_at_ms) >= 0) {
+        if (low_flash_busy() && (long long) (now - scheduled_reset_at_ms) < 30000) {
+            return;   /* retry next pass */
+        }
         scheduled_reset_at_ms = 0;
         printf("CARD: scheduled reset firing\n");
-        chip_reset_now();
+        chip_reset_now(false);
         return;
     }
 

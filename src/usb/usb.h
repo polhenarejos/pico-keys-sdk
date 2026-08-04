@@ -51,6 +51,11 @@
 #define EV_BUTTON_PRESSED        32
 #define EV_BUTTON_CANCELLED      64
 
+/* Dead-man's switch probe (card_watchdog_task): apdu_thread must echo this and
+ * CONTINUE the loop — never process it as a command (see apdu.c). */
+#define EV_PING                 0x10000u
+#define EV_PING_ECHO            (EV_PING + 1)
+
 enum { ITF_INVALID = 0xFF };
 
 #ifdef USB_ITF_HID

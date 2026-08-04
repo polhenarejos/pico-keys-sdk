@@ -234,6 +234,14 @@ void *apdu_thread(void *arg) {
             queue_add_blocking(&card_to_usb_q, &flag);
         }
 
+        /* The dead-man's ping is a liveness probe, NOT a command: echo it and loop.
+         * Without this, a ping landing between APDU exchanges re-runs process_apdu()
+         * on the staged buffer — executing the previous state-changing command a
+         * SECOND time (measured 2026-08-03: duplicate execution broke the DKEK
+         * domain state mid-session and unwrapKey then failed SW=6400). */
+        if (m == EV_PING) {
+            continue;
+        }
         if (m == EV_VERIFY_CMD_AVAILABLE || m == EV_MODIFY_CMD_AVAILABLE) {
             set_res_sw(0x6f, 0x00);
             goto done;

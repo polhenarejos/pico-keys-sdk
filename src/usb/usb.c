@@ -248,8 +248,6 @@ bool is_busy(void) {
 
 #if defined(PICO_PLATFORM)
 /* State for the core1 dead-man's switch (card_watchdog_task(), bottom of file). */
-#define EV_PING                 0x10000u
-#define EV_PING_ECHO            (EV_PING + 1)
 #define CARD_PING_INTERVAL_MS   2000
 #define CARD_PING_TIMEOUT_MS    1000
 #define CMD_DEADLINE_MS         300000u   /* 180s commit cap + erase margin */

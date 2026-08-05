@@ -113,7 +113,7 @@ void low_flash_task(void){
                 if (flash_pages[r].ready == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
                     //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
-                    if (multicore_lockout_start_timeout_us(1000) == false) {
+                    if (multicore_lockout_start_timeout_us(100000) == false) {
                         printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
                         continue;
                     }
@@ -122,9 +122,18 @@ void low_flash_task(void){
                     flash_range_erase(flash_pages[r].address - XIP_BASE, FLASH_SECTOR_SIZE);
                     flash_range_program(flash_pages[r].address - XIP_BASE, flash_pages[r].page, FLASH_SECTOR_SIZE);
                     restore_interrupts(ints);
-                    if (multicore_lockout_end_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
-                        continue;
+                    if (multicore_lockout_end_timeout_us(100000) == false) {
+                        /* DEFENSIVE ONLY — this timeout has never been observed to fire.
+                         * The core1-parked-in-multicore_lockout_handler state originally
+                         * measured (2026-08-02) is NOT caused by an END timeout: core0
+                         * panics between lockout START and END (and after
+                         * save_and_disable_interrupts()), so the lockout is never released
+                         * (reproduced on unmodified upstream firmware 2026-08-05). The
+                         * 100 ms bound is kept only so a genuine race cannot block forever. Do NOT re-enter the lockout to re-sync — the SDK
+                         * documents lockouts as non-nestable. Stop this drain pass; the
+                         * page stays queued and the next pass retries. */
+                        printf("ERROR: FLASH LOCKOUT END TIMEOUT — aborting this drain pass\n");
+                        break;
                     }
                     //printf("WRITEN %X !\n",flash_pages[r].address);
 #else
@@ -135,7 +144,7 @@ void low_flash_task(void){
                 }
                 else if (flash_pages[r].erase == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    if (multicore_lockout_start_timeout_us(1000) == false) {
+                    if (multicore_lockout_start_timeout_us(100000) == false) {
                         printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
                         continue;
                     }
@@ -143,9 +152,18 @@ void low_flash_task(void){
                     uint32_t ints = save_and_disable_interrupts();
                     flash_range_erase(flash_pages[r].address - XIP_BASE, flash_pages[r].page_size ? ((int) (flash_pages[r].page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
                     restore_interrupts(ints);
-                    if (multicore_lockout_end_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
-                        continue;
+                    if (multicore_lockout_end_timeout_us(100000) == false) {
+                        /* DEFENSIVE ONLY — this timeout has never been observed to fire.
+                         * The core1-parked-in-multicore_lockout_handler state originally
+                         * measured (2026-08-02) is NOT caused by an END timeout: core0
+                         * panics between lockout START and END (and after
+                         * save_and_disable_interrupts()), so the lockout is never released
+                         * (reproduced on unmodified upstream firmware 2026-08-05). The
+                         * 100 ms bound is kept only so a genuine race cannot block forever. Do NOT re-enter the lockout to re-sync — the SDK
+                         * documents lockouts as non-nestable. Stop this drain pass; the
+                         * page stays queued and the next pass retries. */
+                        printf("ERROR: FLASH LOCKOUT END TIMEOUT — aborting this drain pass\n");
+                        break;
                     }
 #else
                     memset(map + flash_pages[r].address, 0, FLASH_SECTOR_SIZE);

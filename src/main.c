@@ -31,9 +31,14 @@
 #include "bsp/board.h"
 #include "hardware/structs/ioqspi.h"
 #include "pico/stdio.h"
+#ifdef PICO_RP2350
+/* POWMAN is RP2350-only — hardware/powman.h does not exist in an RP2040 build
+ * (verified: including it unguarded fails the rp2040 build with
+ * "fatal error: hardware/powman.h: No such file or directory"). */
 #include "hardware/powman.h"
 #include "hardware/structs/psm.h"
 #include "hardware/regs/psm.h"
+#endif
 #endif
 
 #include "random.h"

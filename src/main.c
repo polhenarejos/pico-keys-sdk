@@ -31,6 +31,9 @@
 #include "bsp/board.h"
 #include "hardware/structs/ioqspi.h"
 #include "pico/stdio.h"
+#include "hardware/powman.h"
+#include "hardware/structs/psm.h"
+#include "hardware/regs/psm.h"
 #endif
 
 #include "random.h"
@@ -162,6 +165,26 @@ int main(void) {
 #ifdef PICO_PLATFORM
     board_init();
     stdio_init_all();
+#endif
+
+#ifdef PICO_RP2350
+    /* Make EVERY watchdog-family reset a FULL switched-core power cycle. The default
+     * watchdog reset (PSM_WDSEL minus ROSC/XOSC) leaves the switched core domain
+     * powered and was measured to wedge the warm boot ~5-10% of resets on RP2350B —
+     * cores never start, identically across watchdog_reboot() and rom_reboot()
+     * (2026-08-02/03 forensic record in regalia hardware/pico-hsm/). POWMAN_WDSEL
+     * RESET_SWCORE makes the reset power-cycle the switched domain and run the full
+     * PSM sequence — "the same effect as a power-on reset for the switched core
+     * power domain" (RP2350 datasheet). RESET_POWMAN_ASYNC restores powman defaults
+     * without depending on clk_ref; because it restores defaults, this register must
+     * be re-armed on EVERY boot — hence here, first thing. PSM_WDSEL all-ones per
+     * the datasheet note (powman ignores watchdog resets that don't select CLOCKS
+     * or earlier). RP2350-only: POWMAN does not exist on RP2040. */
+    powman_set_bits(&powman_hw->wdsel,
+                    POWMAN_WDSEL_RESET_POWMAN_ASYNC_BITS |
+                    POWMAN_WDSEL_RESET_SWCORE_BITS |
+                    POWMAN_WDSEL_RESET_PSM_BITS);
+    psm_hw->wdsel = PSM_WDSEL_BITS;
 #endif
 
 #else

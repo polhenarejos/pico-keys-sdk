@@ -178,6 +178,14 @@ static int flash_write_data_to_file_internal(file_t *file, const_byte_array_t da
         return PICOKEYS_ERR_NULL_PARAM;
     }
 
+    /* A FILE_DATA_FUNC file's ->data is a generator FUNCTION POINTER, not a flash
+     * address. The SELECT/FCI path (file.c) and the READ path (cmd_read_binary.c)
+     * both check this flag before using ->data; this write path did not, so an
+     * UPDATE BINARY on such an EF handed a .text address to the flash layer. */
+    if ((file_get_type(file) & FILE_DATA_FUNC) == FILE_DATA_FUNC) {
+        return PICOKEYS_ERR_BLOCKED;
+    }
+
     len = (uint32_t)data.len;
 
     uint32_t old_size = file_get_size(file);

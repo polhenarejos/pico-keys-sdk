@@ -23,7 +23,9 @@
 #if defined(PICO_PLATFORM)
 #include "pico/bootrom.h"
 #include "pico/multicore.h"
+#include "pico/time.h"
 #include "hardware/sync.h"
+#include "hardware/watchdog.h"
 #define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
 #endif
 #include "apdu.h"
@@ -260,11 +262,67 @@ void usb_send_event(uint32_t flag) {
     }
 }
 
+/* Core1 liveness flag, cleared by card_start() before each launch and set by
+ * card_init_core1() — the first thing every launched card function runs (apdu.c).
+ * Exists because the SDK's multicore launch handshake CAN report success while core1
+ * never starts: measured 2026-08-02 via SWD on a live failure — core1 parked in the
+ * bootrom's wait-for-launch loop (polling SIO FIFO_ST), one unread word in the FIFO
+ * (VLD=1), core0 convinced the launch succeeded. The card then enumerates USB (TinyUSB
+ * runs on core0) but never answers an APDU. */
+static volatile bool core1_alive = false;
+
 void card_init_core1(void) {
+    core1_alive = true;
     low_flash_init_core1();
 }
 
 volatile uint16_t finished_data_size = 0;
+
+#if defined(PICO_PLATFORM)
+/* Hard reset with a bounded attempt budget kept in watchdog scratch[1] (survives warm
+ * resets). Used when core1 cannot be launched: each boot is an independent dice roll,
+ * so resetting again converges — but a device that NEVER gets core1 back must stop
+ * rolling and stay alive-dark (enumerated, not answering) rather than reset-loop
+ * forever. */
+#define CORE1_BOOT_ATTEMPTS_MAX 5
+
+static void chip_reset_bounded(void) {
+    uint32_t attempts = watchdog_hw->scratch[1] + 1;
+    watchdog_hw->scratch[1] = attempts;
+    if (attempts > CORE1_BOOT_ATTEMPTS_MAX) {
+        printf("CARD: core1 unrecoverable after %lu boots — staying alive-dark\n",
+               (unsigned long) attempts);
+        return;
+    }
+    printf("CARD: core1 launch failed, resetting chip (attempt %lu)\n", (unsigned long) attempts);
+    watchdog_reboot(0, 0, 0);
+    /* Unreachable if the reset took. Stay alive-dark if it somehow did not. */
+    while (1) {
+        tight_loop_contents();
+    }
+}
+
+/* Launch func on core1 and VERIFY it actually started (the launch handshake can
+ * complete against stale FIFO data while core1 stays parked in the bootrom — the
+ * failure core1_alive exists to catch). Returns core1_alive. */
+static bool card_launch_verified(void *(*func)(void *)) {
+    for (int attempt = 0; attempt < 3 && !core1_alive; attempt++) {
+        if (attempt > 0) {
+            printf("CARD: core1 did not start, relaunching (attempt %d)\n", attempt + 1);
+        }
+        core1_alive = false;
+        multicore_reset_core1();
+        multicore_launch_func_core1(func);
+        for (int waited = 0; waited < 500 && !core1_alive; waited += 10) {
+            busy_wait_ms(10);
+        }
+    }
+    if (core1_alive) {
+        watchdog_hw->scratch[1] = 0;
+    }
+    return core1_alive;
+}
+#endif
 
 void card_start(uint8_t itf, void *(*func)(void *)) {
     timeout_start();
@@ -273,8 +331,17 @@ void card_start(uint8_t itf, void *(*func)(void *)) {
             card_exit();
         }
         if (func) {
+#if defined(PICO_PLATFORM)
+            if (!card_launch_verified(func)) {
+                chip_reset_bounded();
+                /* If the reset fired, unreachable. If it didn't (attempt budget
+                 * exhausted), fall through and stay alive-dark: the host will
+                 * time out, which is honest. */
+            }
+#else
             multicore_reset_core1();
             multicore_launch_func_core1(func);
+#endif
         }
         led_set_mode(MODE_MOUNTED);
         card_locked_itf = itf;

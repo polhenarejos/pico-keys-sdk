@@ -52,5 +52,8 @@ extern void flash_task(void);
 extern void low_flash_init(void);
 extern void flash_commit(void);
 extern bool flash_commit_sync(uint32_t timeout_ms);
+extern void low_flash_quiesce(void);
+extern void low_flash_unquiesce(void);
+extern bool low_flash_busy(void);
 
 #endif // _FLASH_H

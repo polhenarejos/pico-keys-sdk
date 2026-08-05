@@ -22,7 +22,9 @@
 #include "pico_time.h"
 #if defined(PICO_PLATFORM)
 #include "pico/bootrom.h"
+#include "boot/picoboot_constants.h"
 #include "pico/multicore.h"
+#include "pico/time.h"
 #include "hardware/sync.h"
 #define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
 #endif
@@ -266,6 +268,38 @@ void card_init_core1(void) {
 
 volatile uint16_t finished_data_size = 0;
 
+#if defined(PICO_PLATFORM)
+/* Full-chip reset via the BOOTROM's own reboot facility. Why not the alternatives:
+ *  - AIRCR.SYSRESETREQ: resets only the asserting core on RP2040/RP2350 (the datasheet's
+ *    generic ARM text is wrong for these parts; measured here 2026-08-02 as a complete
+ *    no-op — RAM statics survived the write).
+ *  - SDK watchdog_reboot(): full-chip, but measured to wedge the post-reset boot ~7% of
+ *    cycles (shapes A/B in the forensic record).
+ *  - rom_reboot(): still watchdog-based, but it is the bootrom's own sequenced path — the
+ *    same mechanism every UF2 flash-update reboot uses, the most field-exercised warm
+ *    reset this chip has.
+ * Quiesce flash first: no flash op may be in flight when the reset lands. */
+static void chip_reset_now(void) {
+    low_flash_quiesce();
+    printf("CARD: rebooting via rom_reboot\n");
+    rom_reboot(REBOOT2_FLAG_REBOOT_TYPE_NORMAL, 1, 0, 0);
+    /* Unreachable if the reset took. Stay alive and working if it did not. */
+    busy_wait_ms(2000);
+    low_flash_unquiesce();
+    printf("CARD: ERROR reset did not fire — staying alive\n");
+}
+
+/* Deferred chip reset, fired by card_watchdog_task() from core0's main loop. Exists
+ * because a reset must never run inside an APDU handler: the response is transmitted
+ * after the handler returns, so a synchronous reset lands mid-command (measured:
+ * Transmit failed on the host). */
+static uint64_t scheduled_reset_at_ms = 0;   /* 0 = none pending */
+
+void schedule_chip_reset(uint32_t delay_ms) {
+    scheduled_reset_at_ms = board_millis() + delay_ms;
+}
+#endif
+
 void card_start(uint8_t itf, void *(*func)(void *)) {
     timeout_start();
     if (card_locked_itf != itf || card_locked_func != func) {
@@ -377,6 +411,28 @@ int card_status(uint8_t itf) {
     }
     return PICOKEYS_ERR_FILE_NOT_FOUND;
 }
+
+#if defined(PICO_PLATFORM)
+/* Fire a scheduled chip reset from core0's main loop (see schedule_chip_reset). Never
+ * fire it while the flash layer still has lazy work queued: a reset landing mid-drain
+ * leaves a half-written file system and the next boot can fail to present the card.
+ * Wait for the drain, bounded so a stuck queue cannot defer the reset forever. */
+void card_watchdog_task(void) {
+    if (scheduled_reset_at_ms == 0) {
+        return;
+    }
+    uint64_t now = board_millis();
+    if ((long long) (now - scheduled_reset_at_ms) < 0) {
+        return;   /* not due yet */
+    }
+    if (low_flash_busy() && (long long) (now - scheduled_reset_at_ms) < 30000) {
+        return;   /* drain guard: retry next pass */
+    }
+    scheduled_reset_at_ms = 0;
+    printf("CARD: scheduled reset firing\n");
+    chip_reset_now();
+}
+#endif
 
 #ifndef USB_ITF_CCID
 #include "device/usbd_pvt.h"

@@ -172,6 +172,23 @@ void low_flash_task(void){
     }
 }
 
+/* Take the flash mutex and NEVER give it back. Every flash operation in this layer — queued
+ * erases, commits, background page handling — enters mtx_flash (low_flash_task only via
+ * try_enter, so a held mutex makes it skip), and the underlying SDK erase/program calls are
+ * synchronous, so once the mutex is held the flash chip is IDLE and stays idle. Intended for
+ * use immediately before a chip reset: a reset landing while the flash chip is internally busy
+ * is the measured cause of the intermittent post-reset boot wedge (see cmd_initialize.c in
+ * pico-hsm). Not re-entrant; the caller is expected to reset the chip before ever releasing. */
+void low_flash_quiesce(void) {
+    mutex_enter_blocking(&mtx_flash);
+}
+
+/* Release the mutex taken by low_flash_quiesce(). Only for the path where the reset the
+ * quiesce was taken for did NOT fire and the device stays alive — see cmd_initialize.c. */
+void low_flash_unquiesce(void) {
+    mutex_exit(&mtx_flash);
+}
+
 #ifdef PICO_RP2040
 void phymarker_write(void);
 #endif
@@ -256,6 +273,17 @@ static bool low_flash_available(void) {
     bool available = flash_available;
     mutex_exit(&mtx_flash);
     return available;
+}
+
+/* Public idle check for reset scheduling: true while the flash layer has queued or
+ * in-flight work. A reset that lands while lazy writes are still pending leaves a
+ * half-written file system and the next boot may fail to present the card (measured
+ * 2026-08-03: boot mute after init-on-blank-fs, repeatedly). */
+bool low_flash_busy(void) {
+    mutex_enter_blocking(&mtx_flash);
+    bool busy = flash_available || ready_pages > 0;
+    mutex_exit(&mtx_flash);
+    return busy;
 }
 
 bool low_flash_commit_sync(uint32_t timeout_ms) {

@@ -35,6 +35,7 @@ extern uint32_t flash_size(void);
 
 extern void flash_set_bounds(uintptr_t start, uintptr_t end);
 extern bool flash_addr_in_fs(uintptr_t addr);
+extern bool flash_range_in_fs(uintptr_t addr, size_t len);
 extern int flash_write_data_to_file(file_t *file, const_byte_array_t data);
 extern int flash_write_data_to_file_offset(file_t *file, const_byte_array_t data, uint32_t offset);
 extern int flash_program_block(uintptr_t addr, const_byte_array_t data);

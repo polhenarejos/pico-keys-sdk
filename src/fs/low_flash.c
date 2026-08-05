@@ -326,8 +326,9 @@ int flash_program_block(uintptr_t addr, const_byte_array_t data) {
     /* Validate BEFORE find_free_page() reads from the address: fs metadata corruption
      * can hand us a garbage pointer (measured 2026-08-04: BFAR=0x6CB44000, a bogus
      * prev_addr reached via flash_clear_file -> HardFault). Fail loudly, never read. */
-    if (!flash_addr_in_fs(addr)) {
-        printf("ERROR: flash_program_block to out-of-fs address %p — refusing\n", (void *) addr);
+    if (!flash_range_in_fs(addr, data.len)) {
+        printf("ERROR: flash_program_block %p+%u out of fs region — refusing\n",
+               (void *) addr, (unsigned) data.len);
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
 
@@ -466,8 +467,17 @@ uint8_t flash_read_uint8(uintptr_t addr) {
 int flash_erase_page(uintptr_t addr, size_t page_size) {
     page_flash_t *p = NULL;
 
-    if (!flash_addr_in_fs(addr)) {
-        printf("ERROR: flash_erase_page of out-of-fs address %p — refusing\n", (void *) addr);
+    /* Validate the full erase SPAN: low_flash_task() erases page_size rounded down to
+     * whole sectors (minimum one), so a start address inside the region can still
+     * erase past its end. */
+    size_t erase_len = page_size ? (page_size / FLASH_SECTOR_SIZE) * FLASH_SECTOR_SIZE
+                                 : FLASH_SECTOR_SIZE;
+    if (erase_len == 0) {
+        erase_len = FLASH_SECTOR_SIZE;
+    }
+    if (!flash_range_in_fs(addr, erase_len)) {
+        printf("ERROR: flash_erase_page %p+%u out of fs region — refusing\n",
+               (void *) addr, (unsigned) erase_len);
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
     mutex_enter_blocking(&mtx_flash);

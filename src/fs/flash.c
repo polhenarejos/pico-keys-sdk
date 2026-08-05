@@ -66,6 +66,25 @@ bool flash_addr_in_fs(uintptr_t addr) {
     return addr >= start_data_pool && addr < end_flash;
 }
 
+/* True only if the WHOLE [addr, addr + len) span stays inside the fs data region —
+ * and so does the sector-aligned base that find_free_page() will actually operate on.
+ * Checking just the start address is not enough: flash_program_block() walks forward
+ * across sectors as it consumes data, and flash_erase_page() erases page_size bytes,
+ * so a start address one byte inside the region can still run off the end. The
+ * subtraction is done only after addr is known to be below end_flash, so it cannot wrap. */
+bool flash_range_in_fs(uintptr_t addr, size_t len) {
+    if (len == 0) {
+        return false;
+    }
+    if (addr < start_data_pool || addr >= end_flash) {
+        return false;
+    }
+    if ((addr & ~(uintptr_t) (FLASH_SECTOR_SIZE - 1)) < start_data_pool) {
+        return false;
+    }
+    return len <= (size_t) (end_flash - addr);
+}
+
 void flash_set_bounds(uintptr_t start, uintptr_t end) {
     end_flash = end;
     end_rom_pool = end_flash - FLASH_DATA_HEADER_SIZE - 4;

@@ -57,6 +57,15 @@ uintptr_t end_flash, end_rom_pool, start_rom_pool, end_data_pool, start_data_poo
 uintptr_t last_base;
 uint32_t num_files = 0;
 
+/* True if addr is inside the fs data region [start_data_pool, end_flash). Used by
+ * low_flash.c's corrupt-page guard — the region is partition-dependent (measured
+ * 2026-08-04: ~[1MB, 4MB) on this build, NOT [8MB, 16MB) as a hardcoded
+ * FLASH_SIZE_BYTES>>1 bound wrongly assumed, which made the guard drop every
+ * legitimate lazy write). */
+bool flash_addr_in_fs(uintptr_t addr) {
+    return addr >= start_data_pool && addr < end_flash;
+}
+
 void flash_set_bounds(uintptr_t start, uintptr_t end) {
     end_flash = end;
     end_rom_pool = end_flash - FLASH_DATA_HEADER_SIZE - 4;

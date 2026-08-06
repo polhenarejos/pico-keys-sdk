@@ -181,9 +181,17 @@ static int flash_write_data_to_file_internal(file_t *file, const_byte_array_t da
     /* A FILE_DATA_FUNC file's ->data is a generator FUNCTION POINTER, not a flash
      * address. The SELECT/FCI path (file.c) and the READ path (cmd_read_binary.c)
      * both check this flag before using ->data; this write path did not, so an
-     * UPDATE BINARY on such an EF handed a .text address to the flash layer. */
+     * UPDATE BINARY on such an EF handed a .text address to the flash layer.
+     *
+     * Accept and discard rather than returning an error. Returning an error is not
+     * viable in practice: the Smart Card Shell's SmartCardHSM.js aborts initialisation
+     * with "GPError ... Unexpected SW1/SW2=6581" as soon as a write to one of these EFs
+     * is refused, so scsh-driven provisioning cannot complete. (OpenSC ignores the same
+     * failure, which is why it only shows up under scsh.) The content of these EFs is
+     * regenerated from live card state on every read, so discarding the host's copy
+     * loses nothing structural. */
     if ((file_get_type(file) & FILE_DATA_FUNC) == FILE_DATA_FUNC) {
-        return PICOKEYS_ERR_BLOCKED;
+        return PICOKEYS_OK;
     }
 
     len = (uint32_t)data.len;

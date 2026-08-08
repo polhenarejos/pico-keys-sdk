@@ -42,7 +42,7 @@ extern bool low_flash_commit_sync(uint32_t timeout_ms);
 /*
  * ------------------------------------------------------
  * |                                                    |
- * | next_addr | prev_addr | fid | len16 | payload       | legacy
+ * | next_addr | prev_addr | fid | len16 | payload      | legacy
  * | next_addr | prev_addr | fid | FFFF  | len32 | data | extended
  * |                                                    |
  * ------------------------------------------------------

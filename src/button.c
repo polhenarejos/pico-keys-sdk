@@ -20,6 +20,7 @@
 #include "led/led.h"
 #include "pico_time.h"
 #if defined(PICO_PLATFORM)
+#include "pico/multicore.h"
 #include "hardware/sync.h"
 #include "hardware/structs/ioqspi.h"
 #include "hardware/gpio.h"
@@ -95,6 +96,10 @@ static bool picok_board_button_read(void) {
 static bool button_pressed_state = false;
 static uint32_t button_pressed_time = 0;
 static uint8_t button_press = 0;
+static bool button_hold_state = false;
+static uint32_t button_hold_started = 0;
+static uint32_t button_last_poll = 0;
+volatile uint32_t button_pressed_duration = 0;
 
 int button_wait(void) {
     /* Disabled by default. As LED may not be properly configured,
@@ -165,26 +170,51 @@ int button_wait(void) {
     signal_emit(SIGNAL_USER_PRESENCE_COMPLETED);
     return 0;
 }
+
 #endif
 
 void button_task(void) {
 #ifndef ENABLE_EMULATION
-    if (button_pressed_cb && board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up
-        bool current_button_state = picok_board_button_read();
-        if (current_button_state != button_pressed_state) {
-            if (current_button_state == false) { // unpressed
-                if (button_pressed_time == 0 || button_pressed_time + 1000 > board_millis()) {
-                    button_press++;
-                }
-                button_pressed_time = board_millis();
-            }
-            button_pressed_state = current_button_state;
+    uint32_t now = board_millis();
+    if (now > 1000 && now - button_last_poll >= 10 && !is_busy()) { // wait 1 second to boot up
+#ifdef PICO_PLATFORM
+        if (!multicore_lockout_start_timeout_us(1000)) {
+            return;
         }
-        if (button_pressed_time > 0 && button_press > 0 && button_pressed_time + 1000 < board_millis() && button_pressed_state == false) {
-            if (button_pressed_cb != NULL) {
-                (*button_pressed_cb)(button_press);
+#endif
+        bool current_button_state = picok_board_button_read();
+#ifdef PICO_PLATFORM
+        multicore_lockout_end_timeout_us(1000);
+#endif
+        button_last_poll = now;
+        if (current_button_state && !button_hold_state) {
+            button_hold_started = now;
+            button_pressed_duration = 0;
+        }
+        else if (!current_button_state && button_hold_state) {
+            button_pressed_duration = button_hold_started == 0 ? 0 : now - button_hold_started;
+            button_hold_started = 0;
+        }
+        else if (current_button_state && button_hold_state && button_hold_started != 0) {
+            button_pressed_duration = now - button_hold_started;
+        }
+        button_hold_state = current_button_state;
+        if (button_pressed_cb) {
+            if (current_button_state != button_pressed_state) {
+                if (current_button_state == false) { // unpressed
+                    if (button_pressed_time == 0 || button_pressed_time + 1000 > now) {
+                        button_press++;
+                    }
+                    button_pressed_time = now;
+                }
+                button_pressed_state = current_button_state;
             }
-            button_pressed_time = button_press = 0;
+            if (button_pressed_time > 0 && button_press > 0 && button_pressed_time + 1000 < now && button_pressed_state == false) {
+                if (button_pressed_cb != NULL) {
+                    (*button_pressed_cb)(button_press);
+                }
+                button_pressed_time = button_press = 0;
+            }
         }
     }
 #endif

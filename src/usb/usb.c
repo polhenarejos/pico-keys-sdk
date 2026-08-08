@@ -343,7 +343,9 @@ int card_status(uint8_t itf) {
         if (has_m) {
             if (m == EV_EXEC_FINISHED) {
                 timeout_stop();
-                led_set_mode(MODE_MOUNTED);
+                if (led_get_mode() == MODE_PROCESSING) {
+                    led_set_mode(MODE_MOUNTED);
+                }
                 return PICOKEYS_OK;
             }
 #ifndef ENABLE_EMULATION

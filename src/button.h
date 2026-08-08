@@ -26,6 +26,7 @@
 #endif
 
 extern int button_wait(void);
+extern volatile uint32_t button_pressed_duration;
 extern void button_task(void);
 extern volatile bool cancel_button;
 extern bool touch_accept_button;

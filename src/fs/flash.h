@@ -53,4 +53,10 @@ extern void low_flash_init(void);
 extern void flash_commit(void);
 extern bool flash_commit_sync(uint32_t timeout_ms);
 
+/* Corrupt-filesystem state set by scan_region() (src/fs/file.c). When a chain link fails
+ * validation the scan stops and records it here; nothing is erased. */
+extern bool fs_corruption_detected;
+extern uintptr_t fs_corruption_addr;
+extern uintptr_t fs_corruption_prev;
+
 #endif // _FLASH_H

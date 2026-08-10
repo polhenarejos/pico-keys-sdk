@@ -316,6 +316,19 @@ uint8_t last_cmd = 0;
 uint8_t last_seq = 0;
 CTAPHID_FRAME last_req = { 0 };
 uint32_t lock = 0;
+uint32_t lock_cid = 0;
+static uint32_t next_cid = 1;
+
+static uint32_t allocate_cid(void) {
+    uint32_t cid;
+    do {
+        cid = next_cid++;
+        if (next_cid == 0 || next_cid == CID_BROADCAST) {
+            next_cid = 1;
+        }
+    } while (cid == 0 || cid == CID_BROADCAST);
+    return cid;
+}
 
 uint8_t thread_type = 0; //1 is APDU, 2 is CBOR
 extern volatile bool cancel_button;
@@ -357,8 +370,8 @@ int driver_process_usb_packet_hid(uint16_t read) {
             (ctap_req->cid == CID_BROADCAST && (FRAME_TYPE(ctap_req) != TYPE_INIT || ctap_req->init.cmd != CTAPHID_INIT))) {
             return ctap_error(CTAP1_ERR_INVALID_CHANNEL);
         }
-        if (board_millis() < lock && ctap_req->cid != last_req.cid &&
-            last_cmd_time + 100 > board_millis()) {
+        if (board_millis() < lock && ctap_req->cid != lock_cid &&
+            !(ctap_req->cid == CID_BROADCAST && ctap_req->init.cmd == CTAPHID_INIT)) {
             return ctap_error(CTAP1_ERR_CHANNEL_BUSY);
         }
         if (FRAME_TYPE(ctap_req) == TYPE_INIT && ctap_req->init.cmd == CTAPHID_CANCEL) {
@@ -431,7 +444,7 @@ int driver_process_usb_packet_hid(uint16_t read) {
             CTAPHID_INIT_REQ *req = (CTAPHID_INIT_REQ *) ctap_req->init.data;
             CTAPHID_INIT_RESP *resp = (CTAPHID_INIT_RESP *) ctap_resp->init.data;
             memcpy(resp->nonce, req->nonce, sizeof(resp->nonce));
-            resp->cid = 0x01000000;
+            resp->cid = ctap_req->cid == CID_BROADCAST ? allocate_cid() : ctap_req->cid;
             resp->versionInterface = CTAPHID_IF_VERSION;
             resp->versionMajor = get_version_major ? get_version_major() : PICOKEYS_SDK_VERSION_MAJOR;
             resp->versionMinor = get_version_minor ? get_version_minor() : PICOKEYS_SDK_VERSION_MINOR;
@@ -482,7 +495,17 @@ int driver_process_usb_packet_hid(uint16_t read) {
             if (ctap_req->init.data[0] > 10) {
                 return ctap_error(CTAP1_ERR_INVALID_PARAMETER);
             }
-            lock = board_millis() + ctap_req->init.data[0] * 1000;
+            if (board_millis() < lock && ctap_req->cid != lock_cid) {
+                return ctap_error(CTAP1_ERR_CHANNEL_BUSY);
+            }
+            if (ctap_req->init.data[0] == 0) {
+                lock = 0;
+                lock_cid = 0;
+            }
+            else {
+                lock = board_millis() + ctap_req->init.data[0] * 1000;
+                lock_cid = ctap_req->cid;
+            }
             ctap_resp->cid = ctap_req->cid;
             ctap_resp->init.cmd = ctap_req->init.cmd;
             driver_write_hid(ITF_HID_CTAP, CONST_BYTE_ARRAY((const uint8_t *)ctap_resp, 64));

@@ -73,6 +73,9 @@ int process_apdu(void) {
             is_chaining = false;
         }
     }
+    if (!(CLA(apdu) & 0x10) && (CLA(apdu) & 0x0C)) {
+        return SW_CLA_NOT_SUPPORTED();
+    }
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
         if (select_app(CONST_BYTE_ARRAY(apdu.data, apdu.nc)) == PICOKEYS_OK) {
             return SW_OK();

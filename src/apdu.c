@@ -49,7 +49,7 @@ int process_apdu(void) {
             memset(chain_buf, 0, sizeof(chain_buf));
             chain_ptr = NULL;
             is_chaining = false;
-            return SW_CLA_NOT_SUPPORTED();
+            return SW_WRONG_LENGTH();
         }
         memcpy(chain_ptr, apdu.data, apdu.nc);
         chain_ptr += apdu.nc;
@@ -63,7 +63,7 @@ int process_apdu(void) {
                 memset(chain_buf, 0, sizeof(chain_buf));
                 chain_ptr = NULL;
                 is_chaining = false;
-                return SW_CLA_NOT_SUPPORTED();
+                return SW_WRONG_LENGTH();
             }
             memmove(apdu.data + chain_used, apdu.data, apdu.nc);
             memcpy(apdu.data, chain_buf, chain_used);

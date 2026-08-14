@@ -98,6 +98,7 @@ extern int bulk_cmd(int (*cmd)(void));
 
 #define SW_LOGICAL_CHANNEL_NOT_SUPPORTED()  set_res_sw(0x68, 0x81)
 #define SW_SECURE_MESSAGING_NOT_SUPPORTED() set_res_sw(0x68, 0x82)
+#define SW_LAST_CHAIN_EXPECTED()             set_res_sw(0x68, 0x83)
 
 #define SW_COMMAND_INCOMPATIBLE()           set_res_sw(0x69, 0x81)
 #define SW_SECURITY_STATUS_NOT_SATISFIED()  set_res_sw(0x69, 0x82)

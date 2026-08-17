@@ -16,9 +16,14 @@ set(PICOKEYS_REQUIRES
     efuse
     mbedtls
     tinycbor
-    lwip
-    cjson
 )
+
+if (USB_ITF_LWIP)
+    list(APPEND PICOKEYS_REQUIRES
+        lwip
+        cjson
+    )
+endif()
 
 if(ENABLE_PQC)
     list(APPEND PICOKEYS_INCLUDE_DIRS

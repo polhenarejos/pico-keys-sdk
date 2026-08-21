@@ -156,6 +156,14 @@ static int rest_start_core1_job(rest_conn_t *conn, rest_route_handler_t handler,
     rest_core1_job.handler = handler;
     if (request != NULL) {
         rest_core1_job.request = *request;
+        for (size_t i = 0; i < request->query_count; i++) {
+            if (request->query[i].key != NULL) {
+                rest_core1_job.request.query[i].key = rest_core1_job.request.path + (request->query[i].key - request->path);
+            }
+            if (request->query[i].value != NULL) {
+                rest_core1_job.request.query[i].value = rest_core1_job.request.path + (request->query[i].value - request->path);
+            }
+        }
     }
     else {
         memset(&rest_core1_job.request, 0, sizeof(rest_core1_job.request));

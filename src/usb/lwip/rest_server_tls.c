@@ -19,6 +19,10 @@
 #include "rest_server_tls.h"
 #ifdef ENABLE_EMULATION
 #include "compat/board.h"
+#elif defined(PICO_PLATFORM)
+#include "bsp/board.h"
+#elif defined(ESP_PLATFORM)
+#include "compat/esp_compat.h"
 #endif
 
 #ifdef _MSC_VER

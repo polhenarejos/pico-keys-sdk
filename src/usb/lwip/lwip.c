@@ -49,6 +49,7 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #include "dnserver.h"
 #include "lwip/init.h"
 #include "lwip/timeouts.h"
+#include "bsp/board.h"
 #elif defined(ESP_PLATFORM)
 #include "apps/dhcpserver/dhcpserver.h"
 #include "netif/ethernet.h"

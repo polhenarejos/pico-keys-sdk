@@ -901,6 +901,8 @@ void rest_handle_request(rest_conn_t *conn) {
         return;
     }
 
+    conn->request_dispatched = true;
+
     if (rest_core1_job_pending_load() && !(request->method == REST_HTTP_POST && strcmp(request->path, "/device/jobs/cancel") == 0)) {
         if (request->query != NULL) {
             free(request->query);
@@ -1236,8 +1238,9 @@ static err_t rest_poll(void *arg, struct tcp_pcb *pcb) {
         return ERR_OK;
     }
     uint32_t now = board_millis();
-    if (now - conn->last_progress_ms >= REST_CONN_TIMEOUT_MS ||
-        (!conn->request_dispatched && now - conn->opened_ms >= REST_CONN_TOTAL_TIMEOUT_MS)) {
+    if (!conn->request_dispatched &&
+        (now - conn->last_progress_ms >= REST_CONN_TIMEOUT_MS ||
+         now - conn->opened_ms >= REST_CONN_TOTAL_TIMEOUT_MS)) {
         rest_close_conn(conn);
         return ERR_ABRT;
     }
@@ -1409,9 +1412,14 @@ static void *rest_emulation_thread(void *arg) {
             mbedtls_ssl_set_bio(&conn->ssl, conn, tls_send_cb, tls_recv_cb, NULL);
         }
         while (conn->in_use) {
+            // Core 0 owns the connection after request dispatch.
+            if (conn->request_dispatched) {
+                break;
+            }
             uint32_t now = board_millis();
-            if (now - conn->last_progress_ms >= REST_CONN_TIMEOUT_MS ||
-                (!conn->request_dispatched && now - conn->opened_ms >= REST_CONN_TOTAL_TIMEOUT_MS)) {
+            if (!conn->request_dispatched &&
+                (now - conn->last_progress_ms >= REST_CONN_TIMEOUT_MS ||
+                 now - conn->opened_ms >= REST_CONN_TOTAL_TIMEOUT_MS)) {
                 rest_close_conn(conn);
                 break;
             }

@@ -75,6 +75,7 @@ void mbedtls_sha256_free(mbedtls_sha256_context *ctx) {
         return;
     }
 
+    pico_sha256_cleanup(&ctx->pico_state);
     mbedtls_platform_zeroize(ctx, sizeof(mbedtls_sha256_context));
 }
 

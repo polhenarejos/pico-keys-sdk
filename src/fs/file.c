@@ -324,6 +324,14 @@ void file_initialize_flash(bool hard) {
 
 extern uintptr_t last_base;
 extern uint32_t num_files;
+/* Corrupt-filesystem state, exposed rather than silently swallowed. Set when scan_region() finds a
+ * chain link that is outside the region or does not move toward its start. The scan stops; nothing
+ * is erased. This keeps the linked-list pointers usable as integrity indicators and leaves the
+ * decision about a corrupt filesystem to the operator. */
+bool fs_corruption_detected = false;
+uintptr_t fs_corruption_addr = 0;   /* the offending link */
+uintptr_t fs_corruption_prev = 0;   /* the link before it, so direction is visible */
+
 static void scan_region(bool persistent) {
     uintptr_t endp = end_data_pool, startp = start_data_pool;
     if (persistent) {
@@ -334,10 +342,41 @@ static void scan_region(bool persistent) {
         last_base = endp;
         num_files = 0;
     }
+    uintptr_t prev_base = endp + 1;   /* links must move strictly toward startp */
     for (uintptr_t base = flash_read_uintptr(endp); base >= startp; base = flash_read_uintptr(base)) {
         if (base == 0x0) { //all is empty
             break;
         }
+
+        /* Validate the chain link before dereferencing it: inside the region, and strictly
+         * decreasing.
+         *
+         * The loop condition bounds `base` only from BELOW. Anything above the region passes it
+         * and is then read by the flash_read_*() calls that follow — including addresses that are
+         * not memory. Measured on RP2350B: a card stopped enumerating and survived reset, POWMAN
+         * cycles, VBUS cuts and a reflash. It was not wedged hardware; the core was parked in the
+         * bootrom exception handler with a precise bus fault, BFAR = 0x40130000 (peripheral space,
+         * neither flash nor SRAM). Every reset re-read the same link and faulted identically,
+         * which is why only erasing the filesystem recovered it.
+         *
+         * The strictly-decreasing test is not redundant with the range test: a link that points
+         * forward, or at itself, stays in range and yields an INFINITE SCAN instead of a fault —
+         * a different failure that a range check alone would hide.
+         *
+         * On detecting corruption this stops scanning and records what it saw. Nothing is erased,
+         * rewritten or skipped: the links stay usable as integrity indicators, the remaining data
+         * is left intact for inspection, and recovery stays an explicit decision rather than
+         * something the firmware does to itself. */
+        if (base > endp || base >= prev_base) {
+            fs_corruption_detected = true;
+            fs_corruption_addr = base;
+            fs_corruption_prev = prev_base;
+            printf("SCAN: chain link %x invalid (prev %x, region %x..%x) — stopping scan\n",
+                   (unsigned int) base, (unsigned int) prev_base,
+                   (unsigned int) startp, (unsigned int) endp);
+            break;
+        }
+        prev_base = base;
 
         uint16_t fid = flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t));
         uintptr_t length_addr = base + 2 * sizeof(uintptr_t) + sizeof(uint16_t);

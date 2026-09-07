@@ -66,6 +66,8 @@ void file_process_fci(const file_t *pe, int fmd) {
     uint8_t type = file_get_type(pe);
     uint8_t structure = entry ? entry->ef_structure : FILE_EF_TRANSPARENT;
     const uint8_t *name = entry ? entry->name : NULL;
+    /* The pseudo-applet entry stores [length][AID]; file data has a two-byte prefix. */
+    const uint8_t name_offset = pe->fid == 0x0000 ? 1 : 2;
 
     res_APDU_size = 0;
     if (fmd) {
@@ -116,7 +118,7 @@ void file_process_fci(const file_t *pe, int fmd) {
     if (name) {
         res_APDU[res_APDU_size++] = 0x84;
         res_APDU[res_APDU_size++] = MIN(name[0], 16);
-        memcpy(res_APDU + res_APDU_size, name + 2, MIN(name[0], 16));
+        memcpy(res_APDU + res_APDU_size, name + name_offset, MIN(name[0], 16));
         res_APDU_size += MIN(name[0], 16);
     }
     memcpy(res_APDU + res_APDU_size, "\x8A\x01\x05", 3); //life-cycle (5 -> activated)

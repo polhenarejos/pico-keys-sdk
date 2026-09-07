@@ -565,8 +565,8 @@ static int vault_enrollment_validate_certificate(mbedtls_x509_crt *certificate) 
 }
 
 static int vault_enrollment_validate_serial(mbedtls_x509_crt *certificate) {
-    if (!certificate || !certificate->subject_alt_names.next) {
-        log_errstr("vault enrollment: certificate serial missing certificate=%p has_san=%d", (void *)certificate, certificate ? certificate->subject_alt_names.next != NULL : 0);
+    if (!certificate || !certificate->subject_alt_names.buf.p) {
+        log_errstr("vault enrollment: certificate serial missing certificate=%p has_san=%d", (void *)certificate, certificate ? certificate->subject_alt_names.buf.p != NULL : 0);
         return PICOKEYS_VERIFICATION_FAILED;
     }
 
@@ -574,7 +574,7 @@ static int vault_enrollment_validate_serial(mbedtls_x509_crt *certificate) {
     return PICOKEYS_OK;
 #else
     size_t serial_len = strlen(pico_serial_str);
-    for (mbedtls_x509_sequence *entry = certificate->subject_alt_names.next; entry; entry = entry->next) {
+    for (mbedtls_x509_sequence *entry = &certificate->subject_alt_names; entry; entry = entry->next) {
         mbedtls_x509_subject_alternative_name san = { 0 };
         int ret = mbedtls_x509_parse_subject_alt_name(&entry->buf, &san);
         if (ret == 0 && (san.type == MBEDTLS_X509_SAN_DNS_NAME || san.type == MBEDTLS_X509_SAN_UNIFORM_RESOURCE_IDENTIFIER) && san.san.unstructured_name.len == serial_len && memcmp(san.san.unstructured_name.p, pico_serial_str, serial_len) == 0) {

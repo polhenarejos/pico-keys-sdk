@@ -152,6 +152,11 @@ extern file_t *file_new(uint16_t);
 extern int flash_clear_file(file_t *file);
 typedef bool (*file_iter_cb)(file_t *file, void *ctx);
 extern void file_for_each_dynamic(file_iter_cb cb, void *ctx);
+typedef struct file_delete_result {
+    int value;
+    int metadata;
+} file_delete_result_t;
+extern file_delete_result_t file_delete_no_commit_parts(file_t *ef);
 extern int file_delete_no_commit(file_t *ef);
 extern int file_delete(file_t *ef);
 file_t *get_parent(file_t *f);

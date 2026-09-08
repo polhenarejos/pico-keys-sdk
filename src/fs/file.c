@@ -522,7 +522,10 @@ static int meta_delete_internal(uint16_t fid, bool commit) {
         if (cfid == fid) {
             size_t new_len = ctxi.len - 1 - tag_len - tlv_format_len(tag_len, NULL);
             if (new_len == 0) {
-                flash_clear_file(ef);
+                int r = flash_clear_file(ef);
+                if (r != PICOKEYS_OK) {
+                    return r;
+                }
             }
             else {
                 fdata = (uint8_t *) calloc(1, new_len);
@@ -639,18 +642,37 @@ bool file_has_data(const file_t *f) {
     return f != NULL && f->data != NULL && file_get_size(f) > 0;
 }
 
-int file_delete_no_commit(file_t *ef) {
+file_delete_result_t file_delete_no_commit_parts(file_t *ef) {
+    file_delete_result_t result = {
+        .value = PICOKEYS_OK,
+        .metadata = PICOKEYS_OK
+    };
+
     if (ef == NULL) {
-        return PICOKEYS_OK;
+        return result;
     }
-    meta_delete_internal(ef->fid, false);
+
+    result.metadata = meta_delete_internal(ef->fid, false);
+    if (result.metadata == PICOKEYS_ERR_FILE_NOT_FOUND) {
+        result.metadata = PICOKEYS_OK;
+    }
     if (flash_clear_file(ef) != PICOKEYS_OK) {
-        return PICOKEYS_EXEC_ERROR;
+        result.value = PICOKEYS_EXEC_ERROR;
+        return result;
     }
     if (delete_dynamic_file(ef) != PICOKEYS_OK) {
-        return PICOKEYS_EXEC_ERROR;
+        result.value = PICOKEYS_EXEC_ERROR;
+        return result;
     }
-    return PICOKEYS_OK;
+    return result;
+}
+
+int file_delete_no_commit(file_t *ef) {
+    file_delete_result_t result = file_delete_no_commit_parts(ef);
+    if (result.value != PICOKEYS_OK) {
+        return result.value;
+    }
+    return result.metadata;
 }
 
 int file_delete(file_t *ef) {

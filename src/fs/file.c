@@ -660,7 +660,8 @@ file_delete_result_t file_delete_no_commit_parts(file_t *ef) {
         result.value = PICOKEYS_EXEC_ERROR;
         return result;
     }
-    if (delete_dynamic_file(ef) != PICOKEYS_OK) {
+    int r = delete_dynamic_file(ef);
+    if (r != PICOKEYS_OK && r != PICOKEYS_ERR_FILE_NOT_FOUND) {
         result.value = PICOKEYS_EXEC_ERROR;
         return result;
     }

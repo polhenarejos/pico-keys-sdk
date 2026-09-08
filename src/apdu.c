@@ -242,7 +242,7 @@ uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer) {
 
 uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {
     apdu.sw = make_uint16_be(sw1, sw2);
-    if (sw1 != 0x90) {
+    if (sw1 != 0x90 && sw1 != 0x61) {
         res_APDU_size = 0;
     }
     return make_uint16_be(sw1, sw2);

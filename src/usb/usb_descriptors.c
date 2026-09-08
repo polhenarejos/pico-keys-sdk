@@ -149,7 +149,7 @@ enum
 #endif
 
 uint8_t desc_config[MAX_TUSB_DESC_TOTAL_LEN] = {
-    TUD_CONFIG_DESCRIPTOR(1, 0, 4, 0, USB_CONFIG_ATT_ONE | TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, MAX_USB_POWER)
+    TUD_CONFIG_DESCRIPTOR(1, 0, 0, 0, USB_CONFIG_ATT_ONE | TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, MAX_USB_POWER)
 };
 
 #ifdef USB_ITF_HID
@@ -172,13 +172,13 @@ void usb_desc_setup(void) {
 #ifdef USB_ITF_HID
     if (ITF_HID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_INOUT_DESC_LEN;
-        const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID + 6, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
+        const uint8_t desc[] = { TUD_HID_INOUT_DESCRIPTOR(ITF_HID, ITF_HID + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID, (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10) };
         memcpy(p, desc, sizeof(desc));
         p += sizeof(desc);
     }
     if (ITF_KEYBOARD != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_HID_DESC_LEN;
-        const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 6, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID_KB, 16, 5) };
+        const uint8_t desc_kb[] = { TUD_HID_DESCRIPTOR(ITF_KEYBOARD, ITF_KEYBOARD + 5, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report_kb), (uint8_t)TUSB_DIR_IN_MASK | EPNUM_HID_KB, 16, 5) };
         memcpy(p, desc_kb, sizeof(desc_kb));
         p += sizeof(desc_kb);
     }
@@ -186,13 +186,13 @@ void usb_desc_setup(void) {
 #ifdef USB_ITF_CCID
     if (ITF_CCID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUSB_SMARTCARD_CCID_DESC_LEN;
-        const uint8_t desc_ccid[] = { TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID + 6, EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID_INT, 64) };
+        const uint8_t desc_ccid[] = { TUD_SMARTCARD_DESCRIPTOR(ITF_CCID, ITF_CCID + 5, EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID, TUSB_DIR_IN_MASK | EPNUM_CCID_INT, 64) };
         memcpy(p, desc_ccid, sizeof(desc_ccid));
         p += sizeof(desc_ccid);
     }
     if (ITF_WCID != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUSB_SMARTCARD_WCID_DESC_LEN;
-        const uint8_t desc_wcid[] = { TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID + 6, EPNUM_WCID, TUSB_DIR_IN_MASK | EPNUM_WCID, 64) };
+        const uint8_t desc_wcid[] = { TUD_SMARTCARD_DESCRIPTOR_WEB(ITF_WCID, ITF_WCID + 5, EPNUM_WCID, TUSB_DIR_IN_MASK | EPNUM_WCID, 64) };
         memcpy(p, desc_wcid, sizeof(desc_wcid));
         p += sizeof(desc_wcid);
     }
@@ -200,7 +200,7 @@ void usb_desc_setup(void) {
 #ifdef USB_ITF_LWIP
     if (ITF_LWIP != ITF_INVALID) {
         TUSB_DESC_TOTAL_LEN += TUD_CDC_NCM_DESC_LEN;
-        const uint8_t desc_lwip[] = { TUD_CDC_NCM_DESCRIPTOR(ITF_LWIP, ITF_LWIP + 6, 5, EPNUM_LWIP_NOTIF | TUSB_DIR_IN_MASK, 64, EPNUM_LWIP, EPNUM_LWIP | TUSB_DIR_IN_MASK, CFG_TUD_NET_ENDPOINT_SIZE, CFG_TUD_NET_MTU) };
+        const uint8_t desc_lwip[] = { TUD_CDC_NCM_DESCRIPTOR(ITF_LWIP, ITF_LWIP + 5, 4, EPNUM_LWIP_NOTIF | TUSB_DIR_IN_MASK, 64, EPNUM_LWIP, EPNUM_LWIP | TUSB_DIR_IN_MASK, CFG_TUD_NET_ENDPOINT_SIZE, CFG_TUD_NET_MTU) };
         memcpy(p, desc_lwip, sizeof(desc_lwip));
         p += sizeof(desc_lwip);
     }
@@ -350,8 +350,7 @@ char const *string_desc_arr [] = {
     "Pol Henarejos",                     // 1: Manufacturer
     "Pico Key",                       // 2: Product
     "11223344",                      // 3: Serials, should use chip ID
-    "Config",               // 4: Vendor Interface
-    "MAC"                   // 5: MAC address string, handled separately
+    "MAC"                   // 4: MAC address string, handled separately
     , "HID Interface"
     , "HID Keyboard Interface"
 #ifdef USB_ITF_HID

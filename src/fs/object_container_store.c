@@ -564,13 +564,19 @@ int file_object_container_delete(const file_object_container_layout_t *layout, u
                 }
                 file_t *record = file_search(record_fid);
                 if (record) {
-                    file_delete_no_commit(record);
+                    r = file_delete_no_commit(record);
+                    if (r != PICOKEYS_OK) {
+                        return r;
+                    }
                 }
             }
         }
         file_t *manifest = file_search(layout->manifest_fid(layout->ctx, container_id, slot));
         if (manifest) {
-            file_delete_no_commit(manifest);
+            r = file_delete_no_commit(manifest);
+            if (r != PICOKEYS_OK) {
+                return r;
+            }
         }
     }
     if (layout->deactivate) {

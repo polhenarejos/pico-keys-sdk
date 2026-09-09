@@ -336,15 +336,25 @@ static void scan_region(bool persistent) {
         last_base = endp;
         num_files = 0;
     }
-    for (uintptr_t base = flash_read_uintptr(endp); base >= startp; base = flash_read_uintptr(base)) {
-        if (base == 0x0) { //all is empty
+    for (uintptr_t base = flash_read_uintptr(endp); base != 0; base = flash_read_uintptr(base)) {
+        size_t minimum_header = 2 * sizeof(uintptr_t) + sizeof(uint16_t) + sizeof(uint16_t);
+        if (base < startp || base > endp || endp - base < minimum_header) {
+            printf("ERROR: invalid flash record address %x\n", (unsigned int)base);
             break;
         }
 
+        uintptr_t next_addr = flash_read_uintptr(base);
+        uintptr_t prev_addr = flash_read_uintptr(base + sizeof(uintptr_t));
         uint16_t fid = flash_read_uint16(base + sizeof(uintptr_t) + sizeof(uintptr_t));
         uintptr_t length_addr = base + 2 * sizeof(uintptr_t) + sizeof(uint16_t);
         uint16_t stored_length = flash_read_uint16(length_addr);
         uint32_t length = stored_length == FLASH_FILE_EXTENDED_LENGTH ? flash_read_uint32(length_addr + sizeof(uint16_t)) : stored_length;
+        size_t length_size = stored_length == FLASH_FILE_EXTENDED_LENGTH ? FLASH_FILE_EXTENDED_LENGTH_SIZE : FLASH_FILE_LEGACY_LENGTH_SIZE;
+        size_t record_header = 2 * sizeof(uintptr_t) + sizeof(uint16_t) + length_size;
+        if (fid == DYNAMIC_FID_EMPTY || fid == DYNAMIC_FID_DELETED || record_header > endp - base || length > endp - base - record_header || (next_addr != 0 && (next_addr < startp || next_addr >= base)) || (prev_addr != endp && (prev_addr <= base || prev_addr > endp))) {
+            printf("ERROR: invalid flash record at %x\n", (unsigned int)base);
+            break;
+        }
         printf("[%x] scan fid %x, len %lu\n", (unsigned int)base, fid, (unsigned long)length);
         file_t *file = (file_t *) file_search_by_fid(fid, NULL, SPECIFY_EF);
         if (!file) {
@@ -356,7 +366,7 @@ static void scan_region(bool persistent) {
         if (!persistent) {
             num_files++;
         }
-        if (flash_read_uintptr(base) == 0x0) {
+        if (next_addr == 0) {
             if (base < last_base) {
                 last_base = base;
             }
@@ -681,8 +691,7 @@ int file_delete(file_t *ef) {
     if (ret != PICOKEYS_OK) {
         return ret;
     }
-    flash_commit();
-    return PICOKEYS_OK;
+    return flash_commit_sync(5000u) ? PICOKEYS_OK : PICOKEYS_ERR_MEMORY_FATAL;
 }
 
 int flash_clear_file(file_t *file) {
@@ -697,22 +706,44 @@ int flash_clear_file(file_t *file) {
     uintptr_t base_addr = (uintptr_t)(file->data - sizeof(uintptr_t) - sizeof(uint16_t) - sizeof(uintptr_t));
     uintptr_t prev_addr = flash_read_uintptr(base_addr + sizeof(uintptr_t));
     uintptr_t next_addr = flash_read_uintptr(base_addr);
-    //printf("nc %lx->%lx   %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);
-    flash_program_uintptr(prev_addr, next_addr);
-    flash_program_halfword((uintptr_t) file->data, 0);
+    int r = flash_program_uintptr(prev_addr, next_addr);
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
     const uint8_t zeros[256] = {0};
+
+    if (next_addr > 0) {
+        r = flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);
+        if (r != PICOKEYS_OK) {
+            return r;
+        }
+    }
+
+    /* Unlink durably before erasing the record it used to reference. */
+    if (!flash_commit_sync(5000u)) {
+        return PICOKEYS_ERR_MEMORY_FATAL;
+    }
+
+    r = flash_program_halfword((uintptr_t) file->data, 0);
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
     for (uint32_t offset = 0; offset < len;) {
         size_t chunk = MIN(sizeof(zeros), len - offset);
-        if (flash_program_block(payload_addr + offset, CONST_BYTE_ARRAY(zeros, chunk)) != PICOKEYS_OK) {
-            return PICOKEYS_EXEC_ERROR;
+        r = flash_program_block(payload_addr + offset, CONST_BYTE_ARRAY(zeros, chunk));
+        if (r != PICOKEYS_OK) {
+            return r;
         }
         offset += (uint32_t)chunk;
     }
-    if (next_addr > 0) {
-        flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);
+    r = flash_program_uintptr(base_addr, 0);
+    if (r != PICOKEYS_OK) {
+        return r;
     }
-    flash_program_uintptr(base_addr, 0);
-    flash_program_uintptr(base_addr + sizeof(uintptr_t), 0);
+    r = flash_program_uintptr(base_addr + sizeof(uintptr_t), 0);
+    if (r != PICOKEYS_OK) {
+        return r;
+    }
     file->data = NULL;
     if (num_files > 0) {
         num_files--;

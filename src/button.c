@@ -109,10 +109,11 @@ static uint32_t button_last_poll = 0;
 volatile uint32_t button_pressed_duration = 0;
 
 void button_wait_start(void) {
-    /* Disabled by default. As LED may not be properly configured,
-       it will not be possible to indicate button press unless it
-       is commissioned. */
-    uint32_t button_timeout = phy_data.up_btn_present ? phy_data.up_btn * 1000 : 0;
+    button_wait_start_timeout(button_timeout_seconds());
+}
+
+void button_wait_start_timeout(uint32_t timeout_seconds) {
+    uint32_t button_timeout = timeout_seconds * 1000;
     if (button_timeout == 0 && !force_button_wait) {
         signal_emit(SIGNAL_USER_PRESENCE_COMPLETED);
         uint32_t flag = EV_BUTTON_PRESSED;
@@ -184,6 +185,17 @@ void button_wait_poll(void) {
 }
 
 #endif
+
+uint32_t button_timeout_seconds(void) {
+    /* Disabled by default. As LED may not be properly configured,
+       it will not be possible to indicate button press unless it
+       is commissioned. */
+#ifndef ENABLE_EMULATION
+    return phy_data.up_btn_present ? phy_data.up_btn : 0;
+#else
+    return 0;
+#endif
+}
 
 void button_task(void) {
 #ifndef ENABLE_EMULATION

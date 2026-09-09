@@ -51,6 +51,11 @@
 #define EV_BUTTON_PRESSED        32
 #define EV_BUTTON_CANCELLED      64
 
+#define EV_PRESS_BUTTON_TIMEOUT_SHIFT 8 // Upper byte carries the timeout in seconds.
+#define EV_PRESS_BUTTON_TIMEOUT_MASK (0xffu << EV_PRESS_BUTTON_TIMEOUT_SHIFT)
+#define EV_PRESS_BUTTON_WITH_TIMEOUT(seconds) (EV_PRESS_BUTTON | (((uint32_t)(seconds) & 0xffu) << EV_PRESS_BUTTON_TIMEOUT_SHIFT))
+#define EV_PRESS_BUTTON_GET_TIMEOUT(event) (((event) & EV_PRESS_BUTTON_TIMEOUT_MASK) >> EV_PRESS_BUTTON_TIMEOUT_SHIFT)
+
 enum { ITF_INVALID = 0xFF };
 
 #ifdef USB_ITF_HID

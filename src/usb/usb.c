@@ -349,8 +349,8 @@ int card_status(uint8_t itf) {
                 return PICOKEYS_OK;
             }
 #ifndef ENABLE_EMULATION
-            else if (m == EV_PRESS_BUTTON) {
-                button_wait_start();
+            else if ((m & 0xffu) == EV_PRESS_BUTTON) {
+                button_wait_start_timeout(EV_PRESS_BUTTON_GET_TIMEOUT(m));
             }
 #endif
 #ifdef PICO_PLATFORM

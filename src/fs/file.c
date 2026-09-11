@@ -394,10 +394,7 @@ void file_scan_flash(void) {
     uint32_t r2 = (uint32_t)flash_read_uintptr(end_rom_pool + sizeof(uintptr_t));
     if ((r1 == 0xffffffff || r1 == 0xefefefef) && (r2 == 0xffffffff || r2 == 0xefefefef)) {
         printf("First initialization (or corrupted!)\n");
-        uint8_t empty[sizeof(uintptr_t) * 2 + sizeof(uint32_t)];
-        memset(empty, 0, sizeof(empty));
-        flash_program_block(end_data_pool, CONST_BYTE_ARRAY(empty, sizeof(empty)));
-        flash_program_block(end_rom_pool, CONST_BYTE_ARRAY(empty, sizeof(empty)));
+        low_flash_first_init();
         //flash_commit();
     }
     printf("SCAN\n");

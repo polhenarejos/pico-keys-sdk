@@ -50,6 +50,7 @@ extern int flash_erase_page(uintptr_t addr, size_t page_size);
 extern bool flash_check_blank(const_byte_array_t data);
 extern void flash_task(void);
 extern void low_flash_init(void);
+extern int low_flash_first_init(void);
 extern int low_flash_recover_journal(bool force);
 extern void flash_commit(void);
 extern bool flash_commit_sync(uint32_t timeout_ms);

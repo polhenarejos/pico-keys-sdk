@@ -422,6 +422,7 @@ int low_flash_recover_journal(bool force) {
         printf("WARN: FLASH JOURNAL SECTOR OUT OF RANGE\n");
         return PICOKEYS_ERR_MEMORY_FATAL;
     }
+    bool journal_found = false;
     while (journal_sector >= start_data_pool) {
         uint8_t *sector_data = flash_read(journal_sector);
         flash_journal_t *candidate = NULL;
@@ -434,6 +435,7 @@ int low_flash_recover_journal(bool force) {
             if (!journal_entry_valid_at(entry, journal_sector)) {
                 continue;
             }
+            journal_found = true;
             if (force) {
                 candidate = entry;
                 candidate_pos = pos;
@@ -450,11 +452,14 @@ int low_flash_recover_journal(bool force) {
             if (journal_sector < start_data_pool + FLASH_SECTOR_SIZE) {
                 break;
             }
+            if (journal_found == true) {
+                printf("INFO: FLASH JOURNAL FOUND BUT IS DONE\n");
+                return PICOKEYS_ERR_NO_MEMORY;
+            }
             journal_sector -= FLASH_SECTOR_SIZE;
             continue;
         }
 
-        printf("INFO: RESTORING FLASH JOURNAL FROM JOURNAL ENTRY\n");
         for (int i = 0; i < TOTAL_FLASH_PAGES; i++) {
             uintptr_t target = candidate->target_addr[i];
             if (target == UINTPTR_MAX || target == 0x00000000) {
@@ -471,7 +476,10 @@ int low_flash_recover_journal(bool force) {
                 return PICOKEYS_ERR_MEMORY_FATAL;
             }
             uintptr_t redo = journal_sector - redo_offset;
-            int ret = do_flash_op_erase_program(target, (const uint8_t *)redo, FLASH_SECTOR_SIZE);
+            uint8_t data_internal[FLASH_SECTOR_SIZE];
+            memset(data_internal, 0xFF, sizeof(data_internal));
+            memcpy(data_internal, (const uint8_t *)redo, FLASH_SECTOR_SIZE);
+            int ret = do_flash_op_erase_program(target, (const uint8_t *)data_internal, FLASH_SECTOR_SIZE);
             if (ret == PICOKEYS_ERR_NO_MEMORY) {
                 printf("WARN: FLASH RESTORE FAILED\n");
                 return PICOKEYS_EXEC_ERROR;
@@ -495,13 +503,38 @@ int low_flash_recover_journal(bool force) {
         if (ret != PICOKEYS_OK) {
             printf("WARN: FLASH LOCKOUT END TIMEOUT AFTER JOURNAL DONE\n");
         }
-        printf("INFO: FLASH JOURNAL RESTORED SUCCESSFULLY\n");
         return PICOKEYS_OK;
     }
 #else
     (void)force;
 #endif
     return PICOKEYS_ERR_MEMORY_FATAL;
+}
+
+int low_flash_first_init(void) {
+    uint8_t empty[sizeof(uintptr_t) * 2 + sizeof(uint32_t)];
+    memset(empty, 0, sizeof(empty));
+
+    flash_program_block(end_data_pool, CONST_BYTE_ARRAY(empty, sizeof(empty)));
+    flash_program_block(end_rom_pool, CONST_BYTE_ARRAY(empty, sizeof(empty)));
+
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+    uintptr_t journal_sector = FLASH_SECTOR(end_data_pool) - FLASH_SECTOR_SIZE;
+    if (journal_sector < start_data_pool) {
+        return PICOKEYS_ERR_MEMORY_FATAL;
+    }
+    uint8_t journal_data[sizeof(flash_journal_t)];
+    memset(journal_data, 0xFF, sizeof(journal_data));
+    flash_journal_t *entry = (flash_journal_t *)journal_data;
+    entry->magic = JOURNAL_MAGIC;
+    entry->status = JOURNAL_STATUS_DONE;
+    entry->target_addr[0] = FLASH_SECTOR(end_data_pool);
+    flash_program_block(journal_sector, CONST_BYTE_ARRAY(journal_data, sizeof(journal_data)));
+    last_journal_sector = journal_sector;
+    journal_slot = 1;
+#endif
+
+    return PICOKEYS_OK;
 }
 
 #ifdef PICO_RP2040
@@ -635,11 +668,17 @@ static page_flash_t *find_free_page(uintptr_t addr) {
     for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
         if (!flash_pages[r].ready && !flash_pages[r].erase) {
             page_flash_t *p = &flash_pages[r];
+            bool new_data_sector = addr_alg <= end_data_pool && addr_alg + FLASH_SECTOR_SIZE >= start_data_pool && addr_alg < FLASH_SECTOR(last_base) && addr_alg != FLASH_SECTOR(end_data_pool - 1);
+            if (new_data_sector) {
+                memset(p->page, 0xFF, FLASH_SECTOR_SIZE);
+            }
+            else {
 #ifdef PICO_PLATFORM
-            memcpy(p->page, (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
+                memcpy(p->page, (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
 #else
-            memcpy(p->page, (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *)(map + addr_alg) : (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
+                memcpy(p->page, (addr >= start_data_pool && addr <= end_rom_pool + sizeof(uintptr_t)) ? (uint8_t *)(map + addr_alg) : (uint8_t *)addr_alg, FLASH_SECTOR_SIZE);
 #endif
+            }
             ready_pages++;
             p->address = addr_alg;
             p->ready = true;

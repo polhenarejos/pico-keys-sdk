@@ -56,8 +56,10 @@
  #endif
  #ifdef ENABLE_EMULATION
     #define FLASH_SECTOR_SIZE       0x4000
+    #define FLASH_PAGE_SIZE         0x400
  #else
     #define FLASH_SECTOR_SIZE       0x1000
+    #define FLASH_PAGE_SIZE         0x100
  #endif
  #define XIP_BASE 0
  int fd_map = 0;
@@ -74,6 +76,7 @@ extern uint32_t FLASH_SIZE_BYTES;
 #define FLASH_CACHE_FLUSH_TIMEOUT_MS 5000u
 
 extern const uintptr_t start_data_pool;
+extern const uintptr_t end_data_pool;
 extern const uintptr_t end_rom_pool;
 
 PACK(
@@ -99,40 +102,203 @@ static uint8_t ready_pages = 0;
 
 bool flash_available = false;
 
-
 //this function has to be called from the core 0
 void low_flash_task(void);
 void low_flash_commit(void);
 bool low_flash_commit_sync(uint32_t timeout_ms);
+extern uintptr_t last_base;
 
-void low_flash_task(void){
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+PACK(
+typedef struct {
+    uint32_t magic;
+    uintptr_t target_addr[TOTAL_FLASH_PAGES];
+    uint8_t status;
+    uint8_t reserved[3];
+}) flash_journal_t;
+static uint16_t journal_slot = 0;
+static uintptr_t last_journal_sector = 0x0;
+_Static_assert(sizeof(flash_journal_t) == 32, "flash_journal_t must be 32 bytes");
+#define JOURNAL_MAGIC 0x504A524Eu
+#define JOURNAL_STATUS_EMPTY    0xFF
+#define JOURNAL_STATUS_PENDING  0xFE
+#define JOURNAL_STATUS_DONE     0xFC
+_Static_assert(JOURNAL_STATUS_EMPTY == 0xFF, "");
+_Static_assert((JOURNAL_STATUS_PENDING & JOURNAL_STATUS_EMPTY) == JOURNAL_STATUS_PENDING, "");
+_Static_assert((JOURNAL_STATUS_DONE & JOURNAL_STATUS_PENDING) == JOURNAL_STATUS_DONE, "");
+static bool journal_pending = false, journal_finalize_pending = false;
+static uintptr_t pending_journal_addr;
+#endif
+
+#define FLASH_SECTOR(x) ((x) & -FLASH_SECTOR_SIZE)
+
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+static int do_flash_op_erase(uintptr_t addr) {
+    if (multicore_lockout_start_timeout_us(1000) == false) {
+        printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
+        return PICOKEYS_ERR_NO_MEMORY;
+    }
+    uint32_t ints = save_and_disable_interrupts();
+    flash_range_erase(addr - XIP_BASE, FLASH_SECTOR_SIZE);
+    restore_interrupts(ints);
+    if (multicore_lockout_end_timeout_us(1000) == false) {
+        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
+        return PICOKEYS_EXEC_ERROR;
+    }
+    return PICOKEYS_OK;
+}
+
+static int do_flash_op_program(uintptr_t addr, const uint8_t *data, size_t size) {
+    if (multicore_lockout_start_timeout_us(1000) == false) {
+        printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
+        return PICOKEYS_ERR_NO_MEMORY;
+    }
+    uint32_t ints = save_and_disable_interrupts();
+    flash_range_program(addr - XIP_BASE, data, size);
+    restore_interrupts(ints);
+    if (multicore_lockout_end_timeout_us(1000) == false) {
+        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
+        return PICOKEYS_EXEC_ERROR;
+    }
+    return PICOKEYS_OK;
+}
+
+static int do_flash_op_erase_program(uintptr_t addr, const uint8_t *data, size_t size) {
+    if (multicore_lockout_start_timeout_us(1000) == false) {
+        printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
+        return PICOKEYS_ERR_NO_MEMORY;
+    }
+    uint32_t ints = save_and_disable_interrupts();
+    flash_range_erase(addr - XIP_BASE, FLASH_SECTOR_SIZE);
+    flash_range_program(addr - XIP_BASE, data, size);
+    restore_interrupts(ints);
+    if (multicore_lockout_end_timeout_us(1000) == false) {
+        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
+        return PICOKEYS_EXEC_ERROR;
+    }
+    return PICOKEYS_OK;
+}
+
+static int journal_mark_done(void) {
+    uint8_t journal_data[FLASH_PAGE_SIZE];
+    memset(journal_data, 0xFF, sizeof(journal_data));
+    size_t entry_offset = (journal_slot * sizeof(flash_journal_t)) % FLASH_PAGE_SIZE;
+    flash_journal_t *journal_entry = (flash_journal_t *)(journal_data + entry_offset);
+    journal_entry->status = JOURNAL_STATUS_DONE;
+    int ret = do_flash_op_program(pending_journal_addr, journal_data, FLASH_PAGE_SIZE);
+    if (ret == PICOKEYS_ERR_NO_MEMORY) {
+        return ret;
+    }
+    journal_pending = false;
+    journal_finalize_pending = false;
+    journal_slot = (journal_slot + 1) % (FLASH_SECTOR_SIZE / sizeof(flash_journal_t));
+    return ret;
+}
+#endif
+
+void low_flash_task(void) {
 #ifdef ESP_PLATFORM
     bool flash_updated = false;
 #endif
     if (mutex_try_enter(&mtx_flash, NULL) == true) {
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+        if (locked_out == true && journal_finalize_pending) {
+            int ret = journal_mark_done();
+            if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                printf("WARN: FLASH JOURNAL DONE WRITE FAILED\n");
+                goto out;
+            }
+            if (ret != PICOKEYS_OK) {
+                printf("WARN: FLASH LOCKOUT END TIMEOUT AFTER JOURNAL DONE\n");
+            }
+        }
+#endif
         if (locked_out == true && flash_available == true && ready_pages > 0) {
             //printf(" DO_FLASH AVAILABLE\n");
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+            uintptr_t journal_sector = FLASH_SECTOR(last_base) - FLASH_SECTOR_SIZE;
+            if (!journal_pending) {
+                if (journal_sector < start_data_pool + FLASH_SECTOR_SIZE) {
+                    printf("WARN: FLASH JOURNAL SECTOR OUT OF RANGE\n");
+                    goto out;
+                }
+                uintptr_t redo_sector = journal_sector - FLASH_SECTOR_SIZE;
+                if (journal_sector != last_journal_sector || journal_slot == 0) {
+                    int ret = do_flash_op_erase(journal_sector);
+                    if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                        printf("WARN: FLASH JOURNAL ERASE FAILED\n");
+                        goto out;
+                    }
+                    if (ret != PICOKEYS_OK) {
+                        printf("WARN: FLASH LOCKOUT END TIMEOUT AFTER JOURNAL ERASE\n");
+                    }
+                    last_journal_sector = journal_sector;
+                    journal_slot = 0;
+                }
+                uintptr_t addr_journal = journal_sector + (journal_slot * sizeof(flash_journal_t) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE;
+                uint8_t journal_data[FLASH_PAGE_SIZE];
+                memset(journal_data, 0xFF, sizeof(journal_data));
+                flash_journal_t *journal_entry = (flash_journal_t *)(journal_data + journal_slot * sizeof(flash_journal_t) % FLASH_PAGE_SIZE);
+                journal_entry->magic = JOURNAL_MAGIC;
+                for (int i = 0; i < TOTAL_FLASH_PAGES; i++) {
+                    if (flash_pages[i].ready == true) {
+                        uintptr_t redo_offset = i * FLASH_SECTOR_SIZE;
+                        if (redo_sector < start_data_pool + redo_offset) {
+                            printf("WARN: FLASH REDO SECTOR OUT OF RANGE\n");
+                            goto out;
+                        }
+                        uintptr_t redo_addr = redo_sector - redo_offset;
+                        int ret = do_flash_op_erase_program(redo_addr, flash_pages[i].page, FLASH_SECTOR_SIZE);
+                        if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                            printf("WARN: FLASH JOURNAL WRITE FAILED\n");
+                            goto out;
+                        }
+                        if (ret != PICOKEYS_OK) {
+                            printf("WARN: FLASH LOCKOUT END TIMEOUT AFTER JOURNAL WRITE\n");
+                        }
+                        journal_entry->target_addr[i] = flash_pages[i].address;
+                    }
+                }
+                // Two-step write to ensure that the journal entry is not marked as pending until the journal is complete
+                journal_entry->status = JOURNAL_STATUS_EMPTY;
+                int ret = do_flash_op_program(addr_journal, journal_data, FLASH_PAGE_SIZE);
+                if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                    printf("WARN: FLASH JOURNAL WRITE FAILED\n");
+                    goto out;
+                }
+                if (ret != PICOKEYS_OK) {
+                    printf("WARN: FLASH JOURNAL WRITE FAILED\n");
+                }
+                memset(journal_data, 0xFF, sizeof(journal_data));
+                journal_entry->status = JOURNAL_STATUS_PENDING;
+                ret = do_flash_op_program(addr_journal, journal_data, FLASH_PAGE_SIZE);
+                if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                    printf("WARN: FLASH JOURNAL WRITE FAILED\n");
+                    goto out;
+                }
+                journal_pending = true;
+                pending_journal_addr = addr_journal;
+                if (ret != PICOKEYS_OK) {
+                    printf("WARN: FLASH JOURNAL WRITE FAILED\n");
+                }
+            }
+            bool transaction_ok = true;
+#endif
             for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
                 if (flash_pages[r].ready == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
-                    if (multicore_lockout_start_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
-                        continue;
+                    int ret = do_flash_op_erase_program(flash_pages[r].address, flash_pages[r].page, FLASH_SECTOR_SIZE);
+                    if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                        printf("WARN: FLASH WRITE FAILED\n");
+                        transaction_ok = false;
+                        break;
                     }
-                    //printf("WRITTING %X\n",flash_pages[r].address-XIP_BASE);
-                    uint32_t ints = save_and_disable_interrupts();
-                    flash_range_erase(flash_pages[r].address - XIP_BASE, FLASH_SECTOR_SIZE);
-                    flash_range_program(flash_pages[r].address - XIP_BASE, flash_pages[r].page, FLASH_SECTOR_SIZE);
-                    restore_interrupts(ints);
+                    if (ret != PICOKEYS_OK) {
+                        printf("WARN: FLASH LOCKOUT END TIMEOUT AFTER FLASH WRITE\n");
+                    }
 #ifdef ESP_PLATFORM
                     flash_updated = true;
 #endif
-                    if (multicore_lockout_end_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
-                        continue;
-                    }
-                    //printf("WRITEN %X !\n",flash_pages[r].address);
 #else
                     memcpy(map + flash_pages[r].address, flash_pages[r].page, FLASH_SECTOR_SIZE);
 #endif
@@ -141,21 +307,17 @@ void low_flash_task(void){
                 }
                 else if (flash_pages[r].erase == true) {
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
-                    if (multicore_lockout_start_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT START TIMEOUT\n");
+                    int ret = do_flash_op_erase(flash_pages[r].address);
+                    if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                        printf("WARN: FLASH ERASE FAILED\n");
                         continue;
                     }
-                    //printf("WRITTING\n");
-                    uint32_t ints = save_and_disable_interrupts();
-                    flash_range_erase(flash_pages[r].address - XIP_BASE, flash_pages[r].page_size ? ((int) (flash_pages[r].page_size / FLASH_SECTOR_SIZE)) * FLASH_SECTOR_SIZE : FLASH_SECTOR_SIZE);
-                    restore_interrupts(ints);
+                    if (ret != PICOKEYS_OK) {
+                        printf("WARN: FLASH LOCKOUT END TIMEOUT AFTER FLASH ERASE\n");
+                    }
 #ifdef ESP_PLATFORM
                     flash_updated = true;
 #endif
-                    if (multicore_lockout_end_timeout_us(1000) == false) {
-                        printf("WARN: FLASH LOCKOUT END TIMEOUT\n");
-                        continue;
-                    }
 #else
                     memset(map + flash_pages[r].address, 0, FLASH_SECTOR_SIZE);
 #endif
@@ -163,12 +325,25 @@ void low_flash_task(void){
                     ready_pages--;
                 }
             }
-#if !defined(PICO_PLATFORM) && !defined(ESP_PLATFORM)
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+            if (transaction_ok == true && ready_pages == 0) {
+                journal_finalize_pending = true;
+                int ret = journal_mark_done();
+                if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                    printf("WARN: FLASH JOURNAL DONE WRITE FAILED\n");
+                    goto out;
+                }
+                if (ret != PICOKEYS_OK) {
+                    printf("WARN: FLASH LOCKOUT END TIMEOUT AFTER JOURNAL DONE\n");
+                }
+            }
+#else
             msync(map, FLASH_SIZE_BYTES, MS_SYNC);
 #endif
             if (ready_pages != 0) {
                 printf("ERROR: DO FLASH DOES NOT HAVE ZERO PAGES\n");
             }
+
         }
         if (ready_pages == 0) {
             flash_available = false;
@@ -180,8 +355,153 @@ void low_flash_task(void){
             multicore_lockout_end_timeout_us(1000);
         }
 #endif
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+        out:
+#endif
         mutex_exit(&mtx_flash);
     }
+}
+
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+static bool journal_entry_is_erased(const flash_journal_t *entry) {
+    const uint8_t *p = (const uint8_t *) entry;
+    for (size_t i = 0; i < sizeof(*entry); i++) {
+        if (p[i] != 0xFF) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool journal_entry_header_valid(const flash_journal_t *entry) {
+    if (entry->magic != JOURNAL_MAGIC) {
+        return false;
+    }
+    bool has_target = false;
+    for (int i = 0; i < TOTAL_FLASH_PAGES; i++) {
+        uintptr_t addr = entry->target_addr[i];
+        if (addr == 0 || addr == UINTPTR_MAX) {
+            continue;
+        }
+        has_target = true;
+        if (addr < start_data_pool || addr >= end_data_pool) {
+            return false;
+        }
+        if ((addr % FLASH_SECTOR_SIZE) != 0) {
+            return false;
+        }
+    }
+    return has_target;
+}
+
+static bool journal_entry_valid_at(const flash_journal_t *entry, uintptr_t journal_sector) {
+    if (!journal_entry_header_valid(entry)) {
+        return false;
+    }
+    if (entry->status != JOURNAL_STATUS_PENDING && entry->status != JOURNAL_STATUS_DONE) {
+        return false;
+    }
+    for (int i = 0; i < TOTAL_FLASH_PAGES; i++) {
+        uintptr_t target = entry->target_addr[i];
+        if (target == 0 || target == UINTPTR_MAX) {
+            continue;
+        }
+        uintptr_t redo_offset = (i + 1) * FLASH_SECTOR_SIZE;
+        if (journal_sector < start_data_pool + redo_offset) {
+            return false;
+        }
+    }
+    return true;
+}
+#endif
+
+int low_flash_recover_journal(bool force) {
+#if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+    uintptr_t journal_sector = FLASH_SECTOR(last_base) - FLASH_SECTOR_SIZE;
+    if (journal_sector < start_data_pool) {
+        printf("WARN: FLASH JOURNAL SECTOR OUT OF RANGE\n");
+        return PICOKEYS_ERR_MEMORY_FATAL;
+    }
+    while (journal_sector >= start_data_pool) {
+        uint8_t *sector_data = flash_read(journal_sector);
+        flash_journal_t *candidate = NULL;
+        uint16_t candidate_pos = 0;
+        for (uint16_t pos = 0; pos + sizeof(flash_journal_t) <= FLASH_SECTOR_SIZE; pos += sizeof(flash_journal_t)) {
+            flash_journal_t *entry = (flash_journal_t *)&sector_data[pos];
+            if (journal_entry_is_erased(entry)) {
+                break;
+            }
+            if (!journal_entry_valid_at(entry, journal_sector)) {
+                continue;
+            }
+            if (force) {
+                candidate = entry;
+                candidate_pos = pos;
+                continue;
+            }
+            if (entry->status != JOURNAL_STATUS_PENDING) {
+                continue;
+            }
+            candidate = entry;
+            candidate_pos = pos;
+            break;
+        }
+        if (candidate == NULL) {
+            if (journal_sector < start_data_pool + FLASH_SECTOR_SIZE) {
+                break;
+            }
+            journal_sector -= FLASH_SECTOR_SIZE;
+            continue;
+        }
+
+        printf("INFO: RESTORING FLASH JOURNAL FROM JOURNAL ENTRY\n");
+        for (int i = 0; i < TOTAL_FLASH_PAGES; i++) {
+            uintptr_t target = candidate->target_addr[i];
+            if (target == UINTPTR_MAX || target == 0x00000000) {
+                continue;
+            }
+            if (target < start_data_pool || target >= end_data_pool) {
+                printf("WARN: FLASH JOURNAL TARGET ADDRESS OUT OF RANGE\n");
+                return PICOKEYS_ERR_MEMORY_FATAL;
+            }
+
+            uintptr_t redo_offset = (i + 1) * FLASH_SECTOR_SIZE;
+            if (journal_sector < start_data_pool + redo_offset) {
+                printf("WARN: FLASH REDO SECTOR OUT OF RANGE\n");
+                return PICOKEYS_ERR_MEMORY_FATAL;
+            }
+            uintptr_t redo = journal_sector - redo_offset;
+            int ret = do_flash_op_erase_program(target, (const uint8_t *)redo, FLASH_SECTOR_SIZE);
+            if (ret == PICOKEYS_ERR_NO_MEMORY) {
+                printf("WARN: FLASH RESTORE FAILED\n");
+                return PICOKEYS_EXEC_ERROR;
+            }
+            if (ret != PICOKEYS_OK) {
+                printf("WARN: FLASH LOCKOUT END TIMEOUT DURING RESTORE\n");
+            }
+        }
+
+        uint8_t journal_data[FLASH_PAGE_SIZE];
+        memset(journal_data, 0xFF, sizeof(journal_data));
+        size_t entry_offset_in_page = candidate_pos % FLASH_PAGE_SIZE;
+        flash_journal_t *new_entry = (flash_journal_t *)&journal_data[entry_offset_in_page];
+        new_entry->status = JOURNAL_STATUS_DONE;
+        uintptr_t page_addr = journal_sector + (candidate_pos / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE;
+        int ret = do_flash_op_program(page_addr, journal_data, FLASH_PAGE_SIZE);
+        if (ret == PICOKEYS_ERR_NO_MEMORY) {
+            printf("WARN: FLASH JOURNAL WRITE FAILED\n");
+            return PICOKEYS_EXEC_ERROR;
+        }
+        if (ret != PICOKEYS_OK) {
+            printf("WARN: FLASH LOCKOUT END TIMEOUT AFTER JOURNAL DONE\n");
+        }
+        printf("INFO: FLASH JOURNAL RESTORED SUCCESSFULLY\n");
+        return PICOKEYS_OK;
+    }
+#else
+    (void)force;
+#endif
+    return PICOKEYS_ERR_MEMORY_FATAL;
 }
 
 #ifdef PICO_RP2040
@@ -298,7 +618,7 @@ bool low_flash_commit_sync(uint32_t timeout_ms) {
 }
 
 static page_flash_t *find_free_page(uintptr_t addr) {
-    uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
+    uintptr_t addr_alg = FLASH_SECTOR(addr);
 
     /* Reuse an existing cached sector before taking an empty slot. */
     for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
@@ -375,7 +695,7 @@ int flash_program_uintptr(uintptr_t addr, uintptr_t data) {
 }
 
 uint8_t *flash_read(uintptr_t addr) {
-    uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
+    uintptr_t addr_alg = FLASH_SECTOR(addr);
     mutex_enter_blocking(&mtx_flash);
     if (ready_pages > 0) {
         for (int r = 0; r < TOTAL_FLASH_PAGES; r++) {
@@ -402,7 +722,7 @@ int flash_read_block(uintptr_t addr, byte_array_t data) {
     }
 
     while (data.len > 0) {
-        uintptr_t addr_alg = addr & -FLASH_SECTOR_SIZE;
+        uintptr_t addr_alg = FLASH_SECTOR(addr);
         size_t page_offset = addr & (FLASH_SECTOR_SIZE - 1);
         size_t chunk = MIN(data.len, FLASH_SECTOR_SIZE - page_offset);
         const uint8_t *source = NULL;

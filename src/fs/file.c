@@ -326,7 +326,7 @@ void file_initialize_flash(bool hard) {
 
 extern uintptr_t last_base;
 extern uint32_t num_files;
-static void scan_region(bool persistent) {
+static void scan_region_internal(bool persistent, bool allow_force_restore) {
     uintptr_t endp = end_data_pool, startp = start_data_pool;
     if (persistent) {
         endp = end_rom_pool;
@@ -336,10 +336,12 @@ static void scan_region(bool persistent) {
         last_base = endp;
         num_files = 0;
     }
+    bool corrupted = false;
     for (uintptr_t base = flash_read_uintptr(endp); base != 0; base = flash_read_uintptr(base)) {
         size_t minimum_header = 2 * sizeof(uintptr_t) + sizeof(uint16_t) + sizeof(uint16_t);
         if (base < startp || base > endp || endp - base < minimum_header) {
             printf("ERROR: invalid flash record address %x\n", (unsigned int)base);
+            corrupted = true;
             break;
         }
 
@@ -353,6 +355,7 @@ static void scan_region(bool persistent) {
         size_t record_header = 2 * sizeof(uintptr_t) + sizeof(uint16_t) + length_size;
         if (fid == DYNAMIC_FID_EMPTY || fid == DYNAMIC_FID_DELETED || record_header > endp - base || length > endp - base - record_header || (next_addr != 0 && (next_addr < startp || next_addr >= base)) || (prev_addr != endp && (prev_addr <= base || prev_addr > endp))) {
             printf("ERROR: invalid flash record at %x\n", (unsigned int)base);
+            corrupted = true;
             break;
         }
         printf("[%x] scan fid %x, len %lu\n", (unsigned int)base, fid, (unsigned long)length);
@@ -366,14 +369,25 @@ static void scan_region(bool persistent) {
         if (!persistent) {
             num_files++;
         }
+        if (!persistent && base < last_base) {
+            last_base = base;
+        }
         if (next_addr == 0) {
-            if (base < last_base) {
-                last_base = base;
-            }
             break;
         }
     }
+    if (!persistent && (!corrupted || allow_force_restore)) {
+        if (low_flash_recover_journal(corrupted) == PICOKEYS_OK) {
+            printf("INFO: flash redo restored\n");
+            scan_region_internal(persistent, false);
+        }
+    }
 }
+
+static void scan_region(bool persistent) {
+    scan_region_internal(persistent, true);
+}
+
 void file_scan_flash(void) {
     file_initialize_flash(false); //soft initialization
     uint32_t r1 = (uint32_t)flash_read_uintptr(end_rom_pool);
@@ -691,7 +705,8 @@ int file_delete(file_t *ef) {
     if (ret != PICOKEYS_OK) {
         return ret;
     }
-    return flash_commit_sync(5000u) ? PICOKEYS_OK : PICOKEYS_ERR_MEMORY_FATAL;
+    flash_commit();
+    return PICOKEYS_OK;
 }
 
 int flash_clear_file(file_t *file) {
@@ -706,44 +721,22 @@ int flash_clear_file(file_t *file) {
     uintptr_t base_addr = (uintptr_t)(file->data - sizeof(uintptr_t) - sizeof(uint16_t) - sizeof(uintptr_t));
     uintptr_t prev_addr = flash_read_uintptr(base_addr + sizeof(uintptr_t));
     uintptr_t next_addr = flash_read_uintptr(base_addr);
-    int r = flash_program_uintptr(prev_addr, next_addr);
-    if (r != PICOKEYS_OK) {
-        return r;
-    }
+    //printf("nc %lx->%lx   %lx->%lx\n",prev_addr,flash_read_uintptr(prev_addr),base_addr,next_addr);
+    flash_program_uintptr(prev_addr, next_addr);
+    flash_program_halfword((uintptr_t) file->data, 0);
     const uint8_t zeros[256] = {0};
-
-    if (next_addr > 0) {
-        r = flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);
-        if (r != PICOKEYS_OK) {
-            return r;
-        }
-    }
-
-    /* Unlink durably before erasing the record it used to reference. */
-    if (!flash_commit_sync(5000u)) {
-        return PICOKEYS_ERR_MEMORY_FATAL;
-    }
-
-    r = flash_program_halfword((uintptr_t) file->data, 0);
-    if (r != PICOKEYS_OK) {
-        return r;
-    }
     for (uint32_t offset = 0; offset < len;) {
         size_t chunk = MIN(sizeof(zeros), len - offset);
-        r = flash_program_block(payload_addr + offset, CONST_BYTE_ARRAY(zeros, chunk));
-        if (r != PICOKEYS_OK) {
-            return r;
+        if (flash_program_block(payload_addr + offset, CONST_BYTE_ARRAY(zeros, chunk)) != PICOKEYS_OK) {
+            return PICOKEYS_EXEC_ERROR;
         }
         offset += (uint32_t)chunk;
     }
-    r = flash_program_uintptr(base_addr, 0);
-    if (r != PICOKEYS_OK) {
-        return r;
+    if (next_addr > 0) {
+        flash_program_uintptr(next_addr + sizeof(uintptr_t), prev_addr);
     }
-    r = flash_program_uintptr(base_addr + sizeof(uintptr_t), 0);
-    if (r != PICOKEYS_OK) {
-        return r;
-    }
+    flash_program_uintptr(base_addr, 0);
+    flash_program_uintptr(base_addr + sizeof(uintptr_t), 0);
     file->data = NULL;
     if (num_files > 0) {
         num_files--;

@@ -80,7 +80,7 @@ static int rescue_select(app_t *a, uint8_t force) {
     res_APDU_size += sizeof(pico_serial.id);
     apdu.ne = res_APDU_size;
     if (force) {
-        file_scan_flash();
+        //file_scan_flash();
     }
     return PICOKEYS_OK;
 }

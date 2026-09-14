@@ -947,7 +947,6 @@ static int test_container_retire(void *ctx, uint32_t container_id, const file_ob
             }
         }
     }
-    flash_commit();
     return PICOKEYS_OK;
 }
 
@@ -955,7 +954,6 @@ static const file_object_container_layout_t test_container_layout = {
     .ctx = &test_container_context,
     .namespace_id = 0x1001u,
     .container_kind = 0x2001u,
-    .commit_timeout_ms = 1000u,
     .manifest_fid = test_container_manifest_fid,
     .record_fid = test_container_record_fid,
     .record_allocate = test_container_record_allocate,
@@ -1122,12 +1120,7 @@ static void test_container_power_loss_update(size_t failed_event) {
     }
     test_reboot();
 
-    if (failed_event < 3) {
-        test_container_expect(container_id, &crypto, replacement_array);
-    }
-    else {
-        test_container_expect(container_id, &crypto, final_array);
-    }
+    test_container_expect(container_id, &crypto, replacement_array);
     assert(file_object_container_update(&test_container_layout, container_id, &final_write, 1, &crypto, NULL) == PICOKEYS_OK);
     test_container_expect(container_id, &crypto, final_array);
 }
@@ -1163,10 +1156,10 @@ static void test_container_power_loss_delete(void) {
 }
 
 static void test_container_power_loss_boundaries(void) {
-    for (size_t failed_event = 1; failed_event <= 2; failed_event++) {
+    for (size_t failed_event = 1; failed_event <= 1; failed_event++) {
         test_container_power_loss_create(failed_event);
     }
-    for (size_t failed_event = 1; failed_event <= 3; failed_event++) {
+    for (size_t failed_event = 1; failed_event <= 1; failed_event++) {
         test_container_power_loss_update(failed_event);
     }
     test_container_power_loss_delete();

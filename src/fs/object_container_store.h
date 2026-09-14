@@ -66,7 +66,6 @@ typedef struct file_object_container_layout {
     void *ctx;
     uint16_t namespace_id;
     uint16_t container_kind;
-    uint32_t commit_timeout_ms;
     file_object_container_manifest_fid_t manifest_fid;
     file_object_container_record_fid_t record_fid;
     file_object_container_record_allocate_t record_allocate;
@@ -77,6 +76,8 @@ typedef struct file_object_container_layout {
     file_object_container_deactivate_t deactivate;
     file_object_container_retire_t retire;
     bool rollback_new_records;
+    /* The caller owns the commit when true; otherwise the store commits on success. */
+    bool defer_commits;
 } file_object_container_layout_t;
 
 int file_object_container_load(const file_object_container_layout_t *layout, uint32_t container_id, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy, file_object_container_state_t *state);

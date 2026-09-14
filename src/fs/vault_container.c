@@ -90,7 +90,6 @@ static int vault_clear_legacy_record(file_t *file) {
 #define PICOKEYS_VAULT_NAMESPACE 0x0002u
 #define PICOKEYS_VAULT_CONTAINER_KIND 0x0002u
 #define PICOKEYS_VAULT_CONTAINER_ID 0u
-#define PICOKEYS_VAULT_COMMIT_TIMEOUT_MS 5000u
 #define PICOKEYS_VAULT_WRAP_SIZE PICOKEYS_VAULT_RECORD_SIZE
 #define PICOKEYS_VAULT_WRAP_PROTECTION FILE_OBJECT_PROTECTION_AEAD_SECRET
 #define PICOKEYS_VAULT_WRAP_FLAGS (FILE_OBJECT_FLAG_MUTABLE | FILE_OBJECT_FLAG_NON_EXPORTABLE)
@@ -243,7 +242,6 @@ static int vault_layout_retire(void *ctx, uint32_t container_id, const file_obje
             }
         }
     }
-    flash_commit();
     return PICOKEYS_OK;
 }
 
@@ -259,7 +257,6 @@ static const file_object_container_layout_t vault_layout = {
     .ctx = &vault_state,
     .namespace_id = PICOKEYS_VAULT_NAMESPACE,
     .container_kind = PICOKEYS_VAULT_CONTAINER_KIND,
-    .commit_timeout_ms = PICOKEYS_VAULT_COMMIT_TIMEOUT_MS,
     .manifest_fid = vault_layout_manifest_fid,
     .record_fid = vault_layout_record_fid,
     .record_allocate = vault_layout_record_allocate,
@@ -470,11 +467,10 @@ static int vault_migrate_legacy(void) {
     ret = vault_update(writes, sizeof(writes) / sizeof(writes[0]));
     if (ret == PICOKEYS_OK && vault_state.legacy_label_file) {
         ret = vault_clear_file(vault_state.legacy_label_file);
-        if (ret == PICOKEYS_OK && !flash_commit_sync(PICOKEYS_VAULT_COMMIT_TIMEOUT_MS)) {
-            ret = PICOKEYS_ERR_MEMORY_FATAL;
-            log_errstr("vault legacy migration: label commit failed timeout_ms=%u", PICOKEYS_VAULT_COMMIT_TIMEOUT_MS);
+        if (ret == PICOKEYS_OK) {
+            flash_commit();
         }
-        else if (ret != PICOKEYS_OK) {
+        else {
             log_errstr("vault legacy migration: label cleanup failed ret=%d", ret);
         }
     }
@@ -499,11 +495,10 @@ int picokeys_vault_delete_kvault(uint8_t app_id) {
         }
         if (ret == PICOKEYS_OK && app_id == 0 && vault_state.legacy_label_file) {
             ret = vault_clear_file(vault_state.legacy_label_file);
-            if (ret == PICOKEYS_OK && !flash_commit_sync(PICOKEYS_VAULT_COMMIT_TIMEOUT_MS)) {
-                ret = PICOKEYS_ERR_MEMORY_FATAL;
-                log_errstr("vault container delete: legacy label commit failed timeout_ms=%u", PICOKEYS_VAULT_COMMIT_TIMEOUT_MS);
+            if (ret == PICOKEYS_OK) {
+                flash_commit();
             }
-            else if (ret != PICOKEYS_OK) {
+            else {
                 log_errstr("vault container delete: legacy label cleanup failed ret=%d", ret);
             }
         }

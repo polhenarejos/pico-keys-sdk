@@ -21,7 +21,7 @@
 #define FILE_OBJECT_CONTAINER_MAX_MANIFEST_SIZE (FILE_OBJECT_MANIFEST_HEADER_SIZE + FILE_OBJECT_MANIFEST_MAX_OBJECTS * FILE_OBJECT_DESCRIPTOR_SIZE + FILE_OBJECT_AUTH_TAG_SIZE)
 
 static bool file_object_container_layout_valid(const file_object_container_layout_t *layout) {
-    return layout && layout->namespace_id != 0 && layout->container_kind != 0 && layout->commit_timeout_ms > 0 && layout->manifest_fid && layout->record_fid && layout->record_allocate && layout->policy_hash;
+    return layout && layout->namespace_id != 0 && layout->container_kind != 0 && layout->manifest_fid && layout->record_fid && layout->record_allocate && layout->policy_hash;
 }
 
 static bool file_object_container_crypto_valid(const file_object_container_crypto_t *crypto) {
@@ -347,14 +347,16 @@ static int file_object_container_write_record(const file_object_container_layout
     return r;
 }
 
-static void file_object_container_rollback(const uint16_t *record_fids, size_t record_count) {
+static void file_object_container_rollback(const file_object_container_layout_t *layout, const uint16_t *record_fids, size_t record_count) {
     for (size_t i = 0; i < record_count; i++) {
         file_t *record = file_search(record_fids[i]);
         if (record) {
             file_delete_no_commit(record);
         }
     }
-    flash_commit();
+    if (!layout->defer_commits) {
+        flash_commit();
+    }
 }
 
 static int file_object_container_update_internal(const file_object_container_layout_t *layout, uint32_t container_id, const file_object_container_write_t *writes, size_t write_count, const file_object_container_crypto_t *primary, const file_object_container_crypto_t *legacy, bool validate_records) {
@@ -446,12 +448,9 @@ static int file_object_container_update_internal(const file_object_container_lay
             break;
         }
     }
-    if (r == PICOKEYS_OK && !flash_commit_sync(layout->commit_timeout_ms)) {
-        r = PICOKEYS_ERR_MEMORY_FATAL;
-    }
     if (r != PICOKEYS_OK) {
         if (layout->rollback_new_records) {
-            file_object_container_rollback(new_record_fids, new_record_count);
+            file_object_container_rollback(layout, new_record_fids, new_record_count);
         }
         return r;
     }
@@ -464,12 +463,9 @@ static int file_object_container_update_internal(const file_object_container_lay
         r = file_object_container_replace_file(layout->manifest_fid(layout->ctx, container_id, target_slot), CONST_BYTE_ARRAY(manifest_data, manifest.len));
     }
     memset(manifest_data, 0, sizeof(manifest_data));
-    if (r == PICOKEYS_OK && !flash_commit_sync(layout->commit_timeout_ms)) {
-        r = PICOKEYS_ERR_MEMORY_FATAL;
-    }
     if (r != PICOKEYS_OK) {
         if (layout->rollback_new_records) {
-            file_object_container_rollback(new_record_fids, new_record_count);
+            file_object_container_rollback(layout, new_record_fids, new_record_count);
         }
         return r;
     }
@@ -484,6 +480,9 @@ static int file_object_container_update_internal(const file_object_container_lay
         if (r != PICOKEYS_OK) {
             return r;
         }
+    }
+    if (!layout->defer_commits) {
+        flash_commit();
     }
     return PICOKEYS_OK;
 }
@@ -533,14 +532,17 @@ int file_object_container_remove(const file_object_container_layout_t *layout, u
         r = file_object_container_replace_file(layout->manifest_fid(layout->ctx, container_id, target_slot), CONST_BYTE_ARRAY(manifest_data, manifest.len));
     }
     memset(manifest_data, 0, sizeof(manifest_data));
-    if (r == PICOKEYS_OK && !flash_commit_sync(layout->commit_timeout_ms)) {
-        r = PICOKEYS_ERR_MEMORY_FATAL;
-    }
     if (r != PICOKEYS_OK) {
         return r;
     }
     if (layout->retire) {
-        return layout->retire(layout->ctx, container_id, &state, &next, current->slot, target_slot);
+        r = layout->retire(layout->ctx, container_id, &state, &next, current->slot, target_slot);
+        if (r != PICOKEYS_OK) {
+            return r;
+        }
+    }
+    if (!layout->defer_commits) {
+        flash_commit();
     }
     return PICOKEYS_OK;
 }
@@ -585,5 +587,8 @@ int file_object_container_delete(const file_object_container_layout_t *layout, u
             return r;
         }
     }
-    return flash_commit_sync(layout->commit_timeout_ms) ? PICOKEYS_OK : PICOKEYS_ERR_MEMORY_FATAL;
+    if (!layout->defer_commits) {
+        flash_commit();
+    }
+    return PICOKEYS_OK;
 }

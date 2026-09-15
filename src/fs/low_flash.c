@@ -516,7 +516,7 @@ int low_flash_recover_journal(bool force) {
 }
 
 int low_flash_first_init(void) {
-    uint8_t empty[sizeof(uintptr_t) * 2 + sizeof(uint32_t)];
+    uint8_t empty[sizeof(uintptr_t) + sizeof(uint32_t)];
     memset(empty, 0, sizeof(empty));
 
     flash_program_block(end_data_pool, CONST_BYTE_ARRAY(empty, sizeof(empty)));

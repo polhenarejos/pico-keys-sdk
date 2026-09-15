@@ -109,6 +109,8 @@ bool low_flash_commit_sync(uint32_t timeout_ms);
 extern uintptr_t last_base;
 
 #if defined(PICO_PLATFORM) || defined(ESP_PLATFORM)
+static uint8_t data_page[FLASH_PAGE_SIZE];
+
 PACK(
 typedef struct {
     uint32_t magic;
@@ -180,8 +182,8 @@ static int do_flash_op_erase_program(uintptr_t addr, const uint8_t *data, size_t
 }
 
 static int journal_mark_done(void) {
-    uint8_t journal_data[FLASH_PAGE_SIZE];
-    memset(journal_data, 0xFF, sizeof(journal_data));
+    uint8_t *journal_data = data_page;
+    memset(journal_data, 0xFF, sizeof(data_page));
     size_t entry_offset = (journal_slot * sizeof(flash_journal_t)) % FLASH_PAGE_SIZE;
     flash_journal_t *journal_entry = (flash_journal_t *)(journal_data + entry_offset);
     journal_entry->status = JOURNAL_STATUS_DONE;
@@ -236,8 +238,8 @@ void low_flash_task(void) {
                     journal_slot = 0;
                 }
                 uintptr_t addr_journal = journal_sector + (journal_slot * sizeof(flash_journal_t) / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE;
-                uint8_t journal_data[FLASH_PAGE_SIZE];
-                memset(journal_data, 0xFF, sizeof(journal_data));
+                uint8_t *journal_data = data_page;
+                memset(journal_data, 0xFF, sizeof(data_page));
                 flash_journal_t *journal_entry = (flash_journal_t *)(journal_data + journal_slot * sizeof(flash_journal_t) % FLASH_PAGE_SIZE);
                 journal_entry->magic = JOURNAL_MAGIC;
                 for (int i = 0; i < TOTAL_FLASH_PAGES; i++) {
@@ -269,7 +271,7 @@ void low_flash_task(void) {
                 if (ret != PICOKEYS_OK) {
                     printf("WARN: FLASH JOURNAL WRITE FAILED\n");
                 }
-                memset(journal_data, 0xFF, sizeof(journal_data));
+                memset(journal_data, 0xFF, sizeof(data_page));
                 journal_entry->status = JOURNAL_STATUS_PENDING;
                 ret = do_flash_op_program(addr_journal, journal_data, FLASH_PAGE_SIZE);
                 if (ret == PICOKEYS_ERR_NO_MEMORY) {
@@ -476,8 +478,10 @@ int low_flash_recover_journal(bool force) {
                 return PICOKEYS_ERR_MEMORY_FATAL;
             }
             uintptr_t redo = journal_sector - redo_offset;
-            uint8_t data_internal[FLASH_SECTOR_SIZE];
-            memset(data_internal, 0xFF, sizeof(data_internal));
+            // We reuse the buffer. This function is called at the beginning, so no cache alive yet.
+            // For first initialization, journal is found done.
+            uint8_t *data_internal = flash_pages[i].page;
+            memset(data_internal, 0xFF, sizeof(flash_pages[i].page));
             memcpy(data_internal, (const uint8_t *)redo, FLASH_SECTOR_SIZE);
             int ret = do_flash_op_erase_program(target, (const uint8_t *)data_internal, FLASH_SECTOR_SIZE);
             if (ret == PICOKEYS_ERR_NO_MEMORY) {
@@ -489,8 +493,8 @@ int low_flash_recover_journal(bool force) {
             }
         }
 
-        uint8_t journal_data[FLASH_PAGE_SIZE];
-        memset(journal_data, 0xFF, sizeof(journal_data));
+        uint8_t *journal_data = data_page;
+        memset(journal_data, 0xFF, sizeof(data_page));
         size_t entry_offset_in_page = candidate_pos % FLASH_PAGE_SIZE;
         flash_journal_t *new_entry = (flash_journal_t *)&journal_data[entry_offset_in_page];
         new_entry->status = JOURNAL_STATUS_DONE;
@@ -889,7 +893,7 @@ void phymarker_write(void) {
     memcpy(pm.uid, pico_serial.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES);
     pm.crc32 = crc32c(CONST_BYTE_ARRAY((const uint8_t *)&pm, sizeof(phymarker_t) - sizeof(uint32_t)));
 
-    uint8_t buf[FLASH_PAGE_SIZE] = {0};
+    uint8_t *buf = data_page;
     memcpy(buf, &pm, sizeof(phymarker_t));
     uint32_t ints = save_and_disable_interrupts();
 

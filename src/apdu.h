@@ -30,6 +30,7 @@ typedef struct app {
     int (*process_apdu)(void);
     int (*select_aid)(struct app *, uint8_t);
     int (*unload)(void);
+    bool supports_secure_messaging;
 } app_t;
 
 extern bool app_exists(const_byte_array_t aid);

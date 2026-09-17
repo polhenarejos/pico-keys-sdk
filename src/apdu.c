@@ -95,7 +95,7 @@ int process_apdu(void) {
             is_chaining = false;
         }
     }
-    if (!(CLA(apdu) & 0x10) && (CLA(apdu) & 0x0C)) {
+    if (!(CLA(apdu) & 0x10) && (CLA(apdu) & 0x0C) && (!current_app || !current_app->supports_secure_messaging)) {
         return SW_CLA_NOT_SUPPORTED();
     }
     if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID

@@ -256,7 +256,9 @@ void usb_send_event(uint32_t flag) {
 
     if (flag != EV_CMD_AVAILABLE) {
         uint32_t m;
-        queue_remove_blocking(&card_to_usb_q , &m);
+        do {
+            queue_remove_blocking(&card_to_usb_q, &m);
+        } while (m != flag + 1);
     }
 }
 

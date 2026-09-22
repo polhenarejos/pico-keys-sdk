@@ -93,6 +93,9 @@ typedef struct {
 uint8_t ccid_status = 1;
 #ifndef ENABLE_EMULATION
 static uint8_t itf_num;
+static uint8_t wcid_event_data[USB_BUF_SIZE];
+static uint16_t wcid_event_len;
+static volatile bool wcid_event_pending;
 #endif
 
 static usb_buffer_t *ccid_rx = NULL, *ccid_tx = NULL;
@@ -121,6 +124,35 @@ static uint8_t sc_itf_to_usb_itf(uint8_t itf) {
         return ITF_WCID;
     }
     return itf;
+}
+
+int ccid_send_wcid_event(const_byte_array_t data) {
+#ifndef ENABLE_EMULATION
+    if (ITF_SC_WCID == ITF_INVALID) {
+        return PICOKEYS_ERR_FILE_NOT_FOUND;
+    }
+    if (data.data == NULL) {
+        return PICOKEYS_ERR_NULL_PARAM;
+    }
+    if (data.len == 0 || data.len > sizeof(wcid_event_data) - CCID_MSG_HEADER_SIZE) {
+        return PICOKEYS_WRONG_LENGTH;
+    }
+
+    ccid_header_t *header = (ccid_header_t *)wcid_event_data;
+    header->bMessageType = CCID_EVENT;
+    header->dwLength = (uint32_t)data.len;
+    header->bSlot = 0;
+    header->bSeq = 0;
+    header->abRFU0 = ccid_status;
+    header->abRFU1 = 0;
+    memcpy(&header->apdu, data.data, data.len);
+    wcid_event_len = (uint16_t)(CCID_MSG_HEADER_SIZE + data.len);
+    wcid_event_pending = true;
+    return PICOKEYS_OK;
+#else
+    (void)data;
+    return PICOKEYS_ERR_FILE_NOT_FOUND;
+#endif
 }
 
 static void ccid_init_buffers(void) {
@@ -361,6 +393,16 @@ void ccid_task(void) {
     const uint32_t status_poll_interval_ms = 1;
     static uint32_t last_status_poll_ms[8] = {0};
     uint32_t now_ms = board_millis();
+#ifndef ENABLE_EMULATION
+    if (wcid_event_pending && ITF_SC_WCID != ITF_INVALID && ccid_tx[ITF_SC_WCID].w_ptr == ccid_tx[ITF_SC_WCID].r_ptr) {
+        uint32_t written = tud_vendor_n_write(ITF_SC_WCID, wcid_event_data, wcid_event_len);
+        if (written > 0) {
+            tud_vendor_n_write_flush(ITF_SC_WCID);
+            wcid_event_len = 0;
+            wcid_event_pending = false;
+        }
+    }
+#endif
     for (uint8_t itf = 0; itf < ITF_SC_TOTAL; itf++) {
         if (itf < (sizeof(last_status_poll_ms) / sizeof(last_status_poll_ms[0])) &&
             now_ms - last_status_poll_ms[itf] >= status_poll_interval_ms) {
@@ -398,6 +440,8 @@ static void ccid_init_cb(void) {
 
 static void ccid_reset_cb(uint8_t rhport) {
     itf_num = 0;
+    wcid_event_len = 0;
+    wcid_event_pending = false;
     vendord_reset(rhport);
 }
 

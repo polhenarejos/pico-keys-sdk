@@ -18,12 +18,15 @@
 #ifndef _CCID_H_
 #define _CCID_H_
 
+#include "byte_array.h"
+
 extern const uint8_t historical_bytes[];
 
 #define MAX_CMD_APDU_DATA_SIZE (24 + 4 + 512 * 4)
 #define MAX_RES_APDU_DATA_SIZE (5 + 9 + 512 * 4)
 #define CCID_MSG_HEADER_SIZE    10
 #define USB_LL_BUF_SIZE         64
+#define CCID_EVENT              0x7F
 
 enum ccid_state {
     CCID_STATE_NOCARD,      /* No card available */
@@ -39,6 +42,7 @@ enum ccid_state {
 };
 
 extern const uint8_t *ccid_atr;
+int ccid_send_wcid_event(const_byte_array_t data);
 
 PACK(
 struct ccid_class_descriptor {

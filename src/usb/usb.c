@@ -37,6 +37,7 @@
 static uint32_t *timeout_counter = NULL;
 static uint8_t card_locked_itf = 0; // no locked
 static void *(*card_locked_func)(void *) = NULL;
+uint8_t enabled_usb_itf = PHY_USB_ITF_ALL;
 #ifndef ENABLE_EMULATION
 static mutex_t mutex;
 #endif
@@ -96,7 +97,7 @@ void usb_init(void)
     queue_init(&card_to_usb_q, sizeof(uint32_t), 64);
     queue_init(&usb_to_card_q, sizeof(uint32_t), 64);
 
-    uint8_t enabled_usb_itf = PHY_USB_ITF_ALL;
+    enabled_usb_itf = PHY_USB_ITF_ALL;
 #ifndef ENABLE_EMULATION
     if (phy_data.enabled_usb_itf_present) {
         enabled_usb_itf = phy_data.enabled_usb_itf;

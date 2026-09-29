@@ -217,7 +217,7 @@ static bool rescue_require_user_presence(void) {
 #ifdef FORCE_BUTTON_WAIT
     force_button_wait = true;
 #endif
-    uint32_t event = EV_PRESS_BUTTON;
+    uint32_t event = EV_PRESS_BUTTON_WITH_TIMEOUT(button_timeout_seconds());
     queue_add_blocking(&card_to_usb_q, &event);
     do {
         queue_remove_blocking(&usb_to_card_q, &event);

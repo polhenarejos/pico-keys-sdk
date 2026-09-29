@@ -12,7 +12,9 @@ set(PICOKEYS_INCLUDE_DIRS
 
 set(PICOKEYS_REQUIRES
     bootloader_support
+    app_update
     esp_partition
+    spi_flash
     esp_tinyusb
     efuse
     mbedtls

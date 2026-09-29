@@ -23,6 +23,11 @@
 #ifdef PICO_PLATFORM
 #include "hardware/watchdog.h"
 #endif
+#ifdef ESP_PLATFORM
+#include "esp_image_format.h"
+#include "esp_ota_ops.h"
+#include "esp_flash.h"
+#endif
 #include "apdu.h"
 #include "picokeys_version.h"
 #include "otp.h"
@@ -78,6 +83,8 @@ static int rescue_select(app_t *a, uint8_t force) {
     res_APDU[res_APDU_size++] = PICO_VERSION_MINOR;
     memcpy(res_APDU + res_APDU_size, pico_serial.id, sizeof(pico_serial.id));
     res_APDU_size += sizeof(pico_serial.id);
+    put_uint32_be(PICO_BUILD_NUMBER, res_APDU + res_APDU_size);
+    res_APDU_size += 4;
     apdu.ne = res_APDU_size;
     if (force) {
         //file_scan_flash();
@@ -399,7 +406,28 @@ static int cmd_read(void) {
     }
     else if (p1 == 0x2) { // FLASH INFO
         res_APDU_size = 0;
-        uint32_t free = flash_free_space(), total = flash_total_space(), used = flash_used_space(), nfiles = flash_num_files(), size = flash_size();
+        uint32_t free = flash_free_space(), total = flash_total_space(), used = flash_used_space(), nfiles = flash_num_files();
+        uint32_t size;
+#ifdef ESP_PLATFORM
+        size = 0;
+        if (esp_flash_get_physical_size(NULL, &size) != ESP_OK) {
+            size = 0;
+        }
+        uint32_t fw_size = 0;
+        const esp_partition_t *running_partition = esp_ota_get_running_partition();
+        if (running_partition != NULL) {
+            esp_partition_pos_t partition = {
+                .offset = running_partition->address,
+                .size = running_partition->size
+            };
+            esp_image_metadata_t metadata;
+            if (esp_image_get_metadata(&partition, &metadata) == ESP_OK) {
+                fw_size = metadata.image_len;
+            }
+        }
+#else
+        size = flash_size();
+#endif
         res_APDU_size += put_uint32_be(free, res_APDU + res_APDU_size);
         res_APDU_size += put_uint32_be(used, res_APDU + res_APDU_size);
         res_APDU_size += put_uint32_be(total, res_APDU + res_APDU_size);
@@ -409,6 +437,8 @@ static int cmd_read(void) {
         uintptr_t start = (uintptr_t) &__flash_binary_start;
         uintptr_t end = (uintptr_t) &__flash_binary_end;
         uint32_t fw_size = (uint32_t)(end - start);
+        res_APDU_size += put_uint32_be(fw_size, res_APDU + res_APDU_size);
+#elif defined(ESP_PLATFORM)
         res_APDU_size += put_uint32_be(fw_size, res_APDU + res_APDU_size);
 #endif
     }

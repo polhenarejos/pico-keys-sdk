@@ -72,6 +72,18 @@ extern uint32_t FLASH_SIZE_BYTES;
 #define FLASH_SIZE_BYTES   (8 * 1024 * 1024)
 #endif
 
+#ifdef PICO_FLASH_SIZE_LIMIT_BYTES
+ #if !defined(PICO_RP2040) || !PICO_RP2040 || defined(PICO_RP2350) || \
+     defined(ESP_PLATFORM) || defined(ENABLE_EMULATION)
+  #error "PICO_FLASH_SIZE_LIMIT_BYTES is only supported on RP2040"
+ #endif
+ // Keep the half-flash layout sector-aligned and beyond the 1 MiB marker.
+ #if PICO_FLASH_SIZE_LIMIT_BYTES < 0x200000 || PICO_FLASH_SIZE_LIMIT_BYTES > 0x1000000 || \
+     (PICO_FLASH_SIZE_LIMIT_BYTES & (PICO_FLASH_SIZE_LIMIT_BYTES - 1))
+  #error "PICO_FLASH_SIZE_LIMIT_BYTES must be a power of two from 2 MiB to 16 MiB"
+ #endif
+#endif
+
 #define TOTAL_FLASH_PAGES 6
 #define FLASH_CACHE_FLUSH_TIMEOUT_MS 5000u
 
@@ -547,9 +559,6 @@ extern uintptr_t __phymarker_start;
 #endif
 //this function has to be called from the core 0
 void low_flash_init(void) {
-#ifdef PICO_RP2040
-    phymarker_write();
-#endif
     memset(flash_pages, 0, sizeof(page_flash_t) * TOTAL_FLASH_PAGES);
     mutex_init(&mtx_flash);
 
@@ -566,7 +575,13 @@ void low_flash_init(void) {
     uint8_t rxbuf[6] = {0};
     flash_do_cmd(txbuf, rxbuf, 4);
 
-    FLASH_SIZE_BYTES = (1 << rxbuf[3]);
+#ifdef PICO_RP2040
+    // Reject unsupported geometry before shifting or writing the physical marker.
+    if (rxbuf[3] < 21 || rxbuf[3] > 24) {
+        panic("Unsupported RP2040 flash capacity");
+    }
+#endif
+    FLASH_SIZE_BYTES = (1u << rxbuf[3]);
 #ifdef PICO_FLASH_SIZE_LIMIT_BYTES
     if (FLASH_SIZE_BYTES > PICO_FLASH_SIZE_LIMIT_BYTES) {
         FLASH_SIZE_BYTES = PICO_FLASH_SIZE_LIMIT_BYTES;
@@ -604,6 +619,10 @@ void low_flash_init(void) {
     if (data_start_addr <= __phymarker_start - XIP_BASE) {
         data_start_addr = __phymarker_start - XIP_BASE + FLASH_SECTOR_SIZE;
     }
+    if (data_start_addr >= data_end_addr) {
+        panic("Invalid RP2040 flash data bounds");
+    }
+    phymarker_write();
 #endif
 
     data_start_addr += XIP_BASE;
@@ -886,6 +905,7 @@ typedef struct {
     uint8_t  uid[PICO_UNIQUE_BOARD_ID_SIZE_BYTES];
     uint32_t crc32;
 } __attribute__ ((packed)) phymarker_t;
+_Static_assert(sizeof(phymarker_t) <= FLASH_PAGE_SIZE, "Physical marker must fit in one flash page");
 
 uintptr_t __phymarker_start = (uintptr_t)0x10100000;
 
@@ -906,11 +926,12 @@ void phymarker_write(void) {
     pm.crc32 = crc32c(CONST_BYTE_ARRAY((const uint8_t *)&pm, sizeof(phymarker_t) - sizeof(uint32_t)));
 
     uint8_t *buf = data_page;
+    memset(buf, 0xFF, sizeof(data_page));
     memcpy(buf, &pm, sizeof(phymarker_t));
     uint32_t ints = save_and_disable_interrupts();
 
     flash_range_erase((uint32_t)__phymarker_start - XIP_BASE, FLASH_SECTOR_SIZE);
-    flash_range_program((uint32_t)__phymarker_start - XIP_BASE, (const uint8_t *)buf, sizeof(buf));
+    flash_range_program((uint32_t)__phymarker_start - XIP_BASE, (const uint8_t *)buf, sizeof(data_page));
 
     restore_interrupts(ints);
 }

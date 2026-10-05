@@ -543,6 +543,7 @@ int low_flash_first_init(void) {
 
 #ifdef PICO_RP2040
 void phymarker_write(void);
+extern uintptr_t __phymarker_start;
 #endif
 //this function has to be called from the core 0
 void low_flash_init(void) {
@@ -566,6 +567,11 @@ void low_flash_init(void) {
     flash_do_cmd(txbuf, rxbuf, 4);
 
     FLASH_SIZE_BYTES = (1 << rxbuf[3]);
+#ifdef PICO_FLASH_SIZE_LIMIT_BYTES
+    if (FLASH_SIZE_BYTES > PICO_FLASH_SIZE_LIMIT_BYTES) {
+        FLASH_SIZE_BYTES = PICO_FLASH_SIZE_LIMIT_BYTES;
+    }
+#endif
 #ifdef PICO_RP2350
     __attribute__((aligned(4))) uint32_t workarea[1024];
     int rc = rom_load_partition_table((uint8_t *)workarea, sizeof(workarea), false);
@@ -592,6 +598,12 @@ void low_flash_init(void) {
 #else
     data_start_addr = (FLASH_SIZE_BYTES >> 1);
     data_end_addr = FLASH_SIZE_BYTES;
+#endif
+#ifdef PICO_RP2040
+    // The physical marker sector is hard-coded at 1MB; never let the data pool include it.
+    if (data_start_addr <= __phymarker_start - XIP_BASE) {
+        data_start_addr = __phymarker_start - XIP_BASE + FLASH_SECTOR_SIZE;
+    }
 #endif
 
     data_start_addr += XIP_BASE;

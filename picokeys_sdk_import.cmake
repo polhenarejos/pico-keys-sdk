@@ -104,6 +104,11 @@ add_compile_definitions(USB_PID=${USB_PID})
 if(NOT DEFINED DEBUG_APDU)
     set(DEBUG_APDU 0)
 endif()
+# Cap the auto-detected flash size, e.g. -DPICO_FLASH_SIZE_LIMIT_BYTES=0x200000
+# on boards whose upper flash half is unusable for the data pool.
+if(DEFINED PICO_FLASH_SIZE_LIMIT_BYTES)
+    add_compile_definitions(PICO_FLASH_SIZE_LIMIT_BYTES=${PICO_FLASH_SIZE_LIMIT_BYTES})
+endif()
 if(NOT DEFINED ENABLE_EMULATION)
     set(ENABLE_EMULATION 0)
 endif()

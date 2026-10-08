@@ -363,7 +363,11 @@ static void scan_region_internal(bool persistent, bool allow_force_restore) {
         if (!file) {
             file = file_new(fid);
         }
-        if (file) {
+        if (file && (file_get_type(file) & FILE_DATA_FUNC) != 0) {
+            /* Generated files keep their handler in data; never replace it with flash bytes. */
+            printf("WARNING: ignoring stored record for generated file %x\n", fid);
+        }
+        else if (file) {
             file->data = (uint8_t *) (base + sizeof(uintptr_t) + sizeof(uintptr_t) + sizeof(uint16_t));
         }
         if (!persistent) {

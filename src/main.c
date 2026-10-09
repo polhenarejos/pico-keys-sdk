@@ -31,6 +31,41 @@
 #include "bsp/board.h"
 #include "hardware/structs/ioqspi.h"
 #include "pico/stdio.h"
+#include "hardware/watchdog.h"
+#include "pico/runtime_init.h"
+#endif
+
+#if defined(PICO_PLATFORM) && !defined(ENABLE_EMULATION)
+/* Disarm a stale watchdog before anything slow runs.
+ *
+ * watchdog_reboot() leaves the watchdog ENABLED across the reset it causes, and rescue.c's reboot
+ * command uses a 100 ms window. The boot must therefore complete before that window expires — and
+ * it does not always, because the startup flash filesystem scan grows with the number of files on
+ * the card. When it overruns, the watchdog fires again, and again, and the device never escapes.
+ * rom_reboot() does not avoid this: the bootrom implements reboot via the watchdog too.
+ *
+ * Root-caused by provoking the failure and reading the hardware while still in it, on RP2350B:
+ *
+ *     WATCHDOG_CTRL   = 0x40000000   ENABLE set, pause-on-debug clear
+ *     WATCHDOG_LOAD   = 0x00000000   countdown expired
+ *     WATCHDOG_REASON = 0x00000001   TIMER — the last reset WAS the watchdog
+ *
+ * The observable symptoms all follow from that: both cores report "running" but time out on every
+ * halt request (they are reset out from under the debugger), no firmware output appears at all
+ * (boot never reaches stdio), and the USB port shows "power connect" without "enable" because
+ * enumeration never completes. It survives a POWMAN power cycle AND a full VBUS cut, because the
+ * firmware re-arms the trap on the way back up.
+ *
+ * This MUST run before main(). A disarm at the top of main() was tried first and measured not to
+ * work — the loop resets before main() is ever reached, so the wedge reproduced unchanged. Only a
+ * preinit hook is early enough.
+ *
+ * Safe unconditionally: by the time any C code runs, the reset has already happened and its reboot
+ * vector has already been consumed. */
+static void picokeys_disarm_stale_watchdog(void) {
+    hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+}
+PICO_RUNTIME_INIT_FUNC_HW(picokeys_disarm_stale_watchdog, PICO_RUNTIME_INIT_EARLIEST);
 #endif
 
 #include "random.h"

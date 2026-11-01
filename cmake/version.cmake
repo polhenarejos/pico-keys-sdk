@@ -63,7 +63,12 @@ macro(SET_VERSION MAJOR MINOR FILE)
 endmacro()
 
 macro(SET_BUILD_NUMBER SOURCE_DIR)
-    execute_process(COMMAND git -c "safe.directory=${SOURCE_DIR}" rev-list --count HEAD WORKING_DIRECTORY "${SOURCE_DIR}" OUTPUT_VARIABLE PICO_BUILD_NUMBER OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND git -c "safe.directory=${SOURCE_DIR}" rev-list --count HEAD WORKING_DIRECTORY "${SOURCE_DIR}" OUTPUT_VARIABLE PICO_BUILD_NUMBER OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    # Without git history (ZIP download, repository without commits) the build number was empty
+    # and the build failed in rescue.c (PICO_BUILD_NUMBER=). Default to 0.
+    if(NOT PICO_BUILD_NUMBER MATCHES "^[0-9]+$")
+        set(PICO_BUILD_NUMBER 0)
+    endif()
     message(STATUS "Build number:\t\t ${PICO_BUILD_NUMBER}")
     add_compile_definitions(PICO_BUILD_NUMBER=${PICO_BUILD_NUMBER})
 endmacro()

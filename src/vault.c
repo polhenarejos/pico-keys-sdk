@@ -555,7 +555,12 @@ static int vault_enrollment_validate_certificate(mbedtls_x509_crt *certificate) 
     mbedtls_x509_crt_init(&ca);
     int ret = mbedtls_x509_crt_parse(&ca, picokeys_vault_ca_der, sizeof(picokeys_vault_ca_der));
     if (ret == 0) {
-        ret = mbedtls_x509_crt_verify(certificate, &ca, NULL, NULL, &flags, NULL, NULL);
+        /* mbedTLS's default profile does not allow X448 keys in certificates (it flags
+         * BADCERT_BAD_KEY), and the enrollment certificate carries exactly the vault's X448 key.
+         * Use the default profile with Curve448 allowed. */
+        mbedtls_x509_crt_profile profile = mbedtls_x509_crt_profile_default;
+        profile.allowed_curves |= MBEDTLS_X509_ID_FLAG(MBEDTLS_ECP_DP_CURVE448);
+        ret = mbedtls_x509_crt_verify_with_profile(certificate, &ca, NULL, &profile, NULL, &flags, NULL, NULL);
     }
     mbedtls_x509_crt_free(&ca);
     if (ret != 0 || flags != 0) {

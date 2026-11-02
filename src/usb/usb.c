@@ -24,7 +24,10 @@
 #include "pico/bootrom.h"
 #include "pico/multicore.h"
 #include "hardware/sync.h"
-#define multicore_launch_func_core1(a) multicore_launch_core1((void (*) (void))a)
+#define CARD_THREAD_STACK_SIZE 16384
+// Keep the card worker off the scratch RAM adjacent to core 0's stack.
+static uint32_t card_thread_stack[CARD_THREAD_STACK_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
+#define multicore_launch_func_core1(a) multicore_launch_core1_with_stack((void (*) (void))a, card_thread_stack, sizeof(card_thread_stack))
 #endif
 #include "apdu.h"
 #ifndef ENABLE_EMULATION
@@ -209,6 +212,7 @@ static void __attribute__((noreturn, noinline)) usb_secure_reboot_now(void) {
     if (stack1_end > stack1_start) {
         secure_bzero((void *) stack1_start, stack1_end - stack1_start);
     }
+    secure_bzero(card_thread_stack, sizeof(card_thread_stack));
 
     uintptr_t new_sp = (((uintptr_t) reboot_temp_stack) + sizeof(reboot_temp_stack)) & ~(uintptr_t)0x7;
 #if defined(__arm__) || defined(__thumb__)
@@ -277,6 +281,9 @@ void card_start(uint8_t itf, void *(*func)(void *)) {
         }
         if (func) {
             multicore_reset_core1();
+#ifdef PICO_PLATFORM
+            secure_bzero(card_thread_stack, sizeof(card_thread_stack));
+#endif
             multicore_launch_func_core1(func);
         }
         led_set_mode(MODE_MOUNTED);

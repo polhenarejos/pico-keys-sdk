@@ -357,7 +357,7 @@ uint16_t emul_read(uint8_t itf) {
                         uint16_t sent = 0;
                         DEBUG_PAYLOAD(emul_rx, len);
                         apdu.rdata = emul_tx;
-                        if ((sent = apdu_process(itf, CONST_BYTE_ARRAY(emul_rx, len))) > 0) {
+                        if ((sent = apdu_process_ccid(itf, CONST_BYTE_ARRAY(emul_rx, len))) > 0) {
                             process_apdu();
                             apdu_finish();
                         }

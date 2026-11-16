@@ -32,19 +32,28 @@ uint16_t rdata_bk = 0x0;
 static bool response_pending = false;
 extern uint32_t timeout;
 bool is_chaining = false;
-uint8_t chain_buf[2038];
+#define APDU_CHAIN_DATA_SIZE 2038u
+#define APDU_CHAIN_HEADER_SIZE 7u
+#define APDU_STAGING_DATA_SIZE (USB_BUFFER_SIZE > APDU_CHAIN_DATA_SIZE ? USB_BUFFER_SIZE : APDU_CHAIN_DATA_SIZE)
+uint8_t chain_buf[APDU_CHAIN_HEADER_SIZE + APDU_STAGING_DATA_SIZE];
 uint8_t *chain_ptr = NULL;
 static uint8_t chain_header[4];
+static bool apdu_data_staged = false;
+
+#define APDU_CHAIN_DATA (chain_buf + APDU_CHAIN_HEADER_SIZE)
 
 struct apdu apdu;
 
 int process_apdu(void) {
     bool is_select = INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x04);
+    bool chain_assembled = false;
+    int result;
+
     led_set_mode(MODE_PROCESSING);
     if (CLA(apdu) & 0x10) {
         size_t chain_used = 0;
         if (!is_chaining) {
-            chain_ptr = chain_buf;
+            chain_ptr = APDU_CHAIN_DATA;
             chain_header[0] = CLA(apdu) & (uint8_t)~0x10;
             chain_header[1] = INS(apdu);
             chain_header[2] = P1(apdu);
@@ -56,14 +65,16 @@ int process_apdu(void) {
             is_chaining = false;
             return SW_LAST_CHAIN_EXPECTED();
         }
-        chain_used = (size_t)(chain_ptr - chain_buf);
-        if (chain_used + apdu.nc >= sizeof(chain_buf)) {
+        chain_used = (size_t)(chain_ptr - APDU_CHAIN_DATA);
+        if (chain_used + apdu.nc >= APDU_CHAIN_DATA_SIZE) {
             memset(chain_buf, 0, sizeof(chain_buf));
             chain_ptr = NULL;
             is_chaining = false;
             return SW_WRONG_LENGTH();
         }
-        memcpy(chain_ptr, apdu.data, apdu.nc);
+        if (apdu.nc > 0) {
+            memcpy(chain_ptr, apdu.data, apdu.nc);
+        }
         chain_ptr += apdu.nc;
         is_chaining = true;
         return SW_OK();
@@ -80,40 +91,63 @@ int process_apdu(void) {
             }
         }
         if (is_chaining) {
-            size_t chain_used = (size_t)(chain_ptr - chain_buf);
-            if (chain_used + apdu.nc >= sizeof(chain_buf)) {
+            size_t chain_used = (size_t)(chain_ptr - APDU_CHAIN_DATA);
+            if (chain_used + apdu.nc >= APDU_CHAIN_DATA_SIZE) {
                 memset(chain_buf, 0, sizeof(chain_buf));
                 chain_ptr = NULL;
                 is_chaining = false;
                 return SW_WRONG_LENGTH();
             }
-            memmove(apdu.data + chain_used, apdu.data, apdu.nc);
-            memcpy(apdu.data, chain_buf, chain_used);
-            apdu.nc += (uint16_t)chain_used;
-            memset(chain_buf, 0, sizeof(chain_buf));
+
+            size_t header_size = (size_t)(apdu.data - apdu.header);
+            if (header_size > APDU_CHAIN_HEADER_SIZE) {
+                memset(chain_buf, 0, sizeof(chain_buf));
+                chain_ptr = NULL;
+                is_chaining = false;
+                return SW_WRONG_LENGTH();
+            }
+            memcpy(APDU_CHAIN_DATA - header_size, apdu.header, header_size);
+            if (apdu.nc > 0) {
+                memcpy(chain_ptr, apdu.data, apdu.nc);
+            }
+            apdu.header = APDU_CHAIN_DATA - header_size;
+            apdu.data = APDU_CHAIN_DATA;
+            apdu.nc += (uint32_t)chain_used;
             chain_ptr = NULL;
             is_chaining = false;
+            chain_assembled = true;
         }
     }
     if (!(CLA(apdu) & 0x10) && (CLA(apdu) & 0x0C) && (!current_app || !current_app->supports_secure_messaging)) {
-        return SW_CLA_NOT_SUPPORTED();
+        result = SW_CLA_NOT_SUPPORTED();
     }
-    if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
+    else if (INS(apdu) == 0xA4 && P1(apdu) == 0x04 && (P2(apdu) == 0x00 || P2(apdu) == 0x4)) { //select by AID
         if (select_app(CONST_BYTE_ARRAY(apdu.data, apdu.nc)) == PICOKEYS_OK) {
-            return SW_OK();
+            result = SW_OK();
         }
-        return SW_FILE_NOT_FOUND();
+        else {
+            result = SW_FILE_NOT_FOUND();
+        }
     }
-    if (current_app && current_app->process_apdu) {
-        return current_app->process_apdu();
+    else if (current_app && current_app->process_apdu) {
+        result = current_app->process_apdu();
     }
-    return SW_FILE_NOT_FOUND();
+    else {
+        result = SW_FILE_NOT_FOUND();
+    }
+
+    if (chain_assembled || apdu_data_staged) {
+        memset(chain_buf, 0, sizeof(chain_buf));
+        apdu_data_staged = false;
+    }
+    return result;
 }
 
-uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer) {
+static uint16_t apdu_process_internal(uint8_t itf, const_byte_array_t buffer, bool stage_data) {
     uint32_t expected_size;
     uint16_t buffer_size = 0;
 
+    apdu_data_staged = false;
     if (buffer.len < 4 || buffer.len > UINT16_MAX || buffer.data == NULL) {
         return 0;
     }
@@ -122,12 +156,14 @@ uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer) {
     apdu.nc = apdu.ne = 0;
     if (buffer_size == 4) {
         apdu.nc = apdu.ne = 0;
+        apdu.data = apdu.header + 4;
         if (apdu.ne == 0) {
             apdu.ne = 256;
         }
     }
     else if (buffer_size == 5) {
         apdu.nc = 0;
+        apdu.data = apdu.header + 5;
         apdu.ne = apdu.header[4];
         if (apdu.ne == 0) {
             apdu.ne = 256;
@@ -135,6 +171,7 @@ uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer) {
     }
     else if (apdu.header[4] == 0x0 && buffer_size >= 7) {
         if (buffer_size == 7) {
+            apdu.data = apdu.header + 7;
             apdu.ne = get_uint16_be(apdu.header + 5);
             if (apdu.ne == 0) {
                 apdu.ne = 65536;
@@ -170,6 +207,22 @@ uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer) {
                 apdu.ne = 256;
             }
         }
+    }
+    if (stage_data && !(CLA(apdu) & 0x10) && !is_chaining) {
+        if (apdu.nc > APDU_STAGING_DATA_SIZE) {
+            return 0;
+        }
+        size_t header_size = (size_t)(apdu.data - apdu.header);
+        if (header_size > APDU_CHAIN_HEADER_SIZE) {
+            return 0;
+        }
+        memcpy(APDU_CHAIN_DATA - header_size, apdu.header, header_size);
+        if (apdu.nc > 0) {
+            memcpy(APDU_CHAIN_DATA, apdu.data, apdu.nc);
+        }
+        apdu.header = APDU_CHAIN_DATA - header_size;
+        apdu.data = APDU_CHAIN_DATA;
+        apdu_data_staged = true;
     }
     //printf("apdu.nc %u, apdu.ne %u\n",apdu.nc,apdu.ne);
     if (apdu.header[1] == 0xc0) {
@@ -237,7 +290,19 @@ uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer) {
         response_pending = false;
         return 1;
     }
+    if (apdu_data_staged) {
+        memset(chain_buf, 0, sizeof(chain_buf));
+        apdu_data_staged = false;
+    }
     return 0;
+}
+
+uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer) {
+    return apdu_process_internal(itf, buffer, false);
+}
+
+uint16_t apdu_process_ccid(uint8_t itf, const_byte_array_t buffer) {
+    return apdu_process_internal(itf, buffer, true);
 }
 
 uint16_t set_res_sw(uint8_t sw1, uint8_t sw2) {

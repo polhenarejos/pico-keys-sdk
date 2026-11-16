@@ -70,6 +70,7 @@ extern struct apdu apdu;
 extern uint16_t set_res_sw(uint8_t sw1, uint8_t sw2);
 extern int process_apdu(void);
 extern uint16_t apdu_process(uint8_t itf, const_byte_array_t buffer);
+extern uint16_t apdu_process_ccid(uint8_t itf, const_byte_array_t buffer);
 extern void apdu_finish(void);
 extern uint16_t apdu_next(void);
 extern uint16_t apdu_limit_response(uint16_t size_next, uint16_t max_size);

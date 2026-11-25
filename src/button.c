@@ -100,6 +100,24 @@ static bool picok_board_button_read(void) {
     return true; // always unpressed
 }
 #endif
+
+/* The only place the button is read. On the Pico, picok_get_bootsel_button floats the QSPI chip
+   select, which cuts XIP flash access for BOTH cores; it only masks interrupts on the calling core.
+   Core 1 (the card thread) runs from flash, so it must be parked in its RAM lockout handler for the
+   whole read. Returns false, leaving *pressed untouched, if core 1 could not be locked out. */
+static bool picok_board_button_read_locked(bool *pressed) {
+#ifdef PICO_PLATFORM
+    if (!multicore_lockout_start_timeout_us(1000)) {
+        return false;
+    }
+#endif
+    *pressed = picok_board_button_read();
+#ifdef PICO_PLATFORM
+    multicore_lockout_end_timeout_us(1000);
+#endif
+    return true;
+}
+
 static bool button_pressed_state = false;
 static uint32_t button_pressed_time = 0;
 static uint8_t button_press = 0;
@@ -129,7 +147,9 @@ void button_wait_start_timeout(uint32_t timeout_seconds) {
     signal_emit_param(SIGNAL_USER_PRESENCE_REQUEST, &data);
     cancel_button = false;
     async_button_wait = true;
-    async_button_pressed = picok_board_button_read();
+    /* Not read here: core 1 is not locked out. The next poll from button_task() (normally within
+       10 ms) reads it under lockout and records a button that is already held. */
+    async_button_pressed = false;
     async_button_started = board_millis();
     async_button_timeout = button_timeout;
     async_button_led_mode = led_get_mode();
@@ -137,11 +157,10 @@ void button_wait_start_timeout(uint32_t timeout_seconds) {
     led_set_mode(MODE_BUTTON);
 }
 
-void button_wait_poll(void) {
+static void button_wait_poll_pressed(bool pressed) {
     if (!async_button_wait) {
         return;
     }
-    bool pressed = picok_board_button_read();
     uint32_t now = board_millis();
     if (!async_button_pressed && pressed) {
         async_button_pressed = true;
@@ -184,6 +203,13 @@ void button_wait_poll(void) {
     }
 }
 
+void button_wait_poll(void) {
+    bool pressed = false;
+    if (async_button_wait && picok_board_button_read_locked(&pressed)) {
+        button_wait_poll_pressed(pressed);
+    }
+}
+
 #endif
 
 uint32_t button_timeout_seconds(void) {
@@ -201,18 +227,13 @@ void button_task(void) {
 #ifndef ENABLE_EMULATION
     uint32_t now = board_millis();
     if (now > 1000 && now - button_last_poll >= 10 && (async_button_wait || !is_busy())) { // wait 1 second to boot up
-#ifdef PICO_PLATFORM
-        if (!multicore_lockout_start_timeout_us(1000)) {
+        bool current_button_state = false;
+        if (!picok_board_button_read_locked(&current_button_state)) {
             return;
         }
-#endif
-        bool current_button_state = picok_board_button_read();
-#ifdef PICO_PLATFORM
-        multicore_lockout_end_timeout_us(1000);
-#endif
         button_last_poll = now;
         if (async_button_wait) {
-            button_wait_poll();
+            button_wait_poll_pressed(current_button_state); // the value read under lockout
             return;
         }
         if (current_button_state && !button_hold_state) {
